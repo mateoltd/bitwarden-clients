@@ -97,17 +97,25 @@ export class SimpleLoginAliasTransport {
       body = JSON.stringify(options.body);
     }
 
-    const response = await this.api.nativeFetch(
-      new Request(url, {
-        method: options.method ?? "GET",
-        headers,
-        body,
-        redirect: "manual",
-        cache: "no-store",
-      }),
-    );
-
-    const text = await response.text();
+    let response: Response;
+    let text: string;
+    try {
+      response = await this.api.nativeFetch(
+        new Request(url, {
+          method: options.method ?? "GET",
+          headers,
+          body,
+          redirect: "manual",
+          cache: "no-store",
+        }),
+      );
+      text = await response.text();
+    } catch (error) {
+      if (error instanceof SimpleLoginAliasError) {
+        throw error;
+      }
+      throw new SimpleLoginAliasError("SimpleLogin could not be reached", "remote-error");
+    }
     let json: any;
     if (text) {
       try {

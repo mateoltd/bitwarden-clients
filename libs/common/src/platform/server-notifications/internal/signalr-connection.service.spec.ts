@@ -1,4 +1,4 @@
-import { HubConnectionState } from "@microsoft/signalr";
+import { HubConnectionState, ILogger, LogLevel } from "@microsoft/signalr";
 import { mock, MockProxy } from "jest-mock-extended";
 
 import { awaitAsync } from "../../../../spec";
@@ -29,6 +29,7 @@ describe("SignalRConnectionService", () => {
     stop: jest.Mock;
     state: HubConnectionState;
   };
+  let signalRLogger: ILogger;
 
   let sut: SignalRConnectionService;
 
@@ -49,7 +50,10 @@ describe("SignalRConnectionService", () => {
     const builder = {
       withUrl: jest.fn().mockReturnThis(),
       withHubProtocol: jest.fn().mockReturnThis(),
-      configureLogging: jest.fn().mockReturnThis(),
+      configureLogging: jest.fn((logger: ILogger) => {
+        signalRLogger = logger;
+        return builder;
+      }),
       build: jest.fn().mockReturnValue(connection),
     };
 
@@ -99,6 +103,22 @@ describe("SignalRConnectionService", () => {
     await awaitAsync(1);
 
     expect(received).toEqual([{ type: "Connected" }, { type: "Connected" }]);
+    subscription.unsubscribe();
+  });
+
+  it("redacts access tokens from WebSocket diagnostics without discarding the error context", () => {
+    const subscription = sut.connect$(userId, notificationsUrl).subscribe();
+    const secret = "bitwarden-access-token";
+
+    signalRLogger.log(
+      LogLevel.Error,
+      `WebSocket connection to 'wss://notifications.example/hub?access_token=${secret}&id=42' failed`,
+    );
+
+    expect(logService.error).toHaveBeenCalledWith(
+      "[SignalR] WebSocket connection to 'wss://notifications.example/hub?access_token=[REDACTED]&id=42' failed",
+    );
+    expect(logService.error.mock.calls.flat().join(" ")).not.toContain(secret);
     subscription.unsubscribe();
   });
 });

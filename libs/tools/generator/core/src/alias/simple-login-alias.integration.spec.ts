@@ -7,7 +7,7 @@ import { SimpleLogin } from "../integration/simple-login";
 import { GeneratedCredential } from "../types";
 
 import { SimpleLoginAliasService } from "./simple-login-alias.service";
-import { SimpleLoginAliasTransport } from "./simple-login-alias.transport";
+import { SimpleLoginAliasError, SimpleLoginAliasTransport } from "./simple-login-alias.transport";
 
 const integrationEnabled = process.env["SIMPLELOGIN_INTEGRATION"] === "1";
 const describeIntegration = integrationEnabled ? describe : describe.skip;
@@ -25,6 +25,7 @@ describeIntegration("SimpleLogin real API integration", () => {
 
   let token: string;
   let service: SimpleLoginAliasService;
+  let lifecycleAlias: { id: number; address: string; hostname: string } | undefined;
   const aliasesToDelete = new Set<number>();
   const contactsToDelete = new Set<number>();
 
@@ -68,6 +69,7 @@ describeIntegration("SimpleLogin real API integration", () => {
     );
     const aliasId = Number(generated.metadata?.alias.id);
     aliasesToDelete.add(aliasId);
+    lifecycleAlias = { id: aliasId, address: generated.credential, hostname };
 
     expect(generated).toMatchObject({
       category: "email",
@@ -111,5 +113,79 @@ describeIntegration("SimpleLogin real API integration", () => {
     expect(serializedForHistory.metadata).toBeUndefined();
     expect(JSON.stringify(serializedForHistory)).not.toContain(token);
     expect(JSON.stringify(detail)).not.toContain(token);
+  });
+
+  it("handles concurrent clients, expired credentials, partial failures, and offline state", async () => {
+    expect(lifecycleAlias).toBeDefined();
+    const secondClient = new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), {
+      token,
+      baseUrl,
+    });
+
+    const [firstDetail, secondDetail, recommendation] = await Promise.all([
+      service.get(lifecycleAlias!.id),
+      secondClient.get(lifecycleAlias!.id),
+      secondClient.recommend(lifecycleAlias!.hostname),
+    ]);
+    expect(firstDetail).toMatchObject({
+      id: lifecycleAlias!.id,
+      address: lifecycleAlias!.address,
+    });
+    expect(secondDetail).toEqual(firstDetail);
+    expect(recommendation.alias).toMatchObject({ id: lifecycleAlias!.id });
+
+    let partialFailure: SimpleLoginAliasError | undefined;
+    try {
+      await service.get(-1);
+    } catch (error) {
+      partialFailure = error as SimpleLoginAliasError;
+    }
+    expect(["forbidden", "not-found"]).toContain(partialFailure?.code);
+    await expect(service.get(lifecycleAlias!.id)).resolves.toMatchObject({
+      id: lifecycleAlias!.id,
+    });
+
+    const expiredToken = `expired-${Date.now()}`;
+    const expired = new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), {
+      token: expiredToken,
+      baseUrl,
+    });
+    await expect(expired.list()).rejects.toMatchObject({
+      code: "invalid-credentials",
+      status: 401,
+    });
+    await expect(expired.list()).rejects.not.toThrow(expiredToken);
+
+    const offline = new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), {
+      token,
+      baseUrl: "http://127.0.0.1:1",
+    });
+    await expect(offline.list()).rejects.toMatchObject({
+      code: "remote-error",
+      message: "SimpleLogin could not be reached",
+    });
+  });
+
+  const describeRateLimit =
+    process.env["SIMPLELOGIN_RATE_LIMIT_INTEGRATION"] === "1" ? it : it.skip;
+  describeRateLimit("classifies the real SimpleLogin 429 response", async () => {
+    let rateLimit: SimpleLoginAliasError | undefined;
+    for (let request = 0; request < 60 && !rateLimit; request++) {
+      try {
+        await service.list(0);
+      } catch (error) {
+        const candidate = error as SimpleLoginAliasError;
+        if (candidate.code === "rate-limited") {
+          rateLimit = candidate;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    expect(rateLimit).toMatchObject({ code: "rate-limited", status: 429 });
+    // The pinned official SimpleLogin service returns no Retry-After or X-RateLimit headers. The
+    // transport unit test separately proves that Retry-After is retained when a server supplies it.
+    expect(rateLimit?.retryAfterSeconds).toBeUndefined();
   });
 });

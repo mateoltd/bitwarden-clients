@@ -35,14 +35,9 @@ class SignalRLogger implements ILogger {
   constructor(private readonly logService: LogService) {}
 
   redactMessage(message: string): string {
-    const ACCESS_TOKEN_TEXT = "access_token=";
-    // Redact the access token from the logs if it exists.
-    const accessTokenIndex = message.indexOf(ACCESS_TOKEN_TEXT);
-    if (accessTokenIndex !== -1) {
-      return message.substring(0, accessTokenIndex + ACCESS_TOKEN_TEXT.length) + "[REDACTED]";
-    }
-
-    return message;
+    // SignalR sends its bearer token in the WebSocket query string. Chromium can include that URL
+    // in failure diagnostics, so redact every occurrence while preserving non-sensitive context.
+    return message.replace(/([?&]access_token=)[^&\s"']*/gi, "$1[REDACTED]");
   }
 
   log(logLevel: LogLevel, message: string): void {

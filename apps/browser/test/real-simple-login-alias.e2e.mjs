@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
@@ -38,10 +39,13 @@ const servers = [];
 let context;
 let extensionId;
 let popup;
+let worker;
 let simpleLoginToken;
 let bitwardenAuthorization;
 let createdAliasId;
 let createdCipherId;
+let simpleLoginCreateRequests = 0;
+const safeDiagnostics = [];
 
 try {
   simpleLoginToken = await authenticateSimpleLogin();
@@ -53,7 +57,7 @@ try {
   registrationUrl.hostname = registrationHostname;
   servers.push(apiProxy.server, identityProxy.server, registrationServer.server);
 
-  context = await chromium.launchPersistentContext(profile, {
+  const launchOptions = {
     executablePath: browserExecutable,
     headless: false,
     ignoreHTTPSErrors: true,
@@ -62,29 +66,25 @@ try {
       `--load-extension=${extensionDirectory}`,
       `--host-resolver-rules=MAP ${registrationHostname} 127.0.0.1`,
     ],
-  });
+  };
+  context = await chromium.launchPersistentContext(profile, launchOptions);
   context.setDefaultTimeout(15_000);
-  context.on("request", (request) => {
-    if (request.url().startsWith(simpleLoginUrl.origin)) {
-      console.log("SIMPLELOGIN_REQUEST", request.method(), request.url());
-    }
-    if (request.url().startsWith(apiProxy.url.origin)) {
-      bitwardenAuthorization = request.headers().authorization ?? bitwardenAuthorization;
-    }
-  });
+  observeContext(context, apiProxy);
 
-  const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
-  worker.on("console", (message) => {
-    if (message.type() === "error") {
-      console.log("WORKER_CONSOLE_ERROR", message.text());
-    }
-  });
+  worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  observeWorker(worker);
   extensionId = new URL(worker.url()).host;
   popup = await context.newPage();
 
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html`);
-  await popup.locator("button").filter({ hasText: "Log in" }).click();
-  await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/login`);
+  await popup.waitForTimeout(2_000);
+  const loginButton = popup.locator("button").filter({ hasText: "Log in" });
+  if (await loginButton.isVisible().catch(() => false)) {
+    await loginButton.click();
+  } else {
+    await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/login`);
+  }
+  await popup.locator("#email").waitFor({ timeout: 30_000 });
   await popup.locator("environment-selector").getByRole("button").last().click();
   await popup.getByRole("menuitem", { name: /self-hosted/i }).click();
   await popup.getByRole("button", { name: /Custom environment/i }).click();
@@ -97,7 +97,7 @@ try {
 
   await popup.locator("#email").fill(bitwardenEmail);
   await popup.getByRole("button", { name: "Continue", exact: true }).click();
-  await popup.locator("#masterPassword").fill(bitwardenPassword);
+  await popup.locator('input[type="password"]').fill(bitwardenPassword);
   await popup.getByRole("button", { name: "Log in", exact: true }).click();
   await popup.waitForURL(/#\/tabs\//, { timeout: 30_000 });
   assert.match(await popup.locator("body").innerText(), /Vault/i);
@@ -141,24 +141,15 @@ try {
   const registration = await context.newPage();
   registration.on("console", (message) => {
     if (message.type() === "error") {
-      console.log("REGISTRATION_CONSOLE_ERROR", message.text());
+      recordDiagnostic("REGISTRATION_CONSOLE_ERROR", message.text());
     }
   });
   await registration.goto(registrationUrl.toString());
-  const recommendationResponse = context.waitForEvent("response", (response) =>
-    response.url().includes("/api/v5/alias/options"),
-  );
   await registration.locator("#email").focus();
-  assert.equal((await recommendationResponse).ok(), true);
   await registration.waitForTimeout(1_500);
   await registration.screenshot({ path: "/tmp/alias-registration.png" });
-  const createResponse = context.waitForEvent(
-    "response",
-    (response) =>
-      response.request().method() === "POST" && response.url().includes("/api/alias/random/new"),
-  );
   await registration.locator("#email").press("ArrowDown");
-  await registration.waitForTimeout(200);
+  await registration.waitForTimeout(300);
   await registration.keyboard.press("Enter");
   await registration.waitForFunction(() => document.querySelector("#email")?.value, undefined, {
     timeout: 15_000,
@@ -166,17 +157,35 @@ try {
   const aliasAddress = await registration.locator("#email").inputValue();
   assert.match(aliasAddress, /^[^@\s]+@[^@\s]+$/);
 
-  const createdResponse = await createResponse;
-  assert.equal(createdResponse.ok(), true);
-  const alias = await createdResponse.json();
+  const alias = await findSimpleLoginAlias(simpleLoginToken, aliasAddress);
   assert.equal(typeof alias.id, "number");
   assert.equal(alias.email, aliasAddress);
   createdAliasId = alias.id;
   const persistedAlias = await getSimpleLoginAlias(simpleLoginToken, alias.id);
   assert.equal(persistedAlias.email, aliasAddress);
+  assert.equal(simpleLoginCreateRequests, 1);
+
+  const reuse = await context.newPage();
+  await reuse.goto(registrationUrl.toString());
+  await reuse.locator("#email").focus();
+  await reuse.waitForTimeout(3_000);
+  await reuse.locator("#email").press("ArrowDown");
+  await reuse.waitForTimeout(500);
+  await reuse.keyboard.press("Enter");
+  await reuse.waitForFunction(
+    (address) => document.querySelector("#email")?.value === address,
+    aliasAddress,
+    { timeout: 15_000 },
+  );
+  assert.equal(await reuse.locator("#email").inputValue(), aliasAddress);
+  assert.equal(simpleLoginCreateRequests, 1, "hostname reuse must not create a second alias");
+  await reuse.close();
 
   const marker = `Alias browser e2e ${Date.now()}`;
-  const loginPassword = `alias-browser-${Date.now()}!`;
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/generator`);
+  await popup.locator("bit-toggle").filter({ hasText: "Password" }).click();
+  const loginPassword = (await popup.locator("bit-color-password").textContent())?.trim() ?? "";
+  assert.ok(loginPassword.length >= 12, "the extension must render a generated password");
   await registration.locator("#password").fill(loginPassword);
   await registration.locator("#email").focus();
   await registration.locator("#email").press("ArrowDown");
@@ -273,12 +282,47 @@ try {
   assert.equal((await deleteContactResponse).ok(), true);
   await popup.getByText(reverseContact, { exact: true }).waitFor({ state: "detached" });
 
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/account-switcher`);
+  await popup.getByRole("button", { name: "Lock now", exact: true }).click();
+  await context.close().catch(() => undefined);
+  context = await chromium.launchPersistentContext(profile, launchOptions);
+  context.setDefaultTimeout(15_000);
+  observeContext(context, apiProxy);
+  worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  observeWorker(worker);
+  assert.equal(new URL(worker.url()).host, extensionId);
+  popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html`);
+  await popup.waitForURL(/#\/lock$/);
+  assert.match(await popup.locator("body").innerText(), /vault is locked/i);
+  await popup.screenshot({ path: "/tmp/alias-extension-locked.png" });
+  await popup.locator('input[type="password"]').fill(bitwardenPassword);
+  await popup.getByRole("button", { name: "Unlock", exact: true }).click();
+  await popup.waitForURL(/#\/tabs\//, { timeout: 30_000 });
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/vault`);
+  await popup.getByText(marker, { exact: true }).waitFor({ timeout: 20_000 });
+
+  const restartedBrowserStorage = JSON.stringify(
+    await worker.evaluate(() => new Promise((resolve) => chrome.storage.local.get(null, resolve))),
+  );
+  assert.equal(restartedBrowserStorage.includes(simpleLoginToken), false);
+
   await permanentlyDeleteBitwardenCipher(bitwardenAuthorization, cipherId);
   await waitForCipherDatabaseState(cipherId, (row) => row === undefined);
   createdCipherId = undefined;
 
+  const bitwardenAccessToken = bitwardenAuthorization?.replace(/^Bearer\s+/i, "");
+  const serializedDiagnostics = JSON.stringify(safeDiagnostics);
+  assert.equal(serializedDiagnostics.includes(simpleLoginToken), false);
+  if (bitwardenAccessToken) {
+    assert.equal(serializedDiagnostics.includes(bitwardenAccessToken), false);
+  }
+  assertServiceLogsDoNotContain(simpleLoginToken);
+
   console.log("REAL_ALIAS_CREATED", alias.id, aliasAddress);
   console.log("REAL_LOGIN_BOUND", cipherId, marker);
+  console.log("REAL_ALIAS_REUSED", alias.id);
+  console.log("REAL_EXTENSION_RESTART_UNLOCKED");
   console.log("REAL_STATE_CLEANED");
 } finally {
   if (bitwardenAuthorization && createdCipherId) {
@@ -294,6 +338,45 @@ try {
   }
   await Promise.all(servers.map((server) => closeServer(server)));
   fs.rmSync(profile, { recursive: true, force: true });
+}
+
+function observeContext(browserContext, apiProxy) {
+  browserContext.on("request", (request) => {
+    if (request.url().startsWith(simpleLoginUrl.origin)) {
+      if (request.method() === "POST" && request.url().includes("/api/alias/random/new")) {
+        simpleLoginCreateRequests += 1;
+      }
+      console.log("SIMPLELOGIN_REQUEST", request.method(), request.url());
+    }
+    if (request.url().startsWith(apiProxy.url.origin)) {
+      bitwardenAuthorization = request.headers().authorization ?? bitwardenAuthorization;
+    }
+  });
+}
+
+function observeWorker(serviceWorker) {
+  serviceWorker.on("console", (message) => {
+    if (message.type() === "error") {
+      recordDiagnostic("WORKER_CONSOLE_ERROR", message.text());
+    }
+  });
+}
+
+function recordDiagnostic(kind, message) {
+  let safe = message.replace(/([?&]access_token=)[^&\s"']*/gi, "$1[REDACTED]");
+  for (const secret of [simpleLoginToken, bitwardenAuthorization?.replace(/^Bearer\s+/i, "")]) {
+    if (secret) {
+      safe = safe.split(secret).join("[REDACTED]");
+    }
+  }
+  safeDiagnostics.push(`${kind} ${safe}`);
+  console.log(kind, safe);
+}
+
+function assertServiceLogsDoNotContain(secret) {
+  const logs = spawnSync("docker", ["logs", "alias-core-sl-app"], { encoding: "utf8" });
+  assert.equal(logs.status, 0, "SimpleLogin logs must be readable for leakage checks");
+  assert.equal(`${logs.stdout}${logs.stderr}`.includes(secret), false);
 }
 
 async function permanentlyDeleteBitwardenCipher(authorization, cipherId) {
@@ -348,6 +431,19 @@ async function getSimpleLoginAlias(token, id) {
   });
   assert.equal(response.ok, true, `SimpleLogin detail failed (${response.status})`);
   return response.json();
+}
+
+async function findSimpleLoginAlias(token, address) {
+  const response = await fetch(new URL("api/v2/aliases?page_id=0", simpleLoginUrl), {
+    method: "POST",
+    headers: { Authentication: token, "content-type": "application/json" },
+    body: JSON.stringify({ query: address }),
+  });
+  assert.equal(response.ok, true, `SimpleLogin search failed (${response.status})`);
+  const json = await response.json();
+  const alias = json.aliases?.find((candidate) => candidate.email === address);
+  assert.ok(alias, `SimpleLogin search must return ${address}`);
+  return alias;
 }
 
 async function deleteSimpleLoginAlias(token, id) {

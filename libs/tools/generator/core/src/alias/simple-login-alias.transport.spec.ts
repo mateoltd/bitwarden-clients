@@ -63,4 +63,19 @@ describe("SimpleLoginAliasTransport", () => {
     expect(error?.message).toBe("invalid [redacted]");
     expect(error?.message).not.toContain(settings.token);
   });
+
+  it("classifies offline failures without exposing request details or credentials", async () => {
+    api.nativeFetch.mockRejectedValue(
+      new TypeError(`fetch failed for ${settings.baseUrl}?access_token=${settings.token}`),
+    );
+
+    const result = transport.request(settings, "api/v2/aliases");
+
+    await expect(result).rejects.toMatchObject({
+      name: "SimpleLoginAliasError",
+      code: "remote-error",
+      message: "SimpleLogin could not be reached",
+    });
+    await expect(result).rejects.not.toThrow(settings.token);
+  });
 });
