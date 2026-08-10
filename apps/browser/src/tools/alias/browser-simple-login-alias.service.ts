@@ -1,4 +1,4 @@
-import { filter, firstValueFrom } from "rxjs";
+import { ReplaySubject, firstValueFrom } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { Account, AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -29,15 +29,6 @@ import {
  * copied into alias metadata, browser messages, or vault ciphers.
  */
 export class BrowserSimpleLoginAliasService {
-  private readonly settings$ = this.generatorService.settings<ForwarderOptions>(
-    this.generatorService.forwarder(Vendor.simplelogin),
-    {
-      account$: this.accountService.activeAccount$.pipe(
-        filter((account): account is Account => account !== null),
-      ),
-    },
-  );
-
   constructor(
     private readonly apiService: ApiService,
     private readonly accountService: AccountService,
@@ -115,7 +106,27 @@ export class BrowserSimpleLoginAliasService {
   }
 
   private async lifecycle(): Promise<SimpleLoginAliasService> {
-    const settings = await firstValueFrom(this.settings$);
+    const account = await firstValueFrom(this.accountService.activeAccount$);
+    if (!account) {
+      return createSimpleLoginAliasService(this.apiService, { token: "" });
+    }
+
+    // `UserStateSubject` loads asynchronously and completes with its account dependency. An `of`
+    // dependency completes before encrypted state can emit in production, so keep this scoped
+    // dependency alive until the first settings value has been read.
+    const account$ = new ReplaySubject<Account>(1);
+    account$.next(account);
+    const settings$ = this.generatorService.settings<ForwarderOptions>(
+      this.generatorService.forwarder(Vendor.simplelogin),
+      { account$ },
+    );
+    let settings: ForwarderOptions;
+    try {
+      settings = await firstValueFrom(settings$);
+    } finally {
+      account$.complete();
+      settings$.complete();
+    }
     return createSimpleLoginAliasService(this.apiService, {
       token: settings.token ?? "",
       baseUrl: settings.baseUrl,

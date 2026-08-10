@@ -42,6 +42,7 @@ export class EmailAliasesComponent implements OnInit {
   website = "";
   reverseAliasContact = "";
   saving = false;
+  working = false;
 
   constructor(
     private readonly aliasesService: WebSimpleLoginAliasService,
@@ -98,16 +99,19 @@ export class EmailAliasesComponent implements OnInit {
 
   async createAlias(): Promise<void> {
     this.saving = true;
-    await this.run(async () => {
-      const alias = await this.aliasesService.create({
-        kind: "random",
-        hostname: this.website || undefined,
+    try {
+      await this.run(async () => {
+        const alias = await this.aliasesService.create({
+          kind: "random",
+          hostname: this.website || undefined,
+        });
+        this.recommendation = undefined;
+        await this.loadAliases(0);
+        await this.selectAlias(alias.id);
       });
-      this.recommendation = undefined;
-      await this.loadAliases(0);
-      await this.selectAlias(alias.id);
-    });
-    this.saving = false;
+    } finally {
+      this.saving = false;
+    }
   }
 
   async openAlias(aliasOrId: SimpleLoginAlias | number): Promise<void> {
@@ -144,17 +148,20 @@ export class EmailAliasesComponent implements OnInit {
     }
 
     this.saving = true;
-    await this.run(async () => {
-      this.selected = await this.aliasesService.update(this.selected!.id, {
-        name: this.selected!.name,
-        note: this.selected!.note,
-        pinned: this.selected!.pinned,
-        pgpDisabled: this.selected!.pgpDisabled,
-        mailboxIds: this.selected!.mailboxes.map((mailbox) => mailbox.id),
+    try {
+      await this.run(async () => {
+        this.selected = await this.aliasesService.update(this.selected!.id, {
+          name: this.selected!.name,
+          note: this.selected!.note,
+          pinned: this.selected!.pinned,
+          pgpDisabled: this.selected!.pgpDisabled,
+          mailboxIds: this.selected!.mailboxes.map((mailbox) => mailbox.id),
+        });
+        await this.loadAliases(this.page);
       });
-      await this.loadAliases(this.page);
-    });
-    this.saving = false;
+    } finally {
+      this.saving = false;
+    }
   }
 
   async setEnabled(enabled: boolean): Promise<void> {
@@ -173,16 +180,16 @@ export class EmailAliasesComponent implements OnInit {
       return;
     }
 
-    const confirmed = await this.dialogService.openSimpleDialog({
-      title: { key: "deleteEmailAlias" },
-      content: { key: "deleteEmailAliasConfirmation" },
-      type: "warning",
-    });
-    if (!confirmed) {
-      return;
-    }
-
     await this.run(async () => {
+      const confirmed = await this.dialogService.openSimpleDialog({
+        title: { key: "deleteEmailAlias" },
+        content: { key: "deleteEmailAliasConfirmation" },
+        acceptButtonText: { key: "delete" },
+        type: "warning",
+      });
+      if (!confirmed) {
+        return;
+      }
       const deletedAliasId = this.selected!.id;
       await this.aliasesService.delete(deletedAliasId);
       if (this.recommendation?.alias?.id === deletedAliasId) {
@@ -213,16 +220,16 @@ export class EmailAliasesComponent implements OnInit {
   }
 
   async removeContact(contact: SimpleLoginContact): Promise<void> {
-    const confirmed = await this.dialogService.openSimpleDialog({
-      title: { key: "deleteReverseAlias" },
-      content: { key: "deleteReverseAliasConfirmation" },
-      type: "warning",
-    });
-    if (!confirmed) {
-      return;
-    }
-
     await this.run(async () => {
+      const confirmed = await this.dialogService.openSimpleDialog({
+        title: { key: "deleteReverseAlias" },
+        content: { key: "deleteReverseAliasConfirmation" },
+        acceptButtonText: { key: "delete" },
+        type: "warning",
+      });
+      if (!confirmed) {
+        return;
+      }
       await this.aliasesService.deleteContact(contact.id);
       await this.loadContacts(this.contactPage);
     });
@@ -269,11 +276,17 @@ export class EmailAliasesComponent implements OnInit {
   }
 
   private async run(action: () => Promise<void>): Promise<void> {
+    if (this.working) {
+      return;
+    }
+    this.working = true;
     this.error = undefined;
     try {
       await action();
     } catch (error) {
       this.error = error instanceof Error ? error.message : this.i18nService.t("unexpectedError");
+    } finally {
+      this.working = false;
     }
   }
 }

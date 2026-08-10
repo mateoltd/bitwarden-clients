@@ -75,6 +75,7 @@ export class DesktopAliasComponent implements OnInit {
   protected readonly editName = signal("");
   protected readonly editNote = signal("");
   protected readonly editPinned = signal(false);
+  private readonly reloadGeneration = signal(0);
 
   protected readonly filterOptions: FilterOption[] = [
     { value: "all", name: this.i18nService.t("all") },
@@ -88,6 +89,8 @@ export class DesktopAliasComponent implements OnInit {
   }
 
   protected async reload(page = 0): Promise<void> {
+    const generation = this.reloadGeneration() + 1;
+    this.reloadGeneration.set(generation);
     this.loading.set(true);
     this.error.set(null);
     try {
@@ -96,6 +99,9 @@ export class DesktopAliasComponent implements OnInit {
         client.list(page, this.search().trim() || undefined, this.filter()),
         client.domains(),
       ]);
+      if (generation !== this.reloadGeneration()) {
+        return;
+      }
       this.aliases.set(result.items);
       this.domains.set(domains);
       this.page.set(result.page);
@@ -111,9 +117,13 @@ export class DesktopAliasComponent implements OnInit {
         }
       }
     } catch (error) {
-      this.handleError(error);
+      if (generation === this.reloadGeneration()) {
+        this.handleError(error);
+      }
     } finally {
-      this.loading.set(false);
+      if (generation === this.reloadGeneration()) {
+        this.loading.set(false);
+      }
     }
   }
 
@@ -195,16 +205,16 @@ export class DesktopAliasComponent implements OnInit {
       return;
     }
 
-    const confirmed = await this.dialogService.openSimpleDialog({
-      title: { key: "aliasDeleteTitle" },
-      content: { key: "aliasDeleteConfirmation", placeholders: [alias.address] },
-      type: "warning",
-    });
-    if (!confirmed) {
-      return;
-    }
-
     await this.run(async () => {
+      const confirmed = await this.dialogService.openSimpleDialog({
+        title: { key: "aliasDeleteTitle" },
+        content: { key: "aliasDeleteConfirmation", placeholders: [alias.address] },
+        acceptButtonText: { key: "delete" },
+        type: "warning",
+      });
+      if (!confirmed) {
+        return;
+      }
       await (await this.aliasService.client()).delete(alias.id);
       this.clearSelection();
       await this.reload(Math.max(0, this.page()));
@@ -245,15 +255,16 @@ export class DesktopAliasComponent implements OnInit {
   }
 
   protected async deleteContact(contact: SimpleLoginContact): Promise<void> {
-    const confirmed = await this.dialogService.openSimpleDialog({
-      title: { key: "reverseAliasDeleteTitle" },
-      content: { key: "reverseAliasDeleteConfirmation", placeholders: [contact.address] },
-      type: "warning",
-    });
-    if (!confirmed) {
-      return;
-    }
     await this.run(async () => {
+      const confirmed = await this.dialogService.openSimpleDialog({
+        title: { key: "reverseAliasDeleteTitle" },
+        content: { key: "reverseAliasDeleteConfirmation", placeholders: [contact.address] },
+        acceptButtonText: { key: "delete" },
+        type: "warning",
+      });
+      if (!confirmed) {
+        return;
+      }
       await (await this.aliasService.client()).deleteContact(contact.id);
       const alias = this.selectedAlias();
       if (alias) {

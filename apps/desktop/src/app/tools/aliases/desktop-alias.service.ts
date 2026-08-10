@@ -1,5 +1,5 @@
-import { inject, Injectable, OnDestroy } from "@angular/core";
-import { filter, firstValueFrom } from "rxjs";
+import { inject, Injectable } from "@angular/core";
+import { ReplaySubject, firstValueFrom } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { Account, AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -15,23 +15,31 @@ import {
 } from "@bitwarden/generator-core";
 
 @Injectable()
-export class DesktopAliasService implements OnDestroy {
+export class DesktopAliasService {
   private readonly accountService = inject(AccountService);
   private readonly apiService = inject(ApiService);
   private readonly cipherService = inject(CipherService);
   private readonly generatorService = inject(CredentialGeneratorService);
 
-  private readonly account$ = this.accountService.activeAccount$.pipe(
-    filter((account): account is Account => account != null),
-  );
-
-  private readonly settings = this.generatorService.settings<ForwarderOptions>(
-    this.generatorService.forwarder(Vendor.simplelogin),
-    { account$: this.account$ },
-  );
-
   async client(): Promise<SimpleLoginAliasService> {
-    const settings = await firstValueFrom(this.settings);
+    const account = await firstValueFrom(this.accountService.activeAccount$);
+    if (!account) {
+      return createSimpleLoginAliasService(this.apiService, { token: "" });
+    }
+
+    const account$ = new ReplaySubject<Account>(1);
+    account$.next(account);
+    const settings$ = this.generatorService.settings<ForwarderOptions>(
+      this.generatorService.forwarder(Vendor.simplelogin),
+      { account$ },
+    );
+    let settings: ForwarderOptions;
+    try {
+      settings = await firstValueFrom(settings$);
+    } finally {
+      account$.complete();
+      settings$.complete();
+    }
     return createSimpleLoginAliasService(this.apiService, {
       token: settings.token ?? "",
       baseUrl: settings.baseUrl || undefined,
@@ -39,7 +47,10 @@ export class DesktopAliasService implements OnDestroy {
   }
 
   async boundLogins(alias: SimpleLoginAlias): Promise<CipherView[]> {
-    const account = await firstValueFrom(this.account$);
+    const account = await firstValueFrom(this.accountService.activeAccount$);
+    if (!account) {
+      return [];
+    }
     const ciphers = await this.cipherService.getAllDecrypted(account.id);
     const aliasId = alias.id.toString();
     const address = alias.address.trim().toLowerCase();
@@ -54,9 +65,5 @@ export class DesktopAliasService implements OnDestroy {
         cipher.login?.username?.trim().toLowerCase() === address
       );
     });
-  }
-
-  ngOnDestroy(): void {
-    this.settings.complete();
   }
 }

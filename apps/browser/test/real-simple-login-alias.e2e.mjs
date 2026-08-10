@@ -77,14 +77,27 @@ try {
   popup = await context.newPage();
 
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html`);
-  await popup.waitForTimeout(2_000);
-  const loginButton = popup.locator("button").filter({ hasText: "Log in" });
-  if (await loginButton.isVisible().catch(() => false)) {
-    await loginButton.click();
-  } else {
-    await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/login`);
+  for (let step = 0; step < 8 && !(await popup.locator("#email").isVisible()); step++) {
+    const skip = popup.getByRole("button", { name: "Skip", exact: true });
+    const logIn = popup.getByRole("button", { name: "Log in", exact: true });
+    if (await skip.isVisible().catch(() => false)) {
+      await skip.click();
+    } else if (await logIn.isVisible().catch(() => false)) {
+      await logIn.click();
+    } else {
+      await popup.waitForTimeout(500);
+    }
   }
-  await popup.locator("#email").waitFor({ timeout: 30_000 });
+  try {
+    await popup.locator("#email").waitFor({ timeout: 30_000 });
+  } catch (error) {
+    await popup.screenshot({ path: "/tmp/alias-extension-login-unavailable.png" });
+    recordDiagnostic(
+      "LOGIN_SCREEN_UNAVAILABLE",
+      `${popup.url()} ${(await popup.locator("body").innerText()).slice(0, 500)}`,
+    );
+    throw error;
+  }
   await popup.locator("environment-selector").getByRole("button").last().click();
   await popup.getByRole("menuitem", { name: /self-hosted/i }).click();
   await popup.getByRole("button", { name: /Custom environment/i }).click();
@@ -279,6 +292,9 @@ try {
     .locator("xpath=ancestor::bit-item")
     .getByRole("button", { name: "Delete", exact: true })
     .click();
+  const deleteContactDialog = popup.getByRole("dialog");
+  await deleteContactDialog.waitFor();
+  await deleteContactDialog.getByRole("button", { name: "Delete", exact: true }).click();
   assert.equal((await deleteContactResponse).ok(), true);
   await popup.getByText(reverseContact, { exact: true }).waitFor({ state: "detached" });
 
@@ -319,9 +335,9 @@ try {
   }
   assertServiceLogsDoNotContain(simpleLoginToken);
 
-  console.log("REAL_ALIAS_CREATED", alias.id, aliasAddress);
-  console.log("REAL_LOGIN_BOUND", cipherId, marker);
-  console.log("REAL_ALIAS_REUSED", alias.id);
+  console.log("REAL_ALIAS_CREATED_WITH_STABLE_ID");
+  console.log("REAL_LOGIN_BOUND_AND_ENCRYPTED");
+  console.log("REAL_ALIAS_REUSED");
   console.log("REAL_EXTENSION_RESTART_UNLOCKED");
   console.log("REAL_STATE_CLEANED");
 } finally {
@@ -329,7 +345,10 @@ try {
     try {
       await permanentlyDeleteBitwardenCipher(bitwardenAuthorization, createdCipherId);
     } catch (error) {
-      console.error("BITWARDEN_CLEANUP_FAILED", createdCipherId, error.message);
+      recordDiagnostic(
+        "BITWARDEN_CLEANUP_FAILED",
+        error instanceof Error ? error.message : "error",
+      );
     }
   }
   await context?.close();
@@ -363,12 +382,18 @@ function observeWorker(serviceWorker) {
 }
 
 function recordDiagnostic(kind, message) {
-  let safe = message.replace(/([?&]access_token=)[^&\s"']*/gi, "$1[REDACTED]");
+  let safe = String(message)
+    .replace(/([?&]access_token(?:%3[dD]|=))[^&\s"']*/gi, "$1[REDACTED]")
+    .replace(
+      /\b(authorization|authentication)(\s*[:=]\s*)(?:bearer\s+)?[^,;\s"']+/gi,
+      "$1$2[REDACTED]",
+    );
   for (const secret of [simpleLoginToken, bitwardenAuthorization?.replace(/^Bearer\s+/i, "")]) {
     if (secret) {
       safe = safe.split(secret).join("[REDACTED]");
     }
   }
+  safe = safe.slice(0, 1_000);
   safeDiagnostics.push(`${kind} ${safe}`);
   console.log(kind, safe);
 }

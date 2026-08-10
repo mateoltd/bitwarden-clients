@@ -1,4 +1,7 @@
-<div class="tw-flex tw-h-full tw-flex-col tw-overflow-hidden tw-p-6">
+<div
+  class="tw-flex tw-h-full tw-flex-col tw-overflow-hidden tw-p-6"
+  [attr.aria-busy]="loading() || working()"
+>
   <app-header [title]="'emailAliases' | i18n" icon="bwi-envelope">
     <button
       type="button"
@@ -31,9 +34,10 @@
             name="aliasSearch"
             [ngModel]="search()"
             (ngModelChange)="search.set($event)"
+            [disabled]="loading() || working()"
           />
         </bit-form-field>
-        <button type="submit" bitButton buttonType="secondary" [disabled]="loading()">
+        <button type="submit" bitButton buttonType="secondary" [disabled]="loading() || working()">
           {{ "search" | i18n }}
         </button>
       </form>
@@ -44,6 +48,7 @@
           name="aliasFilter"
           [ngModel]="filter()"
           (ngModelChange)="filter.set($event); reload(0)"
+          [disabled]="loading() || working()"
           [items]="filterOptions"
           bindLabel="name"
           bindValue="value"
@@ -62,6 +67,8 @@
                 type="button"
                 class="tw-flex tw-w-full tw-items-center tw-justify-between tw-gap-2 tw-p-3 tw-text-left hover:tw-bg-secondary-100"
                 [class.tw-bg-secondary-100]="selectedAlias()?.id === alias.id"
+                [attr.aria-current]="selectedAlias()?.id === alias.id ? 'true' : null"
+                [disabled]="loading() || working()"
                 (click)="selectAlias(alias)"
               >
                 <span class="tw-min-w-0">
@@ -88,7 +95,7 @@
           type="button"
           bitButton
           buttonType="secondary"
-          [disabled]="page() === 0 || loading()"
+          [disabled]="page() === 0 || loading() || working()"
           (click)="reload(page() - 1)"
         >
           {{ "previous" | i18n }}
@@ -98,7 +105,7 @@
           type="button"
           bitButton
           buttonType="secondary"
-          [disabled]="nextPage() == null || loading()"
+          [disabled]="nextPage() == null || loading() || working()"
           (click)="reload(nextPage()!)"
         >
           {{ "next" | i18n }}
@@ -114,6 +121,7 @@
             name="createHostname"
             [ngModel]="createHostname()"
             (ngModelChange)="createHostname.set($event)"
+            [disabled]="working()"
             placeholder="example.com"
           />
         </bit-form-field>
@@ -140,6 +148,7 @@
               name="recommendWebsite"
               [ngModel]="website()"
               (ngModelChange)="website.set($event)"
+              [disabled]="working()"
               placeholder="https://example.com"
               required
             />
@@ -163,6 +172,7 @@
               type="button"
               bitButton
               buttonType="primary"
+              [disabled]="working()"
               (click)="createRecommended()"
             >
               {{ "createRecommendedAlias" | i18n }}
@@ -233,6 +243,7 @@
                 name="aliasName"
                 [ngModel]="editName()"
                 (ngModelChange)="editName.set($event)"
+                [disabled]="working()"
               />
             </bit-form-field>
             <bit-form-field>
@@ -242,6 +253,7 @@
                 name="aliasNote"
                 [ngModel]="editNote()"
                 (ngModelChange)="editNote.set($event)"
+                [disabled]="working()"
               ></textarea>
             </bit-form-field>
             <label class="tw-mb-4 tw-flex tw-items-center tw-gap-2">
@@ -251,6 +263,7 @@
                 name="aliasPinned"
                 [ngModel]="editPinned()"
                 (ngModelChange)="editPinned.set($event)"
+                [disabled]="working()"
               />
               <span>{{ "aliasPinned" | i18n }}</span>
             </label>
@@ -290,6 +303,7 @@
                   name="newContact"
                   [ngModel]="newContact()"
                   (ngModelChange)="newContact.set($event)"
+                  [disabled]="working()"
                   required
                 />
               </bit-form-field>

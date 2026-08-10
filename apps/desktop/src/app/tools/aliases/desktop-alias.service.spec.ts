@@ -130,10 +130,10 @@ describe("DesktopAliasService", () => {
     expect(cipherService.getAllDecrypted).toHaveBeenCalledWith(account.id);
   });
 
-  it("releases decrypted forwarder settings when its route is destroyed", () => {
+  it("releases decrypted forwarder settings immediately after creating a request client", async () => {
     const complete = jest.spyOn(settings, "complete");
 
-    service.ngOnDestroy();
+    await service.client();
 
     expect(complete).toHaveBeenCalledTimes(1);
   });

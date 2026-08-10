@@ -1,10 +1,10 @@
 <app-header></app-header>
 
-<bit-container>
+<bit-container [attr.aria-busy]="working">
   <p bitTypography="body1">{{ "emailAliasesDescription" | i18n }}</p>
 
   @if (error) {
-    <bit-callout type="danger" title="{{ 'error' | i18n }}" data-testid="alias-error">
+    <bit-callout type="danger" title="{{ 'error' | i18n }}" data-testid="alias-error" role="alert">
       {{ error }}
     </bit-callout>
   }
@@ -29,14 +29,14 @@
           <bit-label>{{ "website" | i18n }}</bit-label>
           <input bitInput name="website" [(ngModel)]="website" autocomplete="url" />
         </bit-form-field>
-        <button bitButton buttonType="secondary" type="submit">
+        <button bitButton buttonType="secondary" type="submit" [disabled]="working">
           {{ "recommendEmailAlias" | i18n }}
         </button>
         <button
           bitButton
           buttonType="primary"
           type="button"
-          [disabled]="saving"
+          [disabled]="saving || working"
           (click)="createAlias()"
         >
           {{ "createEmailAlias" | i18n }}
@@ -51,6 +51,7 @@
               bitButton
               buttonType="secondary"
               type="button"
+              [disabled]="working"
               (click)="openAlias(recommendation.alias)"
             >
               {{ recommendation.alias.address }}
@@ -61,7 +62,7 @@
               bitButton
               buttonType="primary"
               type="button"
-              [disabled]="saving"
+              [disabled]="saving || working"
               (click)="createAlias()"
             >
               {{ "createEmailAlias" | i18n }}
@@ -107,16 +108,32 @@
             <bit-option value="pinned" label="{{ 'pinnedEmailAliases' | i18n }}"></bit-option>
           </bit-select>
         </bit-form-field>
-        <button bitButton buttonType="secondary" type="submit">{{ "search" | i18n }}</button>
+        <button bitButton buttonType="secondary" type="submit" [disabled]="working">
+          {{ "search" | i18n }}
+        </button>
       </form>
 
       @if (aliases.length) {
         <bit-table data-testid="alias-list">
+          <ng-container header>
+            <tr>
+              <th bitCell>{{ "email" | i18n }}</th>
+              <th bitCell>{{ "name" | i18n }}</th>
+              <th bitCell>{{ "status" | i18n }}</th>
+              <th bitCell class="tw-text-right">{{ "options" | i18n }}</th>
+            </tr>
+          </ng-container>
           <ng-template body>
             @for (alias of aliases; track alias.id) {
               <tr bitRow>
                 <td bitCell>
-                  <button bitLink linkType="primary" type="button" (click)="openAlias(alias)">
+                  <button
+                    bitLink
+                    linkType="primary"
+                    type="button"
+                    [disabled]="working"
+                    (click)="openAlias(alias)"
+                  >
                     {{ alias.address }}
                   </button>
                 </td>
@@ -127,7 +144,13 @@
                   </span>
                 </td>
                 <td bitCell class="tw-text-right">
-                  <button bitButton buttonType="secondary" type="button" (click)="openAlias(alias)">
+                  <button
+                    bitButton
+                    buttonType="secondary"
+                    type="button"
+                    [disabled]="working"
+                    (click)="openAlias(alias)"
+                  >
                     {{ "manage" | i18n }}
                   </button>
                 </td>
@@ -146,7 +169,7 @@
           bitButton
           buttonType="secondary"
           type="button"
-          [disabled]="page === 0"
+          [disabled]="page === 0 || working"
           (click)="previousAliases()"
         >
           {{ "previous" | i18n }}
@@ -156,7 +179,7 @@
           bitButton
           buttonType="secondary"
           type="button"
-          [disabled]="nextPage === undefined"
+          [disabled]="nextPage === undefined || working"
           (click)="nextAliases()"
         >
           {{ "next" | i18n }}
@@ -205,18 +228,25 @@
             }
           </div>
           <div class="tw-flex tw-flex-wrap tw-gap-3">
-            <button bitButton buttonType="primary" type="submit" [disabled]="saving">
+            <button bitButton buttonType="primary" type="submit" [disabled]="saving || working">
               {{ "save" | i18n }}
             </button>
             <button
               bitButton
               buttonType="secondary"
               type="button"
+              [disabled]="working"
               (click)="setEnabled(!selected.enabled)"
             >
               {{ (selected.enabled ? "disable" : "enable") | i18n }}
             </button>
-            <button bitButton buttonType="danger" type="button" (click)="deleteAlias()">
+            <button
+              bitButton
+              buttonType="danger"
+              type="button"
+              [disabled]="working"
+              (click)="deleteAlias()"
+            >
               {{ "delete" | i18n }}
             </button>
           </div>
@@ -235,13 +265,20 @@
                 required
               />
             </bit-form-field>
-            <button bitButton buttonType="primary" type="submit">
+            <button bitButton buttonType="primary" type="submit" [disabled]="working">
               {{ "createReverseAlias" | i18n }}
             </button>
           </form>
 
           @if (contacts.length) {
             <bit-table data-testid="contact-list">
+              <ng-container header>
+                <tr>
+                  <th bitCell>{{ "contactEmail" | i18n }}</th>
+                  <th bitCell>{{ "reverseAliases" | i18n }}</th>
+                  <th bitCell class="tw-text-right">{{ "options" | i18n }}</th>
+                </tr>
+              </ng-container>
               <ng-template body>
                 @for (contact of contacts; track contact.id) {
                   <tr bitRow>
@@ -252,6 +289,7 @@
                         bitButton
                         buttonType="secondary"
                         type="button"
+                        [disabled]="working"
                         (click)="toggleContact(contact)"
                       >
                         {{ (contact.blocked ? "unblock" : "block") | i18n }}
@@ -260,6 +298,7 @@
                         bitIconButton="bwi-trash"
                         buttonType="dangerGhost"
                         type="button"
+                        [disabled]="working"
                         (click)="removeContact(contact)"
                         label="{{ 'delete' | i18n }}"
                       ></button>
@@ -277,7 +316,7 @@
               bitButton
               buttonType="secondary"
               type="button"
-              [disabled]="contactPage === 0"
+              [disabled]="contactPage === 0 || working"
               (click)="previousContacts()"
             >
               {{ "previous" | i18n }}
@@ -287,7 +326,7 @@
               bitButton
               buttonType="secondary"
               type="button"
-              [disabled]="nextContactPage === undefined"
+              [disabled]="nextContactPage === undefined || working"
               (click)="nextContacts()"
             >
               {{ "next" | i18n }}

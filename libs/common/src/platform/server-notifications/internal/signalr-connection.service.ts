@@ -31,13 +31,30 @@ export type TimeoutManager = {
   clearTimeout: (timeoutId: number) => void;
 };
 
+function redactSignalRMessage(message: string): string {
+  return message
+    .replace(/([?&]access_token=)[^&\s"']*/gi, "$1[REDACTED]")
+    .replace(/((?:%3f|%26)access_token%3d)(?:(?!%26)[^\s"'])*/gi, "$1[REDACTED]")
+    .replace(
+      /\b((?:authorization|authentication)["']?\s*[:=]\s*["']?(?:bearer\s+)?)[^\s"',;}]+/gi,
+      "$1[REDACTED]",
+    );
+}
+
+function safeSignalRError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return redactSignalRMessage(message)
+    .replace(/[\r\n\t]+/g, " ")
+    .slice(0, 512);
+}
+
 class SignalRLogger implements ILogger {
   constructor(private readonly logService: LogService) {}
 
   redactMessage(message: string): string {
     // SignalR sends its bearer token in the WebSocket query string. Chromium can include that URL
     // in failure diagnostics, so redact every occurrence while preserving non-sensitive context.
-    return message.replace(/([?&]access_token=)[^&\s"']*/gi, "$1[REDACTED]");
+    return redactSignalRMessage(message);
   }
 
   log(logLevel: LogLevel, message: string): void {
@@ -153,7 +170,9 @@ export class SignalRConnectionService {
         // Cancel any possible scheduled reconnects
         reconnectSubscription?.unsubscribe();
         connection?.stop().catch((error) => {
-          this.logService.error("Error while stopping SignalR connection", error);
+          this.logService.error(
+            `Error while stopping SignalR connection: ${safeSignalRError(error)}`,
+          );
         });
       };
     });

@@ -50,6 +50,7 @@ export class EmailAliasesComponent implements OnInit {
   protected readonly recommendation = signal<SimpleLoginAliasRecommendation | undefined>(undefined);
   protected readonly selectedAlias = signal<SimpleLoginAlias | undefined>(undefined);
   protected readonly loading = signal(true);
+  protected readonly working = signal(false);
   protected readonly error = signal("");
   protected readonly page = signal(0);
   protected readonly nextPage = signal<number | undefined>(undefined);
@@ -104,7 +105,7 @@ export class EmailAliasesComponent implements OnInit {
     await this.run(async () => {
       const tab = await BrowserApi.getTabFromCurrentWindowId();
       await this.aliasesService.recommendOrCreate(tab?.url ?? "");
-      await this.loadList(0, false);
+      await this.fetchList(0);
     });
   }
 
@@ -112,7 +113,7 @@ export class EmailAliasesComponent implements OnInit {
     await this.run(async () => {
       const tab = await BrowserApi.getTabFromCurrentWindowId();
       await this.aliasesService.create({ hostname: tab?.url });
-      await this.loadList(0, false);
+      await this.fetchList(0);
     });
   }
 
@@ -150,15 +151,16 @@ export class EmailAliasesComponent implements OnInit {
     if (!alias) {
       return;
     }
-    const confirmed = await this.dialogService.openSimpleDialog({
-      title: { key: "delete" },
-      content: { key: "deleteEmailAliasConfirmation" },
-      type: "warning",
-    });
-    if (!confirmed) {
-      return;
-    }
     await this.run(async () => {
+      const confirmed = await this.dialogService.openSimpleDialog({
+        title: { key: "delete" },
+        content: { key: "deleteEmailAliasConfirmation" },
+        acceptButtonText: { key: "delete" },
+        type: "warning",
+      });
+      if (!confirmed) {
+        return;
+      }
       await this.aliasesService.delete(alias.id);
       await this.router.navigate(["/email-aliases"]);
     });
@@ -173,7 +175,7 @@ export class EmailAliasesComponent implements OnInit {
     await this.run(async () => {
       await this.aliasesService.createReverseAlias(alias.id, contact);
       this.reverseAliasForm.reset();
-      await this.loadContacts(0);
+      await this.fetchContacts(alias, 0);
     });
   }
 
@@ -188,8 +190,20 @@ export class EmailAliasesComponent implements OnInit {
 
   protected async deleteContact(contact: SimpleLoginContact) {
     await this.run(async () => {
+      const confirmed = await this.dialogService.openSimpleDialog({
+        title: { key: "delete" },
+        content: { key: "deleteReverseAliasConfirmation" },
+        acceptButtonText: { key: "delete" },
+        type: "warning",
+      });
+      if (!confirmed) {
+        return;
+      }
       await this.aliasesService.deleteContact(contact.id);
-      await this.loadContacts(0);
+      const alias = this.selectedAlias();
+      if (alias) {
+        await this.fetchContacts(alias, 0);
+      }
     });
   }
 
@@ -204,28 +218,31 @@ export class EmailAliasesComponent implements OnInit {
   }
 
   private async loadList(page: number, showLoading = true) {
-    await this.run(async () => {
-      const tab = await BrowserApi.getTabFromCurrentWindowId();
-      const { query, filter } = this.searchForm.getRawValue();
-      const [result, domains, recommendation] = await Promise.all([
-        this.aliasesService.list(page, query?.trim() || undefined, filter ?? "all"),
-        this.aliasesService.domains(),
-        this.aliasesService.recommend(tab?.url ?? ""),
-      ]);
-      this.aliases.set(result.items);
-      this.page.set(result.page);
-      this.nextPage.set(result.nextPage);
-      this.domains.set(domains);
-      this.recommendation.set(recommendation);
-    }, showLoading);
+    await this.run(() => this.fetchList(page), showLoading);
+  }
+
+  private async fetchList(page: number) {
+    const tab = await BrowserApi.getTabFromCurrentWindowId();
+    const { query, filter } = this.searchForm.getRawValue();
+    const [result, domains, recommendation] = await Promise.all([
+      this.aliasesService.list(page, query?.trim() || undefined, filter ?? "all"),
+      this.aliasesService.domains(),
+      this.aliasesService.recommend(tab?.url ?? ""),
+    ]);
+    this.aliases.set(result.items);
+    this.page.set(result.page);
+    this.nextPage.set(result.nextPage);
+    this.domains.set(domains);
+    this.recommendation.set(recommendation);
   }
 
   private async loadDetail(id: number) {
     await this.run(async () => {
       const alias = await this.aliasesService.get(id);
+      const contacts = await this.aliasesService.contacts(alias.id, 0);
       this.selectedAlias.set(alias);
       this.patchEditForm(alias);
-      await this.loadContacts(0, false);
+      this.setContacts(contacts);
     });
   }
 
@@ -234,12 +251,17 @@ export class EmailAliasesComponent implements OnInit {
     if (!alias) {
       return;
     }
-    await this.run(async () => {
-      const result = await this.aliasesService.contacts(alias.id, page);
-      this.contacts.set(result.items);
-      this.contactsPage.set(result.page);
-      this.contactsNextPage.set(result.nextPage);
-    }, showLoading);
+    await this.run(() => this.fetchContacts(alias, page), showLoading);
+  }
+
+  private async fetchContacts(alias: SimpleLoginAlias, page: number) {
+    this.setContacts(await this.aliasesService.contacts(alias.id, page));
+  }
+
+  private setContacts(result: { items: SimpleLoginContact[]; page: number; nextPage?: number }) {
+    this.contacts.set(result.items);
+    this.contactsPage.set(result.page);
+    this.contactsNextPage.set(result.nextPage);
   }
 
   private patchEditForm(alias: SimpleLoginAlias) {
@@ -247,6 +269,10 @@ export class EmailAliasesComponent implements OnInit {
   }
 
   private async run(operation: () => Promise<void>, showLoading = true) {
+    if (this.working()) {
+      return;
+    }
+    this.working.set(true);
     if (showLoading) {
       this.loading.set(true);
     }
@@ -257,6 +283,7 @@ export class EmailAliasesComponent implements OnInit {
       this.error.set(error instanceof Error ? error.message : "SimpleLogin request failed");
     } finally {
       this.loading.set(false);
+      this.working.set(false);
     }
   }
 }

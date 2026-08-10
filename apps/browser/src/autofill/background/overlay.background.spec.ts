@@ -44,6 +44,8 @@ import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-c
 import {
   CredentialGeneratorService,
   GeneratedCredential as CoreGeneratedCredential,
+  SimpleLoginAlias,
+  SimpleLoginAliasError,
 } from "@bitwarden/generator-core";
 import { GeneratedCredential, GeneratorHistoryService } from "@bitwarden/generator-history";
 
@@ -429,6 +431,71 @@ describe("OverlayBackground", () => {
 
       expect(pageDetailsForTabSpy[tabId]).toBeUndefined();
       expect(portKeyForTabSpy[tabId]).toBeUndefined();
+    });
+
+    it("clears generated alias state immediately when the vault locks", () => {
+      overlayBackground["generatedEmailAliases"].set(
+        1,
+        new CoreGeneratedCredential("private@sl.test", "email", new Date()),
+      );
+      overlayBackground["emailAliasFillInFlight"].set(1, Symbol());
+      overlayBackground["emailAliasRecommendationInFlight"].set(1, Symbol());
+
+      activeAccountStatusMock$.next(AuthenticationStatus.Locked);
+
+      expect(overlayBackground["generatedEmailAliases"].size).toBe(0);
+      expect(overlayBackground["emailAliasFillInFlight"].size).toBe(0);
+      expect(overlayBackground["emailAliasRecommendationInFlight"].size).toBe(0);
+    });
+
+    it("discards an alias recommendation that finishes after an account switch", async () => {
+      const tab = createChromeTabMock({ id: 1, url: "https://registration.test" });
+      const port = createPortSpyMock(AutofillOverlayPort.List);
+      port.sender = mock<chrome.runtime.MessageSender>({ tab });
+      overlayBackground["focusedFieldData"] = createFocusedFieldDataMock({ tabId: tab.id });
+      jest.spyOn(overlayBackground as any, "shouldShowEmailAliasAction").mockReturnValue(true);
+
+      let resolveRecommendation!: (
+        recommendation: Awaited<ReturnType<BrowserSimpleLoginAliasService["recommend"]>>,
+      ) => void;
+      emailAliasService.recommend.mockReturnValue(
+        new Promise((resolve) => {
+          resolveRecommendation = resolve;
+        }),
+      );
+      const pending = overlayBackground["postEmailAliasRecommendation"](port, tab);
+      await flushPromises();
+
+      accountService.activeAccountSubject.next({
+        id: Utils.newGuid() as UserId,
+        name: "other",
+        email: "other@example.test",
+        emailVerified: true,
+        creationDate: new Date(),
+      });
+      resolveRecommendation({
+        hostname: "registration.test",
+        canCreate: false,
+        prefixSuggestion: "registration",
+        suffixes: [],
+        alias: mock<SimpleLoginAlias>({ address: "private-first-account@sl.test" }),
+      });
+      await pending;
+
+      expect(port.postMessage).not.toHaveBeenCalled();
+    });
+
+    it("logs only classified provider failure data", () => {
+      const secret = "provider-token-must-not-leak";
+
+      overlayBackground["logAliasOperationFailure"](
+        "Email alias fill failed",
+        new SimpleLoginAliasError(`request exposed ${secret}`, "invalid-credentials", 401),
+      );
+
+      const logged = logService.error.mock.calls.flat().join(" ");
+      expect(logged).toContain("invalid-credentials (401)");
+      expect(logged).not.toContain(secret);
     });
   });
 

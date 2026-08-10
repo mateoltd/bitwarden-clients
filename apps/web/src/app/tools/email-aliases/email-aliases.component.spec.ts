@@ -187,6 +187,19 @@ describe("EmailAliasesComponent", () => {
     expect(aliasesService.domains).not.toHaveBeenCalled();
   });
 
+  it("sends only one provider request for concurrent create actions", async () => {
+    let finishCreate!: (created: SimpleLoginAlias) => void;
+    aliasesService.create.mockReturnValue(new Promise((resolve) => (finishCreate = resolve)));
+
+    const first = component.createAlias();
+    const duplicate = component.createAlias();
+    await Promise.resolve();
+
+    expect(aliasesService.create).toHaveBeenCalledTimes(1);
+    finishCreate(alias(8, "created@sl.example"));
+    await Promise.all([first, duplicate]);
+  });
+
   describe("rendered page", () => {
     let fixture: ComponentFixture<EmailAliasesComponent>;
 

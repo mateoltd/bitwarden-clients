@@ -2,6 +2,7 @@ import {
   BehaviorSubject,
   concatMap,
   debounceTime,
+  distinctUntilChanged,
   filter,
   firstValueFrom,
   map,
@@ -59,6 +60,7 @@ import {
   CredentialGeneratorService,
   GeneratedCredential,
   GenerateRequest,
+  SimpleLoginAliasError,
   Type,
 } from "@bitwarden/generator-core";
 import { GeneratorHistoryService } from "@bitwarden/generator-history";
@@ -146,6 +148,9 @@ export class OverlayBackground implements OverlayBackgroundInterface {
   private readonly clearGeneratedPassword$ = new Subject<void>();
   private credential$ = new BehaviorSubject<string>("");
   private generatedEmailAliases = new Map<number, GeneratedCredential>();
+  private emailAliasFillInFlight = new Map<number, symbol>();
+  private emailAliasRecommendationInFlight = new Map<number, symbol>();
+  private emailAliasStateGeneration = 0;
   private credentialPipelineSubscription: Subscription | undefined;
   private pageDetailsForTab: PageDetailsForTab = {};
   private subFrameOffsetsForTab: SubFrameOffsetsForTab = {};
@@ -358,6 +363,20 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       )
       .subscribe();
 
+    // Generated aliases are decrypted account data. Never retain them across a lock, logout, or
+    // account switch, including when an account changes while a provider request is in flight.
+    this.authService.activeAccountStatus$.pipe(distinctUntilChanged()).subscribe((status) => {
+      if (status !== AuthenticationStatus.Unlocked) {
+        this.clearGeneratedEmailAliasState();
+      }
+    });
+    this.accountService.activeAccount$
+      .pipe(
+        map((account) => account?.id),
+        distinctUntilChanged(),
+      )
+      .subscribe(() => this.clearGeneratedEmailAliasState());
+
     // Delayed close of the inline menu
     merge(
       this.startInlineMenuDelayedClose$.pipe(debounceTime(100)),
@@ -412,6 +431,8 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       delete this.portKeyForTab[tabId];
     }
     this.generatedEmailAliases.delete(tabId);
+    this.emailAliasFillInFlight.delete(tabId);
+    this.emailAliasRecommendationInFlight.delete(tabId);
 
     this.clearGeneratedPassword$.next();
     this.focusedFieldData = null;
@@ -439,6 +460,13 @@ export class OverlayBackground implements OverlayBackgroundInterface {
         delete this.pageDetailsForTab[tabId];
       }
     }
+  }
+
+  private clearGeneratedEmailAliasState(): void {
+    this.emailAliasStateGeneration++;
+    this.generatedEmailAliases.clear();
+    this.emailAliasFillInFlight.clear();
+    this.emailAliasRecommendationInFlight.clear();
   }
 
   /**
@@ -2332,14 +2360,41 @@ export class OverlayBackground implements OverlayBackgroundInterface {
 
     const tab = port.sender.tab;
     const tabId = tab.id;
+    if (this.emailAliasFillInFlight.has(tabId)) {
+      return;
+    }
     const pageDetailsForTab = this.pageDetailsForTab[tabId];
     const focusedFieldOpid = this.focusedFieldData?.focusedFieldOpid;
     if (!pageDetailsForTab?.size || !focusedFieldOpid) {
       return;
     }
 
+    const operationId = Symbol();
+    this.emailAliasFillInFlight.set(tabId, operationId);
+    const stateGeneration = this.emailAliasStateGeneration;
     try {
+      const startingAccountId = (await firstValueFrom(this.accountService.activeAccount$))?.id;
+      const startingAuthStatus = await firstValueFrom(this.authService.activeAccountStatus$);
+      if (!startingAccountId || startingAuthStatus !== AuthenticationStatus.Unlocked) {
+        return;
+      }
       const generated = await this.emailAliasService.recommendOrCreate(tab.url ?? "");
+      const currentAccountId = (await firstValueFrom(this.accountService.activeAccount$))?.id;
+      const currentAuthStatus = await firstValueFrom(this.authService.activeAccountStatus$);
+      if (
+        !this.isCurrentEmailAliasFill(
+          tabId,
+          operationId,
+          stateGeneration,
+          startingAccountId,
+          currentAccountId,
+          currentAuthStatus,
+          pageDetailsForTab,
+          focusedFieldOpid,
+        )
+      ) {
+        return;
+      }
       const pageDetails = Array.from(pageDetailsForTab.values()).map((pageDetail) => {
         const copy = structuredClone(pageDetail);
         copy.details.fields = copy.details.fields.filter(
@@ -2367,12 +2422,26 @@ export class OverlayBackground implements OverlayBackgroundInterface {
         inlineMenuFillType: InlineMenuFillTypes.AccountCreationUsername,
       });
 
-      if (!result.didAutofill) {
+      const finalAccountId = (await firstValueFrom(this.accountService.activeAccount$))?.id;
+      const finalAuthStatus = await firstValueFrom(this.authService.activeAccountStatus$);
+      if (
+        !result.didAutofill ||
+        !this.isCurrentEmailAliasFill(
+          tabId,
+          operationId,
+          stateGeneration,
+          startingAccountId,
+          finalAccountId,
+          finalAuthStatus,
+          pageDetailsForTab,
+          focusedFieldOpid,
+        )
+      ) {
         return;
       }
 
       this.generatedEmailAliases.set(tabId, generated);
-      this.postMessageToPort(this.inlineMenuListPort, {
+      this.postMessageToPort(port, {
         command: "updateAutofillInlineMenuEmailAliasRecommendation",
         emailAliasRecommendation: {
           hostname: this.hostname(tab.url),
@@ -2381,27 +2450,72 @@ export class OverlayBackground implements OverlayBackgroundInterface {
         },
       });
     } catch (error) {
-      // Core transport errors redact credentials before reaching this boundary.
-      this.logService.error(error);
-      this.postMessageToPort(this.inlineMenuListPort, {
+      this.logAliasOperationFailure("Email alias fill failed", error);
+      this.postMessageToPort(port, {
         command: "updateAutofillInlineMenuEmailAliasRecommendation",
       });
+    } finally {
+      if (this.emailAliasFillInFlight.get(tabId) === operationId) {
+        this.emailAliasFillInFlight.delete(tabId);
+      }
     }
   }
 
+  private isCurrentEmailAliasFill(
+    tabId: number,
+    operationId: symbol,
+    stateGeneration: number,
+    startingAccountId: string,
+    currentAccountId: string | undefined,
+    authStatus: AuthenticationStatus,
+    pageDetailsForTab: Map<number, PageDetail>,
+    focusedFieldOpid: string,
+  ): boolean {
+    return (
+      this.emailAliasFillInFlight.get(tabId) === operationId &&
+      currentAccountId === startingAccountId &&
+      authStatus === AuthenticationStatus.Unlocked &&
+      stateGeneration === this.emailAliasStateGeneration &&
+      this.pageDetailsForTab[tabId] === pageDetailsForTab &&
+      this.focusedFieldData?.tabId === tabId &&
+      this.focusedFieldData?.focusedFieldOpid === focusedFieldOpid
+    );
+  }
+
   private async refreshEmailAliasRecommendation(port: chrome.runtime.Port) {
-    if (port.sender?.tab) {
+    if (port.sender && this.senderHasValidTab(port.sender)) {
       await this.postEmailAliasRecommendation(port, port.sender.tab);
     }
   }
 
   private async postEmailAliasRecommendation(port: chrome.runtime.Port, tab: chrome.tabs.Tab) {
-    if (!this.shouldShowEmailAliasAction()) {
+    const tabId = tab.id;
+    if (tabId === undefined || !this.shouldShowEmailAliasAction()) {
       return;
     }
 
+    const operationId = Symbol();
+    this.emailAliasRecommendationInFlight.set(tabId, operationId);
+    const stateGeneration = this.emailAliasStateGeneration;
     try {
+      const startingAccountId = (await firstValueFrom(this.accountService.activeAccount$))?.id;
+      const startingAuthStatus = await firstValueFrom(this.authService.activeAccountStatus$);
+      if (!startingAccountId || startingAuthStatus !== AuthenticationStatus.Unlocked) {
+        return;
+      }
       const recommendation = await this.emailAliasService.recommend(tab.url ?? "");
+      const currentAccountId = (await firstValueFrom(this.accountService.activeAccount$))?.id;
+      const currentAuthStatus = await firstValueFrom(this.authService.activeAccountStatus$);
+      if (
+        this.emailAliasRecommendationInFlight.get(tabId) !== operationId ||
+        stateGeneration !== this.emailAliasStateGeneration ||
+        currentAccountId !== startingAccountId ||
+        currentAuthStatus !== AuthenticationStatus.Unlocked ||
+        this.focusedFieldData?.tabId !== tabId ||
+        !this.shouldShowEmailAliasAction()
+      ) {
+        return;
+      }
       this.postMessageToPort(port, {
         command: "updateAutofillInlineMenuEmailAliasRecommendation",
         emailAliasRecommendation: {
@@ -2411,11 +2525,28 @@ export class OverlayBackground implements OverlayBackgroundInterface {
         },
       });
     } catch (error) {
-      this.logService.error(error);
-      this.postMessageToPort(port, {
-        command: "updateAutofillInlineMenuEmailAliasRecommendation",
-      });
+      this.logAliasOperationFailure("Email alias recommendation failed", error);
+      if (
+        this.emailAliasRecommendationInFlight.get(tabId) === operationId &&
+        stateGeneration === this.emailAliasStateGeneration
+      ) {
+        this.postMessageToPort(port, {
+          command: "updateAutofillInlineMenuEmailAliasRecommendation",
+        });
+      }
+    } finally {
+      if (this.emailAliasRecommendationInFlight.get(tabId) === operationId) {
+        this.emailAliasRecommendationInFlight.delete(tabId);
+      }
     }
+  }
+
+  private logAliasOperationFailure(context: string, error: unknown): void {
+    if (error instanceof SimpleLoginAliasError) {
+      this.logService.error(`${context}: ${error.code}${error.status ? ` (${error.status})` : ""}`);
+      return;
+    }
+    this.logService.error(`${context}: unexpected error`);
   }
 
   private shouldShowEmailAliasAction(): boolean {

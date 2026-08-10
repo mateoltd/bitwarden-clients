@@ -4,7 +4,7 @@ import { MockProxy, mock } from "jest-mock-extended";
 
 import { BrowserApi } from "@bitwarden/browser/platform/browser/browser-api";
 import { DialogService } from "@bitwarden/components";
-import { SimpleLoginAlias } from "@bitwarden/generator-core";
+import { SimpleLoginAlias, SimpleLoginContact } from "@bitwarden/generator-core";
 
 import { BrowserSimpleLoginAliasService } from "../../alias/browser-simple-login-alias.service";
 
@@ -81,6 +81,48 @@ describe("EmailAliasesComponent", () => {
     expect(aliasesService.createReverseAlias).toHaveBeenCalledWith(42, "contact@example.com");
   });
 
+  it("requires confirmation before deleting a reverse alias", async () => {
+    const alias = aliasFixture();
+    const contact = contactFixture();
+    aliasesService.get.mockResolvedValue(alias);
+    aliasesService.contacts.mockResolvedValue({ items: [contact], page: 0 });
+    dialogService.openSimpleDialog.mockResolvedValue(true);
+    const component = createComponent("42");
+
+    await component.ngOnInit();
+    await component["deleteContact"](contact);
+
+    expect(dialogService.openSimpleDialog).toHaveBeenCalledWith({
+      title: { key: "delete" },
+      content: { key: "deleteReverseAliasConfirmation" },
+      acceptButtonText: { key: "delete" },
+      type: "warning",
+    });
+    expect(aliasesService.deleteContact).toHaveBeenCalledWith(contact.id);
+  });
+
+  it("coalesces concurrent destructive actions", async () => {
+    const alias = aliasFixture();
+    const contact = contactFixture();
+    let confirmDeletion!: (confirmed: boolean) => void;
+    aliasesService.get.mockResolvedValue(alias);
+    aliasesService.contacts.mockResolvedValue({ items: [contact], page: 0 });
+    dialogService.openSimpleDialog.mockReturnValue(
+      new Promise((resolve) => (confirmDeletion = resolve)),
+    );
+    const component = createComponent("42");
+    await component.ngOnInit();
+
+    const first = component["deleteContact"](contact);
+    const duplicate = component["deleteContact"](contact);
+    await Promise.resolve();
+
+    expect(dialogService.openSimpleDialog).toHaveBeenCalledTimes(1);
+    confirmDeletion(false);
+    await Promise.all([first, duplicate]);
+    expect(aliasesService.deleteContact).not.toHaveBeenCalled();
+  });
+
   function createComponent(id: string | null = null) {
     const route = {
       snapshot: { paramMap: { get: jest.fn().mockReturnValue(id) } },
@@ -111,5 +153,18 @@ function aliasFixture(): SimpleLoginAlias {
     pgpDisabled: false,
     mailboxes: [],
     latestActivity: null,
+  };
+}
+
+function contactFixture(): SimpleLoginContact {
+  return {
+    id: 99,
+    address: "contact@example.com",
+    reverseAlias: "reply-token",
+    reverseAliasAddress: "reply@sl.test",
+    createdAt: 1,
+    lastEmailSentAt: null,
+    blocked: false,
+    existed: false,
   };
 }

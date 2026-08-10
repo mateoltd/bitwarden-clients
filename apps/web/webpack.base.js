@@ -343,7 +343,7 @@ module.exports.buildConfig = function buildConfig(params) {
                     https://*.braintree-api.com
                     https://*.blob.core.windows.net
                     http://127.0.0.1:10000
-                    https://app.simplelogin.io
+                    https://app.simplelogin.io/api/
                     https://quack.duckduckgo.com/api/email/addresses
                     https://app.addy.io/api/v1/aliases
                     https://api.fastmail.com

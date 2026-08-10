@@ -148,4 +148,25 @@ describe("DesktopAliasComponent", () => {
       queryParams: { search: login.name },
     });
   });
+
+  it("ignores a stale list response after a newer search finishes", async () => {
+    let finishFirst!: (result: { items: SimpleLoginAlias[]; page: number }) => void;
+    let finishSecond!: (result: { items: SimpleLoginAlias[]; page: number }) => void;
+    client.list
+      .mockReset()
+      .mockReturnValueOnce(new Promise((resolve) => (finishFirst = resolve)))
+      .mockReturnValueOnce(new Promise((resolve) => (finishSecond = resolve)));
+
+    const first = (fixture.componentInstance as any).reload(0);
+    await Promise.resolve();
+    const second = (fixture.componentInstance as any).reload(1);
+    await Promise.resolve();
+    finishSecond({ items: [makeAlias({ id: 2 })], page: 1 });
+    await second;
+    finishFirst({ items: [makeAlias({ id: 1 })], page: 0 });
+    await first;
+
+    expect((fixture.componentInstance as any).page()).toBe(1);
+    expect((fixture.componentInstance as any).aliases()[0].id).toBe(2);
+  });
 });

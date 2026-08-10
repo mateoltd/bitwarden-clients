@@ -1,7 +1,7 @@
 /** @jest-environment node */
 
 import { MockProxy, mock } from "jest-mock-extended";
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, firstValueFrom } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { FakeAccountService, mockAccountServiceWith } from "@bitwarden/common/spec";
@@ -33,6 +33,7 @@ describe("BrowserSimpleLoginAliasService", () => {
   });
 
   it("reuses the hostname recommendation and returns only public binding metadata", async () => {
+    const complete = jest.spyOn(settings$, "complete");
     apiService.nativeFetch
       .mockResolvedValueOnce(
         jsonResponse({
@@ -59,6 +60,7 @@ describe("BrowserSimpleLoginAliasService", () => {
     });
     expect(JSON.stringify(result.metadata)).not.toContain(token);
     expect(apiService.nativeFetch).toHaveBeenCalledTimes(2);
+    expect(complete).toHaveBeenCalledTimes(1);
   });
 
   it("creates an alias with the registration hostname when no reusable alias exists", async () => {
@@ -82,6 +84,44 @@ describe("BrowserSimpleLoginAliasService", () => {
     });
     expect(createRequest.headers.get("Authentication")).toBe(token);
     expect(result.toJSON()).not.toHaveProperty("metadata");
+  });
+
+  it("reads fresh account-scoped settings after an account switch", async () => {
+    const secondUserId = "second-browser-alias-user" as UserId;
+    const secondSettings$ = new BehaviorSubject<ForwarderOptions>({
+      token: "second-provider-token",
+      baseUrl,
+    });
+    generatorService.settings
+      .mockReset()
+      .mockReturnValueOnce(settings$ as any)
+      .mockReturnValueOnce(secondSettings$ as any);
+    apiService.nativeFetch
+      .mockResolvedValueOnce(jsonResponse(aliasJson(1, "first@sl.test"), 201))
+      .mockResolvedValueOnce(jsonResponse(aliasJson(2, "second@sl.test"), 201));
+
+    await service.create();
+    accountService.activeAccountSubject.next({
+      id: secondUserId,
+      name: "Second user",
+      email: "second@example.com",
+      emailVerified: true,
+      creationDate: undefined,
+    });
+    await service.create();
+
+    expect((apiService.nativeFetch.mock.calls[0][0] as Request).headers.get("Authentication")).toBe(
+      token,
+    );
+    expect((apiService.nativeFetch.mock.calls[1][0] as Request).headers.get("Authentication")).toBe(
+      "second-provider-token",
+    );
+    await expect(
+      firstValueFrom(generatorService.settings.mock.calls[0][1]!.account$),
+    ).resolves.toMatchObject({ id: userId });
+    await expect(
+      firstValueFrom(generatorService.settings.mock.calls[1][1]!.account$),
+    ).resolves.toMatchObject({ id: secondUserId });
   });
 });
 

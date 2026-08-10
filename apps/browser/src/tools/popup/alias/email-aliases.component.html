@@ -1,10 +1,12 @@
-<popup-page [loading]="loading()">
+<popup-page [loading]="loading()" [attr.aria-busy]="working()">
   <popup-header slot="header" [pageTitle]="'emailAliases' | i18n" showBackButton>
     <ng-container slot="end"><app-pop-out /></ng-container>
   </popup-header>
 
   @if (error()) {
-    <bit-callout type="danger" [title]="'error' | i18n" [icon]="null">{{ error() }}</bit-callout>
+    <bit-callout type="danger" [title]="'error' | i18n" [icon]="null" role="alert">{{
+      error()
+    }}</bit-callout>
   }
 
   @if (selectedAlias(); as alias) {
@@ -25,14 +27,30 @@
           <bit-label>Note</bit-label>
           <textarea bitInput formControlName="note"></textarea>
         </bit-form-field>
-        <button bitButton buttonType="primary" type="submit">Save alias</button>
+        <button bitButton buttonType="primary" type="submit" [disabled]="working()">
+          Save alias
+        </button>
       </form>
 
       <div class="tw-flex tw-gap-2">
-        <button bitButton buttonType="secondary" type="button" (click)="toggleEnabled()">
+        <button
+          bitButton
+          buttonType="secondary"
+          type="button"
+          [disabled]="working()"
+          (click)="toggleEnabled()"
+        >
           {{ alias.enabled ? "Disable" : "Enable" }}
         </button>
-        <button bitButton buttonType="danger" type="button" (click)="deleteAlias()">Delete</button>
+        <button
+          bitButton
+          buttonType="danger"
+          type="button"
+          [disabled]="working()"
+          (click)="deleteAlias()"
+        >
+          Delete
+        </button>
       </div>
 
       <section aria-labelledby="reverse-alias-heading">
@@ -46,13 +64,20 @@
             <bit-label>Contact email</bit-label>
             <input bitInput type="email" formControlName="contact" required />
           </bit-form-field>
-          <button bitButton buttonType="primary" type="submit">Create</button>
+          <button bitButton buttonType="primary" type="submit" [disabled]="working()">
+            Create
+          </button>
         </form>
 
         <bit-item-group class="tw-mt-3">
           @for (contact of contacts(); track contact.id) {
             <bit-item>
-              <button bit-item-content type="button" (click)="toggleContact(contact)">
+              <button
+                bit-item-content
+                type="button"
+                [disabled]="working()"
+                (click)="toggleContact(contact)"
+              >
                 <span>{{ contact.address }}</span>
                 <span slot="secondary" class="tw-break-all">{{ contact.reverseAliasAddress }}</span>
               </button>
@@ -61,6 +86,7 @@
                   bitButton
                   buttonType="secondary"
                   type="button"
+                  [disabled]="working()"
                   (click)="toggleContact(contact)"
                 >
                   {{ contact.blocked ? "Unblock" : "Block" }}
@@ -69,6 +95,7 @@
                   bitButton
                   buttonType="danger"
                   type="button"
+                  [disabled]="working()"
                   (click)="deleteContact(contact)"
                 >
                   Delete
@@ -84,7 +111,7 @@
             bitButton
             buttonType="secondary"
             type="button"
-            [disabled]="contactsPage() === 0"
+            [disabled]="contactsPage() === 0 || working()"
             (click)="previousContacts()"
           >
             Previous
@@ -93,7 +120,7 @@
             bitButton
             buttonType="secondary"
             type="button"
-            [disabled]="contactsNextPage() === undefined"
+            [disabled]="contactsNextPage() === undefined || working()"
             (click)="nextContacts()"
           >
             Next
@@ -115,6 +142,7 @@
             bitButton
             buttonType="primary"
             type="button"
+            [disabled]="working()"
             (click)="recommendOrCreate()"
           >
             {{ recommendation.alias ? "Reuse" : "Create" }}
@@ -136,17 +164,25 @@
             <option value="pinned">Pinned</option>
           </select>
         </bit-form-field>
-        <button bitButton buttonType="secondary" type="submit">Search</button>
+        <button bitButton buttonType="secondary" type="submit" [disabled]="working()">
+          Search
+        </button>
       </form>
 
-      <button bitButton buttonType="primary" type="button" (click)="createRandom()">
+      <button
+        bitButton
+        buttonType="primary"
+        type="button"
+        [disabled]="working()"
+        (click)="createRandom()"
+      >
         Create random alias
       </button>
 
       <bit-item-group>
         @for (alias of aliases(); track alias.id) {
           <bit-item>
-            <button bit-item-content type="button" (click)="open(alias)">
+            <button bit-item-content type="button" [disabled]="working()" (click)="open(alias)">
               <span class="tw-break-all">{{ alias.address }}</span>
               <span slot="secondary"
                 >{{ alias.enabled ? "Enabled" : "Disabled" }} ·
@@ -164,7 +200,7 @@
           bitButton
           buttonType="secondary"
           type="button"
-          [disabled]="page() === 0"
+          [disabled]="page() === 0 || working()"
           (click)="previous()"
         >
           Previous
@@ -174,7 +210,7 @@
           bitButton
           buttonType="secondary"
           type="button"
-          [disabled]="nextPage() === undefined"
+          [disabled]="nextPage() === undefined || working()"
           (click)="next()"
         >
           Next

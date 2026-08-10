@@ -7612,5 +7612,9 @@
   "deleteEmailAliasConfirmation": {
     "message": "Delete this email alias? Mail sent to it will no longer be forwarded.",
     "description": "Confirmation shown before deleting a SimpleLogin alias"
+  },
+  "deleteReverseAliasConfirmation": {
+    "message": "Delete this reverse alias? This cannot be undone.",
+    "description": "Confirmation shown before deleting a SimpleLogin reverse alias"
   }
 }

@@ -1,3 +1,5 @@
+import { ReadableStream } from "node:stream/web";
+
 import { mock } from "jest-mock-extended";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
@@ -47,9 +49,29 @@ describe("SimpleLoginAliasTransport", () => {
     });
   });
 
-  it("redacts the configured token from remote error messages", async () => {
+  it.each([
+    ["-1", undefined],
+    ["not-a-date", undefined],
+    ["999999", 300],
+  ])("bounds an untrusted Retry-After value: %s", async (retryAfter, expected) => {
     api.nativeFetch.mockResolvedValue(
-      new Response(JSON.stringify({ error: `invalid ${settings.token}` }), { status: 401 }),
+      new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+        status: 429,
+        headers: { "Retry-After": retryAfter },
+      }),
+    );
+
+    await expect(transport.request(settings, "api/v2/aliases")).rejects.toMatchObject({
+      code: "rate-limited",
+      retryAfterSeconds: expected,
+    });
+  });
+
+  it("does not render untrusted remote error text or the configured token", async () => {
+    api.nativeFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: `<img src=x> invalid ${settings.token}` }), {
+        status: 401,
+      }),
     );
 
     let error: SimpleLoginAliasError | undefined;
@@ -60,8 +82,76 @@ describe("SimpleLoginAliasTransport", () => {
     }
 
     expect(error?.code).toBe("invalid-credentials");
-    expect(error?.message).toBe("invalid [redacted]");
+    expect(error?.message).toBe("SimpleLogin credentials were rejected");
+    expect(error?.message).not.toContain("<img");
     expect(error?.message).not.toContain(settings.token);
+  });
+
+  it.each([
+    "http://simplelogin.example",
+    "ftp://simplelogin.example",
+    "https://user:password@simplelogin.example",
+    "https://simplelogin.example?destination=untrusted",
+  ])("rejects an unsafe provider URL before sending credentials: %s", async (baseUrl) => {
+    const result = transport.request({ ...settings, baseUrl }, "api/v2/aliases");
+
+    await expect(result).rejects.toMatchObject({ code: "invalid-response" });
+    expect(api.nativeFetch).not.toHaveBeenCalled();
+  });
+
+  it("allows an HTTP loopback endpoint for local development and integration", async () => {
+    api.nativeFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    await expect(
+      transport.request({ ...settings, baseUrl: "http://127.0.0.1:32769" }, "api/user_info"),
+    ).resolves.toEqual({ ok: true });
+  });
+
+  it("prevents an absolute request path from sending the token to another origin", async () => {
+    const result = transport.request(settings, "https://untrusted.example/collect");
+
+    await expect(result).rejects.toMatchObject({ code: "invalid-response" });
+    expect(api.nativeFetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects followed cross-origin redirects and oversized responses", async () => {
+    const redirected = new Response(JSON.stringify({ ok: true }), { status: 200 });
+    Object.defineProperties(redirected, {
+      redirected: { value: true },
+      url: { value: "https://untrusted.example/collect" },
+    });
+    api.nativeFetch.mockResolvedValueOnce(redirected).mockResolvedValueOnce(
+      new Response("x", {
+        status: 200,
+        headers: { "Content-Length": "2000001" },
+      }),
+    );
+
+    await expect(transport.request(settings, "api/v2/aliases")).rejects.toMatchObject({
+      code: "invalid-response",
+    });
+    await expect(transport.request(settings, "api/v2/aliases")).rejects.toMatchObject({
+      code: "invalid-response",
+    });
+  });
+
+  it("bounds a streamed response without relying on Content-Length", async () => {
+    const oversized = new Uint8Array(2_000_001);
+    api.nativeFetch.mockResolvedValue(
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(oversized);
+            controller.close();
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(transport.request(settings, "api/v2/aliases")).rejects.toMatchObject({
+      code: "invalid-response",
+    });
   });
 
   it("classifies offline failures without exposing request details or credentials", async () => {
@@ -77,5 +167,39 @@ describe("SimpleLoginAliasTransport", () => {
       message: "SimpleLogin could not be reached",
     });
     await expect(result).rejects.not.toThrow(settings.token);
+  });
+
+  it("bounds a provider request that never settles", async () => {
+    jest.useFakeTimers();
+    const abort = jest.spyOn(AbortController.prototype, "abort");
+    api.nativeFetch.mockReturnValue(new Promise<Response>(() => undefined));
+    const result = transport.request(settings, "api/v2/aliases");
+    const expectation = expect(result).rejects.toMatchObject({
+      code: "remote-error",
+      message: "SimpleLogin could not be reached",
+    });
+
+    await jest.advanceTimersByTimeAsync(15_000);
+
+    await expectation;
+    expect(abort).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+  it("bounds a provider response body that never settles", async () => {
+    jest.useFakeTimers();
+    api.nativeFetch.mockResolvedValue(
+      new Response(new ReadableStream({ start: () => undefined }), { status: 200 }),
+    );
+    const result = transport.request(settings, "api/v2/aliases");
+    const expectation = expect(result).rejects.toMatchObject({
+      code: "remote-error",
+      message: "SimpleLogin could not be reached",
+    });
+
+    await jest.advanceTimersByTimeAsync(15_000);
+
+    await expectation;
+    jest.useRealTimers();
   });
 });
