@@ -1,7 +1,16 @@
 import { CommonModule } from "@angular/common";
 import { booleanAttribute, Component, input, Input } from "@angular/core";
 import { Router, RouterModule } from "@angular/router";
-import { BehaviorSubject, combineLatest, firstValueFrom, map, Observable, switchMap } from "rxjs";
+import {
+  BehaviorSubject,
+  catchError,
+  combineLatest,
+  firstValueFrom,
+  map,
+  Observable,
+  of,
+  switchMap,
+} from "rxjs";
 import { filter } from "rxjs/operators";
 
 import { CollectionService } from "@bitwarden/admin-console/common";
@@ -13,6 +22,7 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { DomainSettingsService } from "@bitwarden/common/autofill/services/domain-settings.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { EmailAliasIdentity } from "@bitwarden/common/tools/alias";
 import { CipherId, UserId } from "@bitwarden/common/types/guid";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -138,6 +148,18 @@ export class ItemMoreOptionsComponent {
     switchMap((cipher) => this.cipherAuthorizationService.canDeleteCipher$(cipher)),
   );
 
+  protected boundAlias$: Observable<EmailAliasIdentity | undefined> = this._cipher$.pipe(
+    filter((cipher) => cipher?.id != null),
+    switchMap((cipher) =>
+      this.accountService.activeAccount$.pipe(
+        getUserId,
+        switchMap((userId) => this.cipherService.cipherView$(userId, cipher.id as CipherId)),
+      ),
+    ),
+    map((cipher) => cipher?.aliasBinding),
+    catchError(() => of(undefined)),
+  );
+
   constructor(
     private cipherService: CipherService,
     private passwordRepromptService: PasswordRepromptService,
@@ -261,6 +283,14 @@ export class ItemMoreOptionsComponent {
     await this.router.navigate(["/view-cipher"], {
       queryParams: { cipherId: this.cipher.id, type: CipherViewLikeUtils.getType(this.cipher) },
     });
+  }
+
+  protected async manageBoundAlias() {
+    const cipher = await this.cipherService.getFullCipherView(this.cipher);
+    if (!cipher.aliasBinding || cipher.aliasBinding.provider !== "simplelogin") {
+      return;
+    }
+    await this.router.navigate(["/email-aliases", cipher.aliasBinding.id]);
   }
 
   /**

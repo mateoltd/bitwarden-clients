@@ -41,11 +41,15 @@ import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault
 import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
-import { CredentialGeneratorService } from "@bitwarden/generator-core";
+import {
+  CredentialGeneratorService,
+  GeneratedCredential as CoreGeneratedCredential,
+} from "@bitwarden/generator-core";
 import { GeneratedCredential, GeneratorHistoryService } from "@bitwarden/generator-history";
 
 import { BrowserApi } from "../../platform/browser/browser-api";
 import { BrowserPlatformUtilsService } from "../../platform/services/platform-utils/browser-platform-utils.service";
+import { BrowserSimpleLoginAliasService } from "../../tools/alias/browser-simple-login-alias.service";
 import {
   AutofillOverlayElement,
   AutofillOverlayPort,
@@ -119,6 +123,7 @@ describe("OverlayBackground", () => {
   let totpService: MockProxy<TotpService>;
   let generatorService: MockProxy<CredentialGeneratorService>;
   let generatorHistoryService: MockProxy<GeneratorHistoryService>;
+  let emailAliasService: MockProxy<BrowserSimpleLoginAliasService>;
   let overlayBackground: OverlayBackground;
   let portKeyForTabSpy: Record<number, string>;
   let pageDetailsForTabSpy: PageDetailsForTab;
@@ -234,6 +239,7 @@ describe("OverlayBackground", () => {
     );
     generatorHistoryService = mock<GeneratorHistoryService>();
     generatorHistoryService.track.mockResolvedValue(null);
+    emailAliasService = mock<BrowserSimpleLoginAliasService>();
     overlayBackground = new OverlayBackground(
       logService,
       cipherService,
@@ -252,6 +258,7 @@ describe("OverlayBackground", () => {
       accountService,
       generatorHistoryService,
       generatorService,
+      emailAliasService,
     );
     portKeyForTabSpy = overlayBackground["portKeyForTab"];
     pageDetailsForTabSpy = overlayBackground["pageDetailsForTab"];
@@ -1775,6 +1782,55 @@ describe("OverlayBackground", () => {
 
         expect(cipherService.setAddEditCipherInfo).toHaveBeenCalled();
         expect(openAddEditVaultItemPopoutSpy).toHaveBeenCalled();
+      });
+
+      it("binds a one-click generated alias to the captured login without persisting credentials", async () => {
+        const aliasAddress = "registration@sl.test";
+        overlayBackground["generatedEmailAliases"].set(
+          1,
+          new CoreGeneratedCredential(
+            aliasAddress,
+            "email",
+            new Date(),
+            "browser-email-alias",
+            "https://top-frame-test.com/register",
+            {
+              kind: "email-alias",
+              alias: {
+                version: 1,
+                provider: "simplelogin",
+                id: "741",
+                address: aliasAddress,
+              },
+            },
+          ),
+        );
+
+        sendMockExtensionMessage(
+          {
+            command: "autofillOverlayAddNewVaultItem",
+            addNewCipherType: CipherType.Login,
+            login: {
+              uri: "https://top-frame-test.com/register",
+              hostname: "top-frame-test.com",
+              username: aliasAddress,
+              password: "generated-password",
+            },
+          },
+          sender,
+        );
+        jest.advanceTimersByTime(100);
+        await flushPromises();
+
+        const savedCipher = cipherService.setAddEditCipherInfo.mock.calls[0][0].cipher;
+        expect(savedCipher.aliasBinding).toEqual({
+          version: 1,
+          provider: "simplelogin",
+          id: "741",
+          address: aliasAddress,
+        });
+        expect(JSON.stringify(savedCipher)).not.toContain("provider-token");
+        expect(overlayBackground["generatedEmailAliases"].has(1)).toBe(false);
       });
 
       it("creates a new card cipher", async () => {

@@ -302,6 +302,10 @@ export class CipherFormComponent implements AfterViewInit, OnInit, OnChanges, Ci
       }
     }
 
+    if (this.config.initialValues?.aliasBinding) {
+      this.updatedCipherView.aliasBinding = this.config.initialValues.aliasBinding;
+    }
+
     this.setInitialCipherFromCache();
 
     this.loading = false;

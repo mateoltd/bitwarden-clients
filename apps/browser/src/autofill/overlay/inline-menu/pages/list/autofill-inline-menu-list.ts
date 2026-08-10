@@ -7,7 +7,10 @@ import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authenticatio
 import { EVENTS, UPDATE_PASSKEYS_HEADINGS_ON_SCROLL } from "@bitwarden/common/autofill/constants";
 import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
 
-import { InlineMenuCipherData } from "../../../../background/abstractions/overlay.background";
+import {
+  InlineMenuCipherData,
+  InlineMenuEmailAliasRecommendation,
+} from "../../../../background/abstractions/overlay.background";
 import { InlineMenuFillType } from "../../../../enums/autofill-overlay.enum";
 import { buildSvgDomElement, specialCharacterToKeyMap, throttle } from "../../../../utils";
 import { EventSecurity } from "../../../../utils/event-security";
@@ -27,6 +30,7 @@ import {
   AutofillInlineMenuListWindowMessageHandlers,
   InitAutofillInlineMenuListMessage,
   UpdateAutofillInlineMenuGeneratedPasswordMessage,
+  UpdateAutofillInlineMenuEmailAliasMessage,
   UpdateAutofillInlineMenuListCiphersParams,
 } from "../../abstractions/autofill-inline-menu-list";
 import { AutofillInlineMenuPageElement } from "../shared/autofill-inline-menu-page-element";
@@ -47,6 +51,7 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
   /** Non-null asserted. Set in initAutofillInlineMenuList from message. */
   private inlineMenuFillType!: InlineMenuFillType;
   private showInlineMenuAccountCreation = false;
+  private emailAliasRecommendation?: InlineMenuEmailAliasRecommendation;
   private showPasskeysLabels = false;
   /** Non-null asserted. Set in buildNewItemButton before any read. */
   private newItemButtonElement!: HTMLButtonElement;
@@ -71,6 +76,8 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
       updateAutofillInlineMenuListCiphers: ({ message }) => this.updateListItems(message),
       updateAutofillInlineMenuGeneratedPassword: ({ message }) =>
         this.handleUpdateAutofillInlineMenuGeneratedPassword(message),
+      updateAutofillInlineMenuEmailAliasRecommendation: ({ message }) =>
+        this.handleUpdateAutofillInlineMenuEmailAliasRecommendation(message),
       showSaveLoginInlineMenuList: () => this.handleShowSaveLoginInlineMenuList(),
       focusAutofillInlineMenuList: () => this.focusInlineMenuList(),
     };
@@ -100,6 +107,7 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
       showInlineMenuAccountCreation = false,
       showPasskeysLabels = false,
       generatedPassword,
+      emailAliasRecommendation,
       showSaveLoginMenu,
       showAnimations = true,
     } = message;
@@ -113,6 +121,12 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
     this.authStatus = authStatus;
     this.inlineMenuFillType = inlineMenuFillType;
     this.showPasskeysLabels = showPasskeysLabels;
+    // The provider request runs alongside initialization. Preserve a recommendation that arrives
+    // while the stylesheet is loading instead of replacing it with the init message's undefined
+    // snapshot.
+    if (emailAliasRecommendation !== undefined || this.emailAliasRecommendation === undefined) {
+      this.emailAliasRecommendation = emailAliasRecommendation;
+    }
 
     const themeClass = `theme_${theme}`;
     globalThis.document.documentElement.classList.add(themeClass);
@@ -147,6 +161,64 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
       showInlineMenuAccountCreation,
     });
   }
+
+  private handleUpdateAutofillInlineMenuEmailAliasRecommendation(
+    message: UpdateAutofillInlineMenuEmailAliasMessage,
+  ) {
+    this.emailAliasRecommendation = message.emailAliasRecommendation;
+    this.renderEmailAliasAction();
+  }
+
+  /** Adds the one-click alias action only for qualified registration email fields. */
+  private renderEmailAliasAction() {
+    if (!this.inlineMenuListContainer) {
+      return;
+    }
+
+    this.inlineMenuListContainer
+      .querySelector("[data-email-alias-action]")
+      ?.parentElement?.remove();
+    const recommendation = this.emailAliasRecommendation;
+    if (!recommendation || (!recommendation.canCreate && !recommendation.address)) {
+      return;
+    }
+
+    const button = globalThis.document.createElement("button");
+    button.type = "button";
+    button.tabIndex = -1;
+    button.dataset.emailAliasAction = "true";
+    button.classList.add(
+      "add-new-item-button",
+      "inline-menu-list-button",
+      "inline-menu-list-action",
+    );
+    button.textContent = recommendation.address
+      ? `${this.getTranslation("useEmailAlias")}: ${recommendation.address}`
+      : this.getTranslation("createEmailAlias");
+    button.setAttribute(
+      "aria-label",
+      recommendation.address
+        ? `${this.getTranslation("useEmailAlias")} ${recommendation.address}`
+        : this.getTranslation("createEmailAlias"),
+    );
+    button.prepend(buildSvgDomElement(plusIcon));
+    button.addEventListener(EVENTS.CLICK, this.handleEmailAliasAction);
+    const container = this.buildButtonContainer(button);
+    const newItemContainer =
+      this.inlineMenuListContainer.querySelector("#new-item-button")?.parentElement;
+    if (newItemContainer) {
+      this.inlineMenuListContainer.insertBefore(container, newItemContainer);
+    } else {
+      this.inlineMenuListContainer.appendChild(container);
+    }
+  }
+
+  private handleEmailAliasAction = (event: MouseEvent) => {
+    if (!EventSecurity.isEventTrusted(event)) {
+      return;
+    }
+    this.postMessageToParent({ command: "fillEmailAlias" });
+  };
 
   /**
    * Builds the locked inline menu, which is displayed when the user is not authenticated.
@@ -547,6 +619,7 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
 
     if (!this.ciphers?.length) {
       this.buildNoResultsInlineMenuList();
+      this.renderEmailAliasAction();
       return;
     }
 
@@ -561,6 +634,7 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
     this.toggleScrollClass();
 
     if (!this.showInlineMenuAccountCreation) {
+      this.renderEmailAliasAction();
       return;
     }
 
@@ -568,6 +642,7 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
     this.inlineMenuListContainer.appendChild(addNewLoginButtonContainer);
     this.inlineMenuListContainer.classList.add("inline-menu-list-container--with-new-item-button");
     this.newItemButtonElement.addEventListener(EVENTS.KEYUP, this.handleNewItemButtonKeyUpEvent);
+    this.renderEmailAliasAction();
   }
 
   /**

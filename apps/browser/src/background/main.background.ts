@@ -410,6 +410,7 @@ import {
   isNotificationsSupported,
 } from "../platform/system-notifications/browser-system-notification.service";
 import { fromChromeRuntimeMessaging } from "../platform/utils/from-chrome-runtime-messaging";
+import { BrowserSimpleLoginAliasService } from "../tools/alias/browser-simple-login-alias.service";
 import { AtRiskCipherBadgeUpdaterService } from "../vault/services/at-risk-cipher-badge-updater.service";
 
 import CommandsBackground from "./commands.background";
@@ -2297,6 +2298,11 @@ export default class MainBackground {
       this.accountService,
       this.generatorHistoryService,
       this.credentialGeneratorService,
+      new BrowserSimpleLoginAliasService(
+        this.apiService,
+        this.accountService,
+        this.credentialGeneratorService,
+      ),
     );
 
     this.autofillBadgeUpdaterService = new AutofillBadgeUpdaterService(
