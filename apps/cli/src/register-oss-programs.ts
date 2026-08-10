@@ -1,6 +1,7 @@
 import { ReportProgram } from "./dirt/report.program";
 import { Program } from "./program";
 import { ServiceContainer } from "./service-container/service-container";
+import { AliasReconciliationProgram } from "./tools/alias-reconciliation/alias-reconciliation.program";
 import { SendProgram } from "./tools/send/send.program";
 import { VaultProgram } from "./vault.program";
 
@@ -20,6 +21,9 @@ export async function registerOssPrograms(serviceContainer: ServiceContainer) {
 
   const sendProgram = new SendProgram(serviceContainer);
   await sendProgram.register();
+
+  const aliasReconciliationProgram = new AliasReconciliationProgram(serviceContainer);
+  await aliasReconciliationProgram.register();
 
   const reportProgram = new ReportProgram(serviceContainer);
   await reportProgram.register();
