@@ -1,4 +1,91 @@
 {
+  "emailAliases": {
+    "message": "Email aliases"
+  },
+  "emailAliasesDescription": {
+    "message": "Create and manage SimpleLogin aliases without leaving your vault. Provider credentials remain in encrypted generator settings."
+  },
+  "simpleLoginNotConfigured": {
+    "message": "Configure SimpleLogin in the username generator before managing aliases."
+  },
+  "configureSimpleLogin": {
+    "message": "Configure SimpleLogin"
+  },
+  "recommendEmailAlias": {
+    "message": "Recommend an alias"
+  },
+  "createEmailAlias": {
+    "message": "Create email alias"
+  },
+  "emailAliasAvailableForReuse": {
+    "message": "An existing alias is available for this website."
+  },
+  "newEmailAliasRecommended": {
+    "message": "A new alias is recommended for this website."
+  },
+  "emailAliasCreationUnavailable": {
+    "message": "SimpleLogin cannot create another alias for this account."
+  },
+  "emailAliasDomains": {
+    "message": "Available domains"
+  },
+  "noEmailAliasDomains": {
+    "message": "No alias domains are available."
+  },
+  "pinnedEmailAliases": {
+    "message": "Pinned"
+  },
+  "noEmailAliases": {
+    "message": "No email aliases found"
+  },
+  "pageX": {
+    "message": "Page $PAGE$",
+    "placeholders": {
+      "page": {
+        "content": "$1",
+        "example": "1"
+      }
+    }
+  },
+  "previous": {
+    "message": "Previous"
+  },
+  "pinEmailAlias": {
+    "message": "Pin alias"
+  },
+  "disablePgpForEmailAlias": {
+    "message": "Disable PGP for this alias"
+  },
+  "deleteEmailAlias": {
+    "message": "Delete email alias?"
+  },
+  "deleteEmailAliasConfirmation": {
+    "message": "This permanently deletes the alias in SimpleLogin. Messages sent to it will no longer be forwarded."
+  },
+  "reverseAliases": {
+    "message": "Contacts and reverse aliases"
+  },
+  "contactEmail": {
+    "message": "Contact email"
+  },
+  "createReverseAlias": {
+    "message": "Create reverse alias"
+  },
+  "noReverseAliases": {
+    "message": "No contacts or reverse aliases found."
+  },
+  "deleteReverseAlias": {
+    "message": "Delete reverse alias?"
+  },
+  "deleteReverseAliasConfirmation": {
+    "message": "This permanently deletes the contact and reverse alias in SimpleLogin."
+  },
+  "manageEmailAlias": {
+    "message": "Manage email alias"
+  },
+  "unblock": {
+    "message": "Unblock"
+  },
   "allApplications": {
     "message": "All applications"
   },

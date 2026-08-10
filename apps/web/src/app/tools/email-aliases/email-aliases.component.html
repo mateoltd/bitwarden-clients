@@ -1,0 +1,300 @@
+<app-header></app-header>
+
+<bit-container>
+  <p bitTypography="body1">{{ "emailAliasesDescription" | i18n }}</p>
+
+  @if (error) {
+    <bit-callout type="danger" title="{{ 'error' | i18n }}" data-testid="alias-error">
+      {{ error }}
+    </bit-callout>
+  }
+
+  @if (loading) {
+    <p bitTypography="body1" data-testid="alias-loading">
+      <i class="bwi bwi-spinner bwi-spin tw-text-muted" aria-hidden="true"></i>
+      <span class="tw-sr-only">{{ "loading" | i18n }}</span>
+    </p>
+  } @else if (!configured) {
+    <bit-callout type="info" title="SimpleLogin">
+      <p>{{ "simpleLoginNotConfigured" | i18n }}</p>
+      <a bitLink linkType="primary" routerLink="/tools/generator">
+        {{ "configureSimpleLogin" | i18n }}
+      </a>
+    </bit-callout>
+  } @else {
+    <section aria-labelledby="recommend-alias-heading" class="tw-mb-8">
+      <h2 id="recommend-alias-heading" bitTypography="h2">{{ "recommendEmailAlias" | i18n }}</h2>
+      <form class="tw-flex tw-flex-wrap tw-items-end tw-gap-3" (ngSubmit)="recommend()">
+        <bit-form-field class="tw-flex-1 !tw-mb-0">
+          <bit-label>{{ "website" | i18n }}</bit-label>
+          <input bitInput name="website" [(ngModel)]="website" autocomplete="url" />
+        </bit-form-field>
+        <button bitButton buttonType="secondary" type="submit">
+          {{ "recommendEmailAlias" | i18n }}
+        </button>
+        <button
+          bitButton
+          buttonType="primary"
+          type="button"
+          [disabled]="saving"
+          (click)="createAlias()"
+        >
+          {{ "createEmailAlias" | i18n }}
+        </button>
+      </form>
+
+      @if (recommendation) {
+        <div class="tw-mt-4" data-testid="alias-recommendation">
+          @if (recommendation.alias) {
+            <p bitTypography="body1">{{ "emailAliasAvailableForReuse" | i18n }}</p>
+            <button
+              bitButton
+              buttonType="secondary"
+              type="button"
+              (click)="openAlias(recommendation.alias)"
+            >
+              {{ recommendation.alias.address }}
+            </button>
+          } @else if (recommendation.canCreate) {
+            <p bitTypography="body1">{{ "newEmailAliasRecommended" | i18n }}</p>
+            <button
+              bitButton
+              buttonType="primary"
+              type="button"
+              [disabled]="saving"
+              (click)="createAlias()"
+            >
+              {{ "createEmailAlias" | i18n }}
+            </button>
+          } @else {
+            <p bitTypography="body1">{{ "emailAliasCreationUnavailable" | i18n }}</p>
+          }
+        </div>
+      }
+    </section>
+
+    <section aria-labelledby="domains-heading" class="tw-mb-8">
+      <h2 id="domains-heading" bitTypography="h2">{{ "emailAliasDomains" | i18n }}</h2>
+      @if (domains.length) {
+        <ul class="tw-m-0 tw-pl-6" data-testid="alias-domains">
+          @for (domain of domains; track domain.domain) {
+            <li>
+              {{ domain.domain }}
+              @if (domain.isCustom) {
+                ({{ "custom" | i18n }})
+              }
+            </li>
+          }
+        </ul>
+      } @else {
+        <p bitTypography="body1">{{ "noEmailAliasDomains" | i18n }}</p>
+      }
+    </section>
+
+    <section aria-labelledby="aliases-heading">
+      <h2 id="aliases-heading" bitTypography="h2">{{ "emailAliases" | i18n }}</h2>
+      <form class="tw-flex tw-flex-wrap tw-items-end tw-gap-3 tw-mb-4" (ngSubmit)="search()">
+        <bit-form-field class="tw-flex-1 !tw-mb-0">
+          <bit-label>{{ "search" | i18n }}</bit-label>
+          <input bitInput name="query" [(ngModel)]="query" type="search" />
+        </bit-form-field>
+        <bit-form-field class="!tw-mb-0">
+          <bit-label>{{ "filter" | i18n }}</bit-label>
+          <bit-select name="filter" [ngModel]="filter" (ngModelChange)="selectFilter($event)">
+            <bit-option value="all" label="{{ 'all' | i18n }}"></bit-option>
+            <bit-option value="enabled" label="{{ 'enabled' | i18n }}"></bit-option>
+            <bit-option value="disabled" label="{{ 'disabled' | i18n }}"></bit-option>
+            <bit-option value="pinned" label="{{ 'pinnedEmailAliases' | i18n }}"></bit-option>
+          </bit-select>
+        </bit-form-field>
+        <button bitButton buttonType="secondary" type="submit">{{ "search" | i18n }}</button>
+      </form>
+
+      @if (aliases.length) {
+        <bit-table data-testid="alias-list">
+          <ng-template body>
+            @for (alias of aliases; track alias.id) {
+              <tr bitRow>
+                <td bitCell>
+                  <button bitLink linkType="primary" type="button" (click)="openAlias(alias)">
+                    {{ alias.address }}
+                  </button>
+                </td>
+                <td bitCell>{{ alias.name || alias.note }}</td>
+                <td bitCell>
+                  <span bitBadge [variant]="alias.enabled ? 'success' : 'secondary'">
+                    {{ (alias.enabled ? "enabled" : "disabled") | i18n }}
+                  </span>
+                </td>
+                <td bitCell class="tw-text-right">
+                  <button bitButton buttonType="secondary" type="button" (click)="openAlias(alias)">
+                    {{ "manage" | i18n }}
+                  </button>
+                </td>
+              </tr>
+            }
+          </ng-template>
+        </bit-table>
+      } @else {
+        <bit-no-items data-testid="alias-empty">
+          <span slot="title">{{ "noEmailAliases" | i18n }}</span>
+        </bit-no-items>
+      }
+
+      <div class="tw-flex tw-items-center tw-justify-between tw-mt-4">
+        <button
+          bitButton
+          buttonType="secondary"
+          type="button"
+          [disabled]="page === 0"
+          (click)="previousAliases()"
+        >
+          {{ "previous" | i18n }}
+        </button>
+        <span>{{ "pageX" | i18n: page + 1 }}</span>
+        <button
+          bitButton
+          buttonType="secondary"
+          type="button"
+          [disabled]="nextPage === undefined"
+          (click)="nextAliases()"
+        >
+          {{ "next" | i18n }}
+        </button>
+      </div>
+    </section>
+
+    @if (selected) {
+      <section aria-labelledby="alias-detail-heading" class="tw-mt-12" data-testid="alias-detail">
+        <div class="tw-flex tw-items-center tw-justify-between">
+          <h2 id="alias-detail-heading" bitTypography="h2">{{ selected.address }}</h2>
+          <button
+            bitIconButton="bwi-close"
+            type="button"
+            (click)="closeAlias()"
+            label="{{ 'close' | i18n }}"
+          ></button>
+        </div>
+
+        <form (ngSubmit)="saveAlias()">
+          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+            <bit-form-field>
+              <bit-label>{{ "name" | i18n }}</bit-label>
+              <input bitInput name="aliasName" [(ngModel)]="selected.name" />
+            </bit-form-field>
+            <bit-form-field>
+              <bit-label>{{ "note" | i18n }}</bit-label>
+              <input bitInput name="aliasNote" [(ngModel)]="selected.note" />
+            </bit-form-field>
+          </div>
+          <div class="tw-flex tw-flex-wrap tw-gap-6 tw-mb-4">
+            <bit-form-control>
+              <input type="checkbox" bitCheckbox name="pinned" [(ngModel)]="selected.pinned" />
+              <bit-label>{{ "pinEmailAlias" | i18n }}</bit-label>
+            </bit-form-control>
+            @if (selected.supportsPgp) {
+              <bit-form-control>
+                <input
+                  type="checkbox"
+                  bitCheckbox
+                  name="pgpDisabled"
+                  [(ngModel)]="selected.pgpDisabled"
+                />
+                <bit-label>{{ "disablePgpForEmailAlias" | i18n }}</bit-label>
+              </bit-form-control>
+            }
+          </div>
+          <div class="tw-flex tw-flex-wrap tw-gap-3">
+            <button bitButton buttonType="primary" type="submit" [disabled]="saving">
+              {{ "save" | i18n }}
+            </button>
+            <button
+              bitButton
+              buttonType="secondary"
+              type="button"
+              (click)="setEnabled(!selected.enabled)"
+            >
+              {{ (selected.enabled ? "disable" : "enable") | i18n }}
+            </button>
+            <button bitButton buttonType="danger" type="button" (click)="deleteAlias()">
+              {{ "delete" | i18n }}
+            </button>
+          </div>
+        </form>
+
+        <section aria-labelledby="contacts-heading" class="tw-mt-8">
+          <h3 id="contacts-heading" bitTypography="h3">{{ "reverseAliases" | i18n }}</h3>
+          <form class="tw-flex tw-items-end tw-gap-3 tw-mb-4" (ngSubmit)="createReverseAlias()">
+            <bit-form-field class="tw-flex-1 !tw-mb-0">
+              <bit-label>{{ "contactEmail" | i18n }}</bit-label>
+              <input
+                bitInput
+                name="reverseAliasContact"
+                [(ngModel)]="reverseAliasContact"
+                type="email"
+                required
+              />
+            </bit-form-field>
+            <button bitButton buttonType="primary" type="submit">
+              {{ "createReverseAlias" | i18n }}
+            </button>
+          </form>
+
+          @if (contacts.length) {
+            <bit-table data-testid="contact-list">
+              <ng-template body>
+                @for (contact of contacts; track contact.id) {
+                  <tr bitRow>
+                    <td bitCell>{{ contact.address }}</td>
+                    <td bitCell>{{ contact.reverseAliasAddress }}</td>
+                    <td bitCell class="tw-text-right">
+                      <button
+                        bitButton
+                        buttonType="secondary"
+                        type="button"
+                        (click)="toggleContact(contact)"
+                      >
+                        {{ (contact.blocked ? "unblock" : "block") | i18n }}
+                      </button>
+                      <button
+                        bitIconButton="bwi-trash"
+                        buttonType="dangerGhost"
+                        type="button"
+                        (click)="removeContact(contact)"
+                        label="{{ 'delete' | i18n }}"
+                      ></button>
+                    </td>
+                  </tr>
+                }
+              </ng-template>
+            </bit-table>
+          } @else {
+            <p bitTypography="body1">{{ "noReverseAliases" | i18n }}</p>
+          }
+
+          <div class="tw-flex tw-items-center tw-justify-between tw-mt-4">
+            <button
+              bitButton
+              buttonType="secondary"
+              type="button"
+              [disabled]="contactPage === 0"
+              (click)="previousContacts()"
+            >
+              {{ "previous" | i18n }}
+            </button>
+            <span>{{ "pageX" | i18n: contactPage + 1 }}</span>
+            <button
+              bitButton
+              buttonType="secondary"
+              type="button"
+              [disabled]="nextContactPage === undefined"
+              (click)="nextContacts()"
+            >
+              {{ "next" | i18n }}
+            </button>
+          </div>
+        </section>
+      </section>
+    }
+  }
+</bit-container>
