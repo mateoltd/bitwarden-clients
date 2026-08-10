@@ -45,9 +45,7 @@ describe("AliasReconciliationCommand", () => {
   });
 
   it("syncs, uses the real provider transport and emits token-free machine-readable output", async () => {
-    stateProvider.getUserState$.mockReturnValue(
-      of({ token, baseUrl: "http://simplelogin.test" }),
-    );
+    stateProvider.getUserState$.mockReturnValue(of({ token, baseUrl: "https://simplelogin.test" }));
     apiService.nativeFetch.mockImplementation(async (request) => {
       expect(request.headers.get("Authentication")).toBe(token);
       return new globalThis.Response(
