@@ -1,8 +1,13 @@
 import { Injectable } from "@angular/core";
+import { filter, firstValueFrom } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
+import { Account, AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
 import {
   CreateSimpleLoginAliasRequest,
+  CredentialGeneratorService,
+  ForwarderOptions,
   createSimpleLoginAliasService,
   SimpleLoginAlias,
   SimpleLoginAliasDomain,
@@ -13,18 +18,27 @@ import {
   SimpleLoginContactPage,
   UpdateSimpleLoginAliasRequest,
 } from "@bitwarden/generator-core";
-import { UsernameGenerationServiceAbstraction } from "@bitwarden/generator-legacy";
 
 @Injectable({ providedIn: "root" })
 export class WebSimpleLoginAliasService {
+  private readonly settings$ = this.generatorService.settings<ForwarderOptions>(
+    this.generatorService.forwarder(Vendor.simplelogin),
+    {
+      account$: this.accountService.activeAccount$.pipe(
+        filter((account): account is Account => account !== null),
+      ),
+    },
+  );
+
   constructor(
     private readonly apiService: ApiService,
-    private readonly usernameGenerationService: UsernameGenerationServiceAbstraction,
+    private readonly accountService: AccountService,
+    private readonly generatorService: CredentialGeneratorService,
   ) {}
 
   async isConfigured(): Promise<boolean> {
-    const options = await this.usernameGenerationService.getOptions();
-    return Boolean(options.forwardedSimpleLoginApiKey?.trim());
+    const settings = await firstValueFrom(this.settings$);
+    return Boolean(settings.token?.trim());
   }
 
   async recommend(website: string): Promise<SimpleLoginAliasRecommendation> {
@@ -80,10 +94,10 @@ export class WebSimpleLoginAliasService {
   }
 
   private async service() {
-    const options = await this.usernameGenerationService.getOptions();
+    const settings = await firstValueFrom(this.settings$);
     return createSimpleLoginAliasService(this.apiService, {
-      token: options.forwardedSimpleLoginApiKey ?? "",
-      baseUrl: options.forwardedSimpleLoginBaseUrl || undefined,
+      token: settings.token ?? "",
+      baseUrl: settings.baseUrl || undefined,
     });
   }
 }

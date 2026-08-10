@@ -183,7 +183,11 @@ export class EmailAliasesComponent implements OnInit {
     }
 
     await this.run(async () => {
-      await this.aliasesService.delete(this.selected!.id);
+      const deletedAliasId = this.selected!.id;
+      await this.aliasesService.delete(deletedAliasId);
+      if (this.recommendation?.alias?.id === deletedAliasId) {
+        this.recommendation = undefined;
+      }
       await this.closeAlias();
       await this.loadAliases(this.page);
     });

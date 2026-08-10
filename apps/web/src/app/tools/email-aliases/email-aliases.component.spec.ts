@@ -130,6 +130,13 @@ describe("EmailAliasesComponent", () => {
 
   it("updates, disables, and deletes the selected alias", async () => {
     component.selected = alias();
+    component.recommendation = {
+      hostname: "example.com",
+      canCreate: true,
+      prefixSuggestion: "example",
+      suffixes: [],
+      alias: component.selected,
+    };
     aliasesService.update.mockResolvedValue({ ...alias(), name: "Updated" });
     aliasesService.setEnabled.mockResolvedValue({ ...alias(), enabled: false });
     dialogService.openSimpleDialog.mockResolvedValue(true);
@@ -149,6 +156,7 @@ describe("EmailAliasesComponent", () => {
     await component.deleteAlias();
     expect(aliasesService.delete).toHaveBeenCalledWith(7);
     expect(component.selected).toBeUndefined();
+    expect(component.recommendation).toBeUndefined();
   });
 
   it("creates, blocks, paginates, and deletes reverse aliases", async () => {

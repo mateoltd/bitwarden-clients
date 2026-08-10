@@ -9,7 +9,10 @@ import { DatabaseSync } from "node:sqlite";
 import { chromium } from "playwright";
 
 const root = process.cwd();
-const extensionDirectory = path.resolve(root, "dist/apps/browser/chrome-dev");
+const extensionDirectory = path.resolve(
+  root,
+  process.env.BROWSER_EXTENSION_DIRECTORY ?? "apps/browser/build",
+);
 const registrationFixture = path.resolve(root, "apps/browser/test/alias-registration.html");
 const certificate = fs.readFileSync(path.resolve(root, "apps/web/dev-server.shared.pem"));
 const browserExecutable =
@@ -82,8 +85,8 @@ try {
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html`);
   await popup.locator("button").filter({ hasText: "Log in" }).click();
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/login`);
-  await popup.getByRole("button", { name: "bitwarden.com" }).last().click();
-  await popup.getByText("self-hosted", { exact: true }).click();
+  await popup.locator("environment-selector").getByRole("button").last().click();
+  await popup.getByRole("menuitem", { name: /self-hosted/i }).click();
   await popup.getByRole("button", { name: /Custom environment/i }).click();
   await popup.locator("#self_hosted_env_settings_form_input_api_url").fill(apiProxy.url.toString());
   await popup

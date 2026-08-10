@@ -8,17 +8,19 @@ import nodeFetch, {
   Request as NodeRequest,
   Response as NodeResponse,
 } from "node-fetch";
+import { BehaviorSubject, of } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { DialogService } from "@bitwarden/components";
 import {
+  CredentialGeneratorService,
   SimpleLoginAliasService,
   SimpleLoginAliasTransport,
   SimpleLoginContact,
 } from "@bitwarden/generator-core";
-import { UsernameGenerationServiceAbstraction } from "@bitwarden/generator-legacy";
 
 import { HeaderModule } from "../../layouts/header/header.module";
 
@@ -81,12 +83,14 @@ describeIntegration("rendered web email alias experience against real services",
       token: body.api_key,
       baseUrl: simpleLoginBaseUrl,
     });
-    facade = new WebSimpleLoginAliasService(api, {
-      getOptions: async () => ({
-        forwardedSimpleLoginApiKey: body.api_key,
-        forwardedSimpleLoginBaseUrl: simpleLoginBaseUrl,
-      }),
-    } as UsernameGenerationServiceAbstraction);
+    facade = new WebSimpleLoginAliasService(
+      api,
+      { activeAccount$: of({ id: "web-alias-integration" }) } as AccountService,
+      {
+        forwarder: () => ({ id: "simplelogin" }),
+        settings: () => new BehaviorSubject({ token: body.api_key, baseUrl: simpleLoginBaseUrl }),
+      } as unknown as CredentialGeneratorService,
+    );
   });
 
   afterAll(async () => {
