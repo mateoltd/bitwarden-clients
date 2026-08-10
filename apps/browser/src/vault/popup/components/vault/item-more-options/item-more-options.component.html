@@ -26,6 +26,11 @@
           {{ "edit" | i18n }}
         </button>
       }
+      @if (boundAlias$ | async) {
+        <button type="button" bitMenuItem (click)="manageBoundAlias()">
+          {{ "manageBoundAlias" | i18n }}
+        </button>
+      }
       @if (canEdit && canViewPassword) {
         @if (canClone$ | async) {
           <a bitMenuItem (click)="clone()">

@@ -653,6 +653,28 @@ describe("AddEditComponent", () => {
       expect(cipherServiceMock.setAddEditCipherInfo).not.toHaveBeenCalled();
     }));
 
+    it("retains alias identity when reloading an add-login handoff", fakeAsync(() => {
+      const aliasBinding = {
+        version: 1 as const,
+        provider: "simplelogin" as const,
+        id: "42",
+        address: "bound-alias@sl.test",
+      };
+      addEditCipherInfo$.next({
+        cipher: {
+          name: "Bound login",
+          type: CipherType.Login,
+          aliasBinding,
+          login: { username: aliasBinding.address },
+        },
+      } as AddEditCipherInfo);
+
+      component["messageListener"]({ command: "reloadAddEditCipherData" });
+      tick();
+
+      expect(component.config.initialValues?.aliasBinding).toEqual(aliasBinding);
+    }));
+
     it("ignores messages with different commands", fakeAsync(() => {
       const initialValues = component.config.initialValues;
 

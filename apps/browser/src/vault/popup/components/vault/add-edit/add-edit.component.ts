@@ -645,6 +645,10 @@ const mapAddEditCipherInfoToInitialValues = (
 
   const cipher = cipherInfo.cipher;
 
+  if (cipher.aliasBinding != null) {
+    initialValues.aliasBinding = cipher.aliasBinding;
+  }
+
   if (cipher.folderId != null) {
     initialValues.folderId = cipher.folderId;
   }
