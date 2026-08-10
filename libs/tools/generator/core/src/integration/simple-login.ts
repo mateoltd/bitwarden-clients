@@ -1,8 +1,10 @@
+/* eslint-disable import/no-restricted-paths -- legacy forwarder state contract */
 import {
   GENERATOR_DISK,
   GENERATOR_MEMORY,
   UserKeyDefinition,
 } from "@bitwarden/common/platform/state";
+/* eslint-enable import/no-restricted-paths */
 import { VendorId } from "@bitwarden/common/tools/extension";
 import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
 import { IntegrationContext, IntegrationId } from "@bitwarden/common/tools/integration";
@@ -16,6 +18,7 @@ import { PublicClassifier } from "@bitwarden/common/tools/public-classifier";
 import { BufferedKeyDefinition } from "@bitwarden/common/tools/state/buffered-key-definition";
 import { ObjectKey } from "@bitwarden/common/tools/state/object-key";
 
+import { simpleLoginAliasFromJson, toSimpleLoginCredentialMetadata } from "../alias";
 import { ForwarderConfiguration, ForwarderContext } from "../engine";
 import { CreateForwardingEmailRpcDef } from "../engine/forwarder-configuration";
 import { SelfHostedApiOptions } from "../types";
@@ -48,7 +51,13 @@ const createForwardingEmail = Object.freeze({
     return response.status === 200 || response.status === 201;
   },
   processJson(json: any) {
-    return [json?.alias];
+    const alias = simpleLoginAliasFromJson(json);
+    return [
+      {
+        credential: alias.address,
+        metadata: toSimpleLoginCredentialMetadata(alias),
+      },
+    ];
   },
 } as CreateForwardingEmailRpcDef<SimpleLoginSettings>);
 

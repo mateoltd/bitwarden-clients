@@ -4,7 +4,7 @@ import { ForwarderContext } from "../engine";
 
 import { SimpleLogin, SimpleLoginSettings } from "./simple-login";
 
-describe("Addy.io forwarder", () => {
+describe("SimpleLogin forwarder", () => {
   const context = mock<ForwarderContext<SimpleLoginSettings>>();
 
   afterEach(() => {
@@ -82,10 +82,36 @@ describe("Addy.io forwarder", () => {
     });
 
     describe("processJson", () => {
-      it("should read the email from the response", () => {
-        const json = { alias: "foo@example.com" };
+      it("should retain stable alias identity from the response", () => {
+        const json: any = {
+          id: 42,
+          alias: "foo@example.com",
+          creation_timestamp: 123,
+          enabled: true,
+          pinned: false,
+          nb_block: 0,
+          nb_forward: 0,
+          nb_reply: 0,
+          support_pgp: false,
+          disable_pgp: false,
+          mailboxes: [],
+          latest_activity: null,
+        };
         const result = SimpleLogin.forwarder.createForwardingEmail.processJson(json, context);
-        expect(result).toEqual(["foo@example.com"]);
+        expect(result).toEqual([
+          {
+            credential: "foo@example.com",
+            metadata: {
+              kind: "email-alias",
+              alias: {
+                version: 1,
+                provider: "simplelogin",
+                id: "42",
+                address: "foo@example.com",
+              },
+            },
+          },
+        ]);
       });
     });
   });

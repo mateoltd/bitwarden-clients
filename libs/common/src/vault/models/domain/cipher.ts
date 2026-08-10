@@ -10,6 +10,7 @@ import { Utils } from "../../../platform/misc/utils";
 import Domain from "../../../platform/models/domain/domain-base";
 import { SymmetricCryptoKey } from "../../../platform/models/domain/symmetric-crypto-key";
 import { InitializerKey } from "../../../platform/services/cryptography/initializer-key";
+import { hydrateAliasBinding } from "../../alias-binding";
 import {
   CipherRepromptType,
   normalizeCipherRepromptTypeForSdk,
@@ -253,6 +254,8 @@ export class Cipher extends Domain implements Decryptable<CipherView> {
       }
       model.fields = fields;
     }
+
+    hydrateAliasBinding(model);
 
     if (this.passwordHistory != null && this.passwordHistory.length > 0) {
       const passwordHistory: PasswordHistoryView[] = [];

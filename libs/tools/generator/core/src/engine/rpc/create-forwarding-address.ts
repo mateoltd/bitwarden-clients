@@ -1,13 +1,13 @@
 import { IntegrationContext } from "@bitwarden/common/tools/integration";
 import { JsonRpc, IntegrationRequest, ApiSettings } from "@bitwarden/common/tools/integration/rpc";
 
-import { ForwarderConfiguration } from "../forwarder-configuration";
+import { ForwarderConfiguration, ForwarderGenerationResult } from "../forwarder-configuration";
 import { ForwarderContext } from "../forwarder-context";
 
 export class CreateForwardingAddressRpc<
   Settings extends ApiSettings,
   Req extends IntegrationRequest = IntegrationRequest,
-> implements JsonRpc<Req, string> {
+> implements JsonRpc<Req, ForwarderGenerationResult> {
   constructor(
     readonly requestor: ForwarderConfiguration<Settings>,
     readonly context: ForwarderContext<Settings>,
@@ -55,7 +55,7 @@ export class CreateForwardingAddressRpc<
     return this.createForwardingEmail.hasJsonPayload(response, this.context);
   }
 
-  processJson(json: any): [string?, string?] {
+  processJson(json: any): [ForwarderGenerationResult?, string?] {
     return this.createForwardingEmail.processJson(json, this.context);
   }
 }

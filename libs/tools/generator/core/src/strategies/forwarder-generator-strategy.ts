@@ -6,6 +6,7 @@ import { Jsonify } from "type-fest";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { SdkService } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
+// eslint-disable-next-line import/no-restricted-paths -- legacy forwarder state contract
 import { SingleUserState, StateProvider } from "@bitwarden/common/platform/state";
 import { UserKeyEncryptor } from "@bitwarden/common/tools/cryptography/user-key-encryptor";
 import {
@@ -78,7 +79,7 @@ export class ForwarderGeneratorStrategy<
 
     const create = this.createForwardingAddress(this.configuration, options);
     const result = await this.client.fetchJson(create, requestOptions);
-    return result;
+    return typeof result === "string" ? result : result.credential;
   };
 
   // per-user encrypted state

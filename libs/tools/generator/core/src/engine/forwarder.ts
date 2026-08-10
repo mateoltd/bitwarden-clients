@@ -6,10 +6,9 @@ import {
   IntegrationRequest,
   RestClient,
 } from "@bitwarden/common/tools/integration/rpc";
-import { GenerationRequest } from "@bitwarden/common/tools/types";
 
 import { Type } from "../metadata";
-import { CredentialGenerator, GeneratedCredential } from "../types";
+import { CredentialGenerator, GeneratedCredential, GenerateRequest } from "../types";
 
 import { AccountRequest, ForwarderConfiguration } from "./forwarder-configuration";
 import { ForwarderContext } from "./forwarder-context";
@@ -31,7 +30,7 @@ export class Forwarder implements CredentialGenerator<ApiSettings> {
     private i18nService: I18nService,
   ) {}
 
-  async generate(request: GenerationRequest, settings: ApiSettings) {
+  async generate(request: GenerateRequest, settings: ApiSettings) {
     const requestOptions: IntegrationRequest & AccountRequest = { website: request.website };
 
     const getAccount = await this.getAccountId(this.configuration, settings);
@@ -42,7 +41,17 @@ export class Forwarder implements CredentialGenerator<ApiSettings> {
     const create = this.createForwardingAddress(this.configuration, settings);
     const result = await this.client.fetchJson(create, requestOptions);
 
-    return new GeneratedCredential(result, Type.email, Date.now());
+    const credential = typeof result === "string" ? result : result.credential;
+    const metadata = typeof result === "string" ? undefined : result.metadata;
+
+    return new GeneratedCredential(
+      credential,
+      Type.email,
+      Date.now(),
+      request.source,
+      request.website,
+      metadata,
+    );
   }
 
   private createContext<Settings>(

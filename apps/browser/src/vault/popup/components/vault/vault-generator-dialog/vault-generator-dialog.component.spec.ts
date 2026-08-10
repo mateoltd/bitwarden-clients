@@ -6,7 +6,7 @@ import { mock, MockProxy } from "jest-mock-extended";
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { DIALOG_DATA, DialogRef } from "@bitwarden/components";
-import { AlgorithmInfo } from "@bitwarden/generator-core";
+import { AlgorithmInfo, GeneratedCredential } from "@bitwarden/generator-core";
 import { CipherFormGeneratorComponent } from "@bitwarden/vault";
 
 import { PopupRouterCacheService } from "../../../../../platform/popup/view-cache/popup-router-cache.service";
@@ -38,8 +38,10 @@ class MockCipherFormGenerator {
   @Input() uri: string = "";
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-output-emitter-ref
-  @Output() valueGenerated = new EventEmitter<string>();
+  @Output() valueGenerated = new EventEmitter<GeneratedCredential>();
 }
+
+const generatedPassword = { credential: "test-password" } as GeneratedCredential;
 
 describe("VaultGeneratorDialogComponent", () => {
   let component: VaultGeneratorDialogComponent;
@@ -85,7 +87,7 @@ describe("VaultGeneratorDialogComponent", () => {
 
   it("should enable select button when value is generated", () => {
     component.onAlgorithmSelected({ useGeneratedValue: "Test" } as any);
-    component.onValueGenerated("test-password");
+    component.onValueGenerated(generatedPassword);
     fixture.detectChanges();
 
     const button = fixture.debugElement.query(By.css("[data-testid='select-button']"));
@@ -109,7 +111,7 @@ describe("VaultGeneratorDialogComponent", () => {
       By.css("vault-cipher-form-generator"),
     ).componentInstance;
 
-    generator.valueGenerated.emit("test-password");
+    generator.valueGenerated.emit(generatedPassword);
     fixture.detectChanges();
 
     const button = fixture.debugElement.query(By.css("[data-testid='select-button']"));
@@ -128,7 +130,7 @@ describe("VaultGeneratorDialogComponent", () => {
 
   it("should close with generated value when selected", () => {
     component.onAlgorithmSelected({ useGeneratedValue: "Test" } as any);
-    component.onValueGenerated("test-password");
+    component.onValueGenerated(generatedPassword);
     fixture.detectChanges();
 
     fixture.debugElement.query(By.css("[data-testid='select-button']")).nativeElement.click();
@@ -136,6 +138,7 @@ describe("VaultGeneratorDialogComponent", () => {
     expect(mockDialogRef.close).toHaveBeenCalledWith({
       action: GeneratorDialogAction.Selected,
       generatedValue: "test-password",
+      generatedCredential: generatedPassword,
     });
   });
 

@@ -48,7 +48,7 @@ describe("WebCipherFormGenerationService", () => {
       expect(dialogService.open).toHaveBeenCalledWith(WebVaultGeneratorDialogComponent, {
         data: { type: "password" },
       });
-      expect(result).toBe(generatedValue);
+      expect(result?.credential).toBe(generatedValue);
     });
 
     it("returns null if the dialog is canceled", async () => {
@@ -72,7 +72,7 @@ describe("WebCipherFormGenerationService", () => {
       expect(dialogService.open).toHaveBeenCalledWith(WebVaultGeneratorDialogComponent, {
         data: { type: "username" },
       });
-      expect(result).toBe(generatedValue);
+      expect(result?.credential).toBe(generatedValue);
     });
 
     it("returns null if the dialog is canceled", async () => {

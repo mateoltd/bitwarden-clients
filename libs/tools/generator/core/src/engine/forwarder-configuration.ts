@@ -1,4 +1,6 @@
+// eslint-disable-next-line import/no-restricted-paths -- legacy forwarder state contract
 import { UserKeyDefinition } from "@bitwarden/common/platform/state";
+import { GeneratedCredentialMetadata } from "@bitwarden/common/tools/alias";
 import { IntegrationConfiguration } from "@bitwarden/common/tools/integration/integration-configuration";
 import { ApiSettings, SelfHostedApiSettings } from "@bitwarden/common/tools/integration/rpc";
 import { IntegrationRequest } from "@bitwarden/common/tools/integration/rpc/integration-request";
@@ -15,11 +17,19 @@ export type AccountRequest = {
   accountId?: string;
 };
 
+/** A forwarder may return only an address or attach non-secret stable provider identity. */
+export type ForwarderGenerationResult =
+  | string
+  | {
+      credential: string;
+      metadata?: GeneratedCredentialMetadata;
+    };
+
 /** definition of the create forwarding request api call for an integration */
 export type CreateForwardingEmailRpcDef<
   Settings extends ApiSettings,
   Request extends IntegrationRequest = IntegrationRequest,
-> = RpcConfiguration<Request, ForwarderContext<Settings>, string>;
+> = RpcConfiguration<Request, ForwarderContext<Settings>, ForwarderGenerationResult>;
 
 /** definition of the get account id api call for an integration */
 export type GetAccountIdRpcDef<

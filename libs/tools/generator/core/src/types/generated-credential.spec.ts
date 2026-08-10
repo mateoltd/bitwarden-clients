@@ -34,7 +34,22 @@ describe("GeneratedCredential", () => {
   });
 
   it("toJSON converts from a credential into a JSON object", () => {
-    const credential = new GeneratedCredential("example", Type.password, new Date(100));
+    const credential = new GeneratedCredential(
+      "example",
+      Type.password,
+      new Date(100),
+      "test",
+      "https://example.test",
+      {
+        kind: "email-alias",
+        alias: {
+          version: 1,
+          provider: "simplelogin",
+          id: "42",
+          address: "alias@sl.test",
+        },
+      },
+    );
 
     const result = credential.toJSON();
 
@@ -43,6 +58,7 @@ describe("GeneratedCredential", () => {
       category: Type.password,
       generationDate: 100,
     });
+    expect(JSON.stringify(result)).not.toContain("simplelogin");
   });
 
   it("fromJSON converts Json objects into credentials", () => {

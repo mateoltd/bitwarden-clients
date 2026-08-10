@@ -5,6 +5,7 @@ import { inject, Injectable } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
 import { DialogService } from "@bitwarden/components";
+import { GeneratedCredential, Type } from "@bitwarden/generator-core";
 import { CipherFormGenerationService } from "@bitwarden/vault";
 
 import { VaultGeneratorDialogComponent } from "../components/vault/vault-generator-dialog/vault-generator-dialog.component";
@@ -14,7 +15,7 @@ export class BrowserCipherFormGenerationService implements CipherFormGenerationS
   private dialogService = inject(DialogService);
   private overlay = inject(Overlay);
 
-  async generatePassword(): Promise<string> {
+  async generatePassword(): Promise<GeneratedCredential | null> {
     const dialogRef = VaultGeneratorDialogComponent.open(this.dialogService, this.overlay, {
       data: { type: "password" },
     });
@@ -25,10 +26,13 @@ export class BrowserCipherFormGenerationService implements CipherFormGenerationS
       return null;
     }
 
-    return result.generatedValue;
+    return (
+      result.generatedCredential ??
+      new GeneratedCredential(result.generatedValue, Type.password, Date.now())
+    );
   }
 
-  async generateUsername(uri: string): Promise<string> {
+  async generateUsername(uri: string): Promise<GeneratedCredential | null> {
     const dialogRef = VaultGeneratorDialogComponent.open(this.dialogService, this.overlay, {
       data: { type: "username", uri: uri },
     });
@@ -39,6 +43,9 @@ export class BrowserCipherFormGenerationService implements CipherFormGenerationS
       return null;
     }
 
-    return result.generatedValue;
+    return (
+      result.generatedCredential ??
+      new GeneratedCredential(result.generatedValue, Type.username, Date.now())
+    );
   }
 }
