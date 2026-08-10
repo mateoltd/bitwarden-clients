@@ -25,6 +25,7 @@ import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/pl
 import { CipherId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   CipherViewLike,
   CipherViewLikeUtils,
@@ -293,6 +294,10 @@ export class VaultCipherRowComponent<C extends CipherViewLike> implements OnInit
       !CipherViewLikeUtils.isDeleted(this.cipher) &&
       !CipherViewLikeUtils.isArchived(this.cipher)
     );
+  }
+
+  protected get aliasBinding() {
+    return (this.cipher as C & Pick<CipherView, "aliasBinding">).aliasBinding;
   }
 
   protected get permissionTooltip(): string | undefined {
