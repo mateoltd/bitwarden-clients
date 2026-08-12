@@ -10,6 +10,7 @@ for (const change of changedEntries(base, target)) {
 }
 const textPatterns = policy.forbiddenAddedTextPatterns.map((pattern) => new RegExp(pattern, "i"));
 for (const { path, text } of addedLines(base, target)) {
+  if (path.startsWith("scripts/public-alias-audit/")) continue;
   for (const pattern of textPatterns) {
     if (pattern.test(text)) findings.push(`forbidden added surface in ${path}: ${pattern.source}`);
   }

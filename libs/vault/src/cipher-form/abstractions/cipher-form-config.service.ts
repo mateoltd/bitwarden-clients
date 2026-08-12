@@ -1,5 +1,6 @@
 import { CollectionView } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
+import { EmailAliasIdentity } from "@bitwarden/common/tools/alias";
 import { CipherId, CollectionId, OrganizationId } from "@bitwarden/common/types/guid";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
@@ -24,6 +25,7 @@ export type OptionalInitialValues = {
   loginUri?: string;
   username?: string;
   password?: string;
+  aliasBinding?: EmailAliasIdentity;
   name?: string;
   // Credit Card Information
   cardholderName?: string;

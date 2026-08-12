@@ -9,6 +9,7 @@
     "proxyEvents": "http://localhost:46273",
     "proxyNotifications": "http://localhost:61840",
     "proxyIcons": "http://localhost:50024",
+    "simpleLoginConnectSrc": "http://127.0.0.1:*",
     "wsConnectSrc": "ws://localhost:61840"
   },
   "additionalRegions": [

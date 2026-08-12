@@ -1,4 +1,6 @@
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { UserStateSubjectDependencyProvider } from "@bitwarden/common/tools/state/user-state-subject-dependency-provider";
+import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 
 import { GeneratorDependencyProvider } from "./generator-dependency-provider";
 import { GeneratorMetadataProvider } from "./generator-metadata-provider";
@@ -11,4 +13,8 @@ export type CredentialGeneratorProviders = {
   readonly generator: GeneratorDependencyProvider;
   readonly profile: GeneratorProfileProvider;
   readonly metadata: GeneratorMetadataProvider;
+  readonly aliasSync?: {
+    readonly cipherService: CipherService;
+    readonly syncService?: SyncService;
+  };
 };

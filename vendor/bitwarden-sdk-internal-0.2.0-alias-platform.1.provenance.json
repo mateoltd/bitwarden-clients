@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 2,
+  "sourceCommit": "ff60528b2f899baec1cea72fd8efbdc509fbab4e",
+  "releaseVersion": "0.2.0-alias-platform.1",
+  "upstreamBase": "fbd21679c1c3690cba424ad3dbb0ba662eb9863e",
+  "providerPin": {
+    "provider": "SimpleLogin",
+    "repository": "https://github.com/simple-login/app.git",
+    "commit": "dbc45fcce4e8e6b4fa615cc729ca95a67bf75266"
+  },
+  "clientsContract": {
+    "repository": "https://github.com/bitwarden/clients.git",
+    "commit": "dcf474cd0e75ab5db798023157f543f0f217dcb9",
+    "node": ">=24.17.0",
+    "typescript": "5.9.3",
+    "compilerOptions": {
+      "strict": false,
+      "moduleResolution": "bundler",
+      "noImplicitAny": true,
+      "target": "ES2016",
+      "module": "ES2020",
+      "lib": [
+        "es5",
+        "es6",
+        "es7",
+        "dom",
+        "ES2021",
+        "ESNext.Disposable"
+      ],
+      "allowSyntheticDefaultImports": true,
+      "resolveJsonModule": true,
+      "skipLibCheck": true,
+      "useDefineForClassFields": false
+    }
+  },
+  "packages": {
+    "typescriptWasm": {
+      "name": "@bitwarden/sdk-internal",
+      "version": "0.2.0-alias-platform.1",
+      "format": "npm-tarball",
+      "artifact": {
+        "path": "alias-sdk-typescript/bitwarden-sdk-internal-0.2.0-alias-platform.1.tgz",
+        "bytes": 11124392,
+        "sha256": "513fc09282335910ea50dfcdd46608e89b81469763f668f4f0ea4ad056e5aa97"
+      }
+    },
+    "swift": {
+      "name": "BitwardenSdk",
+      "version": "0.2.0-alias-platform.1",
+      "format": "swift-package-tarball",
+      "artifact": {
+        "path": "alias-sdk-swift/bitwarden-alias-sdk-swift-0.2.0-alias-platform.1.tar.gz",
+        "bytes": 164744607,
+        "sha256": "130d0f2dbaf4746773c3b6a391cd0b29be6e4595adef035e2985e192b1a8bd81"
+      }
+    },
+    "kotlinJvm": {
+      "name": "bitwarden-alias-sdk-kotlin-host",
+      "version": "0.2.0-alias-platform.1",
+      "format": "jar-with-host-native-library",
+      "artifact": {
+        "path": "alias-sdk-kotlin/bitwarden-alias-sdk-kotlin-host-0.2.0-alias-platform.1.jar",
+        "bytes": 6479515,
+        "sha256": "72a97a9102d6ffb9db5efcc5e787d34df01edaa5941f63f4831f6a8191c159ae"
+      },
+      "supportingArtifacts": [
+        {
+          "path": "alias-sdk-kotlin/libbitwarden_uniffi.so",
+          "bytes": 25841656,
+          "sha256": "efb188495f3166c4215b8e2e9b77ea592f95313696491e67bcbd8e9deea7d9ca"
+        }
+      ]
+    },
+    "android": {
+      "name": "com.bitwarden.sdk",
+      "version": "0.2.0-alias-platform.1",
+      "format": "aar",
+      "artifact": {
+        "path": "alias-sdk-android/bitwarden-alias-sdk-android-0.2.0-alias-platform.1.aar",
+        "bytes": 39605293,
+        "sha256": "fa1fb6776910c416e78f2b6da2249c826af9a30420a5719918bf9adf3185904d"
+      }
+    }
+  },
+  "requiredClientIntegrationSteps": [
+    {
+      "id": "verify-source-and-artifact",
+      "platforms": [
+        "typescriptWasm",
+        "swift",
+        "kotlinJvm",
+        "android"
+      ],
+      "instruction": "Verify the selected artifact SHA-256 and source commit against this handoff manifest before integrating it."
+    },
+    {
+      "id": "typescript-wasm-package",
+      "platforms": [
+        "typescriptWasm"
+      ],
+      "instruction": "Install the exact .tgz as @bitwarden/sdk-internal, keep the existing WASM initialization path, and remove any client-local alias lifecycle or alias-reference implementation."
+    },
+    {
+      "id": "swift-package",
+      "platforms": [
+        "swift"
+      ],
+      "instruction": "Extract the Swift archive, consume its BitwardenSdk package and BitwardenFFI.xcframework together, and remove any separately generated alias bindings."
+    },
+    {
+      "id": "kotlin-jvm-package",
+      "platforms": [
+        "kotlinJvm"
+      ],
+      "instruction": "Place the versioned JAR and matching host native library on the same runtime path, then remove any separately generated alias bindings."
+    },
+    {
+      "id": "android-package",
+      "platforms": [
+        "android"
+      ],
+      "instruction": "Add the versioned AAR as the sole Android SDK binary and remove any separately generated alias bindings or native libraries."
+    },
+    {
+      "id": "current-reference-schema",
+      "platforms": [
+        "typescriptWasm",
+        "swift",
+        "kotlinJvm",
+        "android"
+      ],
+      "instruction": "Persist only current-schema alias references created and parsed by the SDK; reject unsupported schemas and do not infer bindings from usernames or addresses."
+    },
+    {
+      "id": "provider-pin",
+      "platforms": [
+        "typescriptWasm",
+        "swift",
+        "kotlinJvm",
+        "android"
+      ],
+      "instruction": "Use the provider commit recorded in providerPin when reproducing the real SimpleLogin lifecycle gate."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "alias-sdk-android/BUILD-ENVIRONMENT.txt",
+      "bytes": 317,
+      "sha256": "d82a100f72e6b18092ee4f2cc2435768252de8dc5f8051eab09cdb209f80f2ae"
+    },
+    {
+      "path": "alias-sdk-android/PACKAGE_VERSION",
+      "bytes": 23,
+      "sha256": "b293ce0a00446728a5f8e88ddc35c16be1e1a78093d600249ef558c4105c83d1"
+    },
+    {
+      "path": "alias-sdk-android/VERSION",
+      "bytes": 41,
+      "sha256": "eca74b799f6664f506fc2b48b8987d321b04b8406fe648678b1416f0bdcc9132"
+    },
+    {
+      "path": "alias-sdk-android/bitwarden-alias-sdk-android-0.2.0-alias-platform.1.aar",
+      "bytes": 39605293,
+      "sha256": "fa1fb6776910c416e78f2b6da2249c826af9a30420a5719918bf9adf3185904d"
+    },
+    {
+      "path": "alias-sdk-kotlin/BUILD-ENVIRONMENT.txt",
+      "bytes": 311,
+      "sha256": "8be320fb49e12faa3a5ddabd97b2133610b2fc87cf2d4ea9916c8d28dbaa05c5"
+    },
+    {
+      "path": "alias-sdk-kotlin/PACKAGE_VERSION",
+      "bytes": 23,
+      "sha256": "b293ce0a00446728a5f8e88ddc35c16be1e1a78093d600249ef558c4105c83d1"
+    },
+    {
+      "path": "alias-sdk-kotlin/VERSION",
+      "bytes": 41,
+      "sha256": "eca74b799f6664f506fc2b48b8987d321b04b8406fe648678b1416f0bdcc9132"
+    },
+    {
+      "path": "alias-sdk-kotlin/bitwarden-alias-sdk-kotlin-host-0.2.0-alias-platform.1.jar",
+      "bytes": 6479515,
+      "sha256": "72a97a9102d6ffb9db5efcc5e787d34df01edaa5941f63f4831f6a8191c159ae"
+    },
+    {
+      "path": "alias-sdk-kotlin/libbitwarden_uniffi.so",
+      "bytes": 25841656,
+      "sha256": "efb188495f3166c4215b8e2e9b77ea592f95313696491e67bcbd8e9deea7d9ca"
+    },
+    {
+      "path": "alias-sdk-swift/BUILD-ENVIRONMENT.txt",
+      "bytes": 255,
+      "sha256": "efdece257f71125c300a570866f0e94d1c4ea6c021e748cbb2ea3f9cc8a0d24b"
+    },
+    {
+      "path": "alias-sdk-swift/PACKAGE_VERSION",
+      "bytes": 23,
+      "sha256": "b293ce0a00446728a5f8e88ddc35c16be1e1a78093d600249ef558c4105c83d1"
+    },
+    {
+      "path": "alias-sdk-swift/VERSION",
+      "bytes": 41,
+      "sha256": "eca74b799f6664f506fc2b48b8987d321b04b8406fe648678b1416f0bdcc9132"
+    },
+    {
+      "path": "alias-sdk-swift/bitwarden-alias-sdk-swift-0.2.0-alias-platform.1.tar.gz",
+      "bytes": 164744607,
+      "sha256": "130d0f2dbaf4746773c3b6a391cd0b29be6e4595adef035e2985e192b1a8bd81"
+    },
+    {
+      "path": "alias-sdk-typescript/BUILD-ENVIRONMENT.txt",
+      "bytes": 180,
+      "sha256": "9690451c45e105bbc60366299e5a499111187ec8b8aad7f74575c4e53bd6164c"
+    },
+    {
+      "path": "alias-sdk-typescript/PACKAGE_VERSION",
+      "bytes": 23,
+      "sha256": "b293ce0a00446728a5f8e88ddc35c16be1e1a78093d600249ef558c4105c83d1"
+    },
+    {
+      "path": "alias-sdk-typescript/VERSION",
+      "bytes": 41,
+      "sha256": "eca74b799f6664f506fc2b48b8987d321b04b8406fe648678b1416f0bdcc9132"
+    },
+    {
+      "path": "alias-sdk-typescript/bitwarden-sdk-internal-0.2.0-alias-platform.1.tgz",
+      "bytes": 11124392,
+      "sha256": "513fc09282335910ea50dfcdd46608e89b81469763f668f4f0ea4ad056e5aa97"
+    }
+  ]
+}

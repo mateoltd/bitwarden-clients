@@ -24,6 +24,7 @@ import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.servic
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { CipherId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
+import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   CipherViewLike,
   CipherViewLikeUtils,
@@ -266,6 +267,10 @@ export class VaultCipherRowComponent<C extends CipherViewLike> implements OnInit
 
   protected get showEventLogs() {
     return this.useEvents && this.cipher.organizationId;
+  }
+
+  protected get aliasBinding() {
+    return (this.cipher as C & Pick<CipherView, "aliasBinding">).aliasBinding;
   }
 
   protected get permissionTooltip(): string | undefined {

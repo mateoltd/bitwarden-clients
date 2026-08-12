@@ -1,8 +1,10 @@
 import { ExtensionMetadata, ExtensionStorageKey } from "@bitwarden/common/tools/extension/type";
+import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
 import { IdentityConstraint } from "@bitwarden/common/tools/state/identity-state-constraint";
 
 import { getForwarderConfiguration } from "../../data";
 import { Forwarder } from "../../engine/forwarder";
+import { SimpleLoginForwarder } from "../../engine/simple-login-forwarder";
 import { GeneratorDependencyProvider } from "../../providers";
 import { ForwarderOptions } from "../../types";
 import { Profile, Type } from "../data";
@@ -41,6 +43,9 @@ export function toForwarderMetadata(
     engine: {
       create(dependencies: GeneratorDependencyProvider) {
         const config = getForwarderConfiguration(extension.product.vendor.id);
+        if (extension.product.vendor.id === Vendor.simplelogin) {
+          return new SimpleLoginForwarder(config, dependencies.i18nService, dependencies.now);
+        }
         return new Forwarder(config, dependencies.client, dependencies.i18nService);
       },
     },

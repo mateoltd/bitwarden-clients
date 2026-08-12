@@ -12,7 +12,7 @@ import {
   ButtonModule,
   DialogService,
 } from "@bitwarden/components";
-import { AlgorithmInfo } from "@bitwarden/generator-core";
+import { AlgorithmInfo, GeneratedCredential } from "@bitwarden/generator-core";
 import { I18nPipe } from "@bitwarden/ui-common";
 import { CipherFormGeneratorComponent } from "@bitwarden/vault";
 
@@ -76,8 +76,8 @@ export class BrowserSendGeneratorDialogComponent {
     });
   };
 
-  onValueGenerated(value: string) {
-    this.generatedValue.set(value);
+  onValueGenerated(value: GeneratedCredential) {
+    this.generatedValue.set(value.credential);
   }
 
   onAlgorithmSelected = (selected?: AlgorithmInfo) => {

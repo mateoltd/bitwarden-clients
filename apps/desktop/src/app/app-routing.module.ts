@@ -72,6 +72,8 @@ import { SharedFoldersComponent } from "../vault/app/shared-folders/shared-folde
 import { VaultComponent } from "../vault/app/vault-v3/vault.component";
 
 import { DesktopLayoutComponent } from "./layout/desktop-layout.component";
+import { DesktopAliasComponent } from "./tools/aliases/desktop-alias.component";
+import { DesktopAliasService } from "./tools/aliases/desktop-alias.service";
 import { unsavedSendEditsGuard } from "./tools/send/guards/unsaved-send-edits.guard";
 import { SendComponent } from "./tools/send/send.component";
 
@@ -541,6 +543,12 @@ export const routes: Routes = [
         component: SendComponent,
         data: { pageTitle: { key: "send" } } satisfies RouteDataProperties,
         canDeactivate: [unsavedSendEditsGuard],
+      },
+      {
+        path: "aliases",
+        component: DesktopAliasComponent,
+        data: { pageTitle: { key: "emailAliases" } } satisfies RouteDataProperties,
+        providers: [DesktopAliasService],
       },
       {
         path: "import",

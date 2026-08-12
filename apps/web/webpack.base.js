@@ -329,6 +329,7 @@ module.exports.buildConfig = function buildConfig(params) {
                     ;connect-src
                     'self'
                     ${envConfig.dev.wsConnectSrc ?? ""}
+                    ${envConfig.dev.simpleLoginConnectSrc ?? ""}
                     wss://notifications.bitwarden.com
                     https://notifications.bitwarden.com
                     https://cdn.bitwarden.net
@@ -342,7 +343,7 @@ module.exports.buildConfig = function buildConfig(params) {
                     https://*.braintree-api.com
                     https://*.blob.core.windows.net
                     http://127.0.0.1:10000
-                    https://app.simplelogin.io/api/alias/random/new
+                    https://app.simplelogin.io/api/
                     https://quack.duckduckgo.com/api/email/addresses
                     https://app.addy.io/api/v1/aliases
                     https://api.fastmail.com

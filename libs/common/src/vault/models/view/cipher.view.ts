@@ -13,6 +13,12 @@ import { asUuid, uuidAsString } from "../../../platform/abstractions/sdk/sdk.ser
 import { InitializerMetadata } from "../../../platform/interfaces/initializer-metadata.interface";
 import { InitializerKey } from "../../../platform/services/cryptography/initializer-key";
 import { DeepJsonify } from "../../../types/deep-jsonify";
+import {
+  AliasBinding,
+  bindAliasReferenceToSdkCipher,
+  fieldsWithoutAliasReferences,
+  hydrateAliasBinding,
+} from "../../alias-binding";
 import { CipherType, LinkedIdType } from "../../enums";
 import { CipherRepromptType } from "../../enums/cipher-reprompt-type";
 import { CipherPermissionsApi } from "../api/cipher-permissions.api";
@@ -57,6 +63,8 @@ export class CipherView implements View, InitializerMetadata {
   passport = new PassportView();
   attachments: AttachmentView[] = [];
   fields: FieldView[] = [];
+  /** Provider alias identity extracted from the reserved encrypted field after decryption. */
+  aliasBinding?: AliasBinding;
   passwordHistory: PasswordHistoryView[] = [];
   collectionIds: string[] = [];
   revisionDate: Date;
@@ -279,6 +287,8 @@ export class CipherView implements View, InitializerMetadata {
         break;
     }
 
+    hydrateAliasBinding(view, obj.aliasBinding);
+
     return view;
   }
 
@@ -369,6 +379,8 @@ export class CipherView implements View, InitializerMetadata {
         break;
     }
 
+    hydrateAliasBinding(cipherView);
+
     return cipherView;
   }
 
@@ -378,6 +390,7 @@ export class CipherView implements View, InitializerMetadata {
    * @returns {CipherCreateRequest} The SDK cipher create request object
    */
   toSdkCreateCipherRequest(): CipherCreateRequest {
+    const sdkCipherView = this.toSdkCipherView();
     const sdkCipherCreateRequest: CipherCreateRequest = {
       organizationId: this.organizationId ? asUuid(this.organizationId) : undefined,
       collectionIds: this.collectionIds ? this.collectionIds.map((i) => asUuid(i)) : [],
@@ -386,7 +399,7 @@ export class CipherView implements View, InitializerMetadata {
       notes: this.notes,
       favorite: this.favorite ?? false,
       reprompt: this.reprompt ?? CipherRepromptType.None,
-      fields: this.fields?.map((f) => f.toSdkFieldView()),
+      fields: sdkCipherView.fields,
       type: this.getSdkCipherViewType(),
       archivedDate: this.archivedDate?.toISOString(),
     };
@@ -400,6 +413,7 @@ export class CipherView implements View, InitializerMetadata {
    * @returns {CipherEditRequest} The SDK cipher edit request object
    */
   toSdkUpdateCipherRequest(): CipherEditRequest {
+    const sdkCipherView = this.toSdkCipherView();
     const sdkCipherEditRequest: CipherEditRequest = {
       id: asUuid(this.id),
       organizationId: this.organizationId ? asUuid(this.organizationId) : undefined,
@@ -408,7 +422,7 @@ export class CipherView implements View, InitializerMetadata {
       notes: this.notes,
       favorite: this.favorite ?? false,
       reprompt: this.reprompt ?? CipherRepromptType.None,
-      fields: this.fields?.map((f) => f.toSdkFieldView()),
+      fields: sdkCipherView.fields,
       type: this.getSdkCipherViewType(),
       revisionDate: this.revisionDate?.toISOString(),
       archivedDate: this.archivedDate?.toISOString(),
@@ -496,7 +510,7 @@ export class CipherView implements View, InitializerMetadata {
       viewPassword: this.viewPassword ?? true,
       localData: toSdkLocalData(this.localData),
       attachments: this.attachments?.map((a) => a.toSdkAttachmentView()),
-      fields: this.fields?.map((f) => f.toSdkFieldView()),
+      fields: fieldsWithoutAliasReferences(this).map((f) => f.toSdkFieldView()),
       passwordHistory: this.passwordHistory?.map((ph) => ph.toSdkPasswordHistoryView()),
       collectionIds: this.collectionIds?.map((i) => asUuid(i)) ?? [],
       // Revision and creation dates are non-nullable in SDKCipherView
@@ -548,6 +562,6 @@ export class CipherView implements View, InitializerMetadata {
         break;
     }
 
-    return sdkCipherView;
+    return bindAliasReferenceToSdkCipher(this, sdkCipherView);
   }
 }

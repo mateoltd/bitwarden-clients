@@ -19,9 +19,11 @@ const ALLOWED_BG_COMMANDS = new Set<string>([
   "checkAutofillInlineMenuButtonFocused",
   "checkInlineMenuButtonFocused",
   "fillAutofillInlineMenuCipher",
+  "fillEmailAlias",
   "fillGeneratedPassword",
   "redirectAutofillInlineMenuFocusOut",
   "refreshGeneratedPassword",
+  "refreshEmailAliasRecommendation",
   "refreshOverlayCiphers",
   "triggerDelayedAutofillInlineMenuClosure",
   "updateAutofillInlineMenuColorScheme",
@@ -37,6 +39,8 @@ export class AutofillInlineMenuContainer {
   private portName!: string;
   /** Non-null asserted. */
   private inlineMenuPageIframe!: HTMLIFrameElement;
+  private inlineMenuPageLoaded = false;
+  private readonly pendingInlineMenuMessages: AutofillInlineMenuContainerWindowMessage[] = [];
   private token: string;
   private isInitialized: boolean = false;
   private readonly extensionOrigin: string;
@@ -155,8 +159,24 @@ export class AutofillInlineMenuContainer {
    */
   private setupPortMessageListener = (message: InitAutofillInlineMenuElementMessage) => {
     this.port = chrome.runtime.connect({ name: this.portName });
+    this.port.onMessage.addListener(this.handleBackgroundPortMessage);
     const initMessage = { ...message, token: this.token };
     this.postMessageToInlineMenuPageUnsafe(initMessage);
+    this.inlineMenuPageLoaded = true;
+    for (const pendingMessage of this.pendingInlineMenuMessages.splice(0)) {
+      this.postMessageToInlineMenuPage(pendingMessage);
+    }
+  };
+
+  /** Routes asynchronous background results into the authenticated rendered-menu iframe. */
+  private handleBackgroundPortMessage = (message: AutofillInlineMenuContainerWindowMessage) => {
+    if (
+      message.command === "initAutofillInlineMenuButton" ||
+      message.command === "initAutofillInlineMenuList"
+    ) {
+      return;
+    }
+    this.postMessageToInlineMenuPage(message);
   };
 
   /**
@@ -165,6 +185,11 @@ export class AutofillInlineMenuContainer {
    * @param message - The message to post.
    */
   private postMessageToInlineMenuPage(message: AutofillInlineMenuContainerWindowMessage) {
+    if (!this.inlineMenuPageLoaded) {
+      this.pendingInlineMenuMessages.push(message);
+      return;
+    }
+
     if (this.inlineMenuPageIframe?.contentWindow) {
       const messageWithToken = { ...message, token: this.token };
       this.postMessageToInlineMenuPageUnsafe(messageWithToken);

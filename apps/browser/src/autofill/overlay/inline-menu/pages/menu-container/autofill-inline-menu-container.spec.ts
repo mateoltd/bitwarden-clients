@@ -38,6 +38,8 @@ describe("AutofillInlineMenuContainer", () => {
     });
 
     it("sets up a onLoad listener on the iframe that sets up the background port message listener", async () => {
+      const port = createPortSpyMock(AutofillOverlayPort.Button);
+      jest.mocked(chrome.runtime.connect).mockReturnValue(port);
       const message = {
         command: "initAutofillInlineMenuButton",
         iframeUrl,
@@ -52,6 +54,9 @@ describe("AutofillInlineMenuContainer", () => {
       autofillInlineMenuContainer["inlineMenuPageIframe"].dispatchEvent(new Event("load"));
 
       expect(chrome.runtime.connect).toHaveBeenCalledWith({ name: message.portName });
+      expect(port.onMessage.addListener).toHaveBeenCalledWith(
+        autofillInlineMenuContainer["handleBackgroundPortMessage"],
+      );
       const expectedMessage = expect.objectContaining({
         ...message,
         token: expect.any(String),
@@ -59,6 +64,70 @@ describe("AutofillInlineMenuContainer", () => {
       expect(
         autofillInlineMenuContainer["inlineMenuPageIframe"].contentWindow.postMessage,
       ).toHaveBeenCalledWith(expectedMessage, "*");
+    });
+
+    it("forwards asynchronous background messages to the rendered menu iframe", () => {
+      const port = createPortSpyMock(AutofillOverlayPort.List);
+      jest.mocked(chrome.runtime.connect).mockReturnValue(port);
+      const message = {
+        command: "initAutofillInlineMenuList",
+        iframeUrl,
+        pageTitle,
+        portKey,
+        portName: AutofillOverlayPort.List,
+      };
+
+      postWindowMessage(message, extensionOrigin);
+      const iframe = autofillInlineMenuContainer["inlineMenuPageIframe"];
+      jest.spyOn(iframe.contentWindow, "postMessage");
+      iframe.dispatchEvent(new Event("load"));
+      const handlePortMessage = jest.mocked(port.onMessage.addListener).mock.calls[0][0];
+
+      handlePortMessage(
+        {
+          command: "updateAutofillInlineMenuEmailAliasRecommendation",
+          emailAliasRecommendation: { hostname: "registration.example", canCreate: true },
+        },
+        port,
+      );
+
+      expect(iframe.contentWindow.postMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          command: "updateAutofillInlineMenuEmailAliasRecommendation",
+          token: expect.any(String),
+        }),
+        "*",
+      );
+    });
+
+    it("delivers parent updates that arrive before the rendered menu iframe loads", () => {
+      const port = createPortSpyMock(AutofillOverlayPort.List);
+      jest.mocked(chrome.runtime.connect).mockReturnValue(port);
+      const initMessage = {
+        command: "initAutofillInlineMenuList",
+        iframeUrl,
+        pageTitle,
+        portKey,
+        portName: AutofillOverlayPort.List,
+      };
+      const updateMessage = {
+        command: "updateAutofillInlineMenuEmailAliasRecommendation",
+        portKey,
+        emailAliasRecommendation: { hostname: "registration.example", canCreate: true },
+      };
+
+      postWindowMessage(initMessage, extensionOrigin);
+      const iframe = autofillInlineMenuContainer["inlineMenuPageIframe"];
+      jest.spyOn(iframe.contentWindow, "postMessage");
+      postWindowMessage(updateMessage);
+
+      expect(iframe.contentWindow.postMessage).not.toHaveBeenCalled();
+      iframe.dispatchEvent(new Event("load"));
+
+      expect(iframe.contentWindow.postMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ ...updateMessage, token: expect.any(String) }),
+        "*",
+      );
     });
 
     it("ignores initialization when URLs are not from extension origin", () => {
@@ -110,6 +179,7 @@ describe("AutofillInlineMenuContainer", () => {
       jest.spyOn(iframe.contentWindow, "postMessage");
       port = createPortSpyMock(AutofillOverlayPort.Button);
       autofillInlineMenuContainer["port"] = port;
+      autofillInlineMenuContainer["inlineMenuPageLoaded"] = true;
     });
 
     it("ignores messages that do not contain a portKey", () => {
