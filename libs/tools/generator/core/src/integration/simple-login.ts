@@ -5,6 +5,7 @@ import {
   UserKeyDefinition,
 } from "@bitwarden/common/platform/state";
 /* eslint-enable import/no-restricted-paths */
+import { AliasSyncDocument } from "@bitwarden/common/tools/alias";
 import { VendorId } from "@bitwarden/common/tools/extension";
 import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
 import { IntegrationContext, IntegrationId } from "@bitwarden/common/tools/integration";
@@ -22,7 +23,10 @@ import { ForwarderConfiguration } from "../engine";
 import { SelfHostedApiOptions } from "../types";
 
 // integration types
-export type SimpleLoginSettings = SelfHostedApiSettings & { connectionId?: string };
+export type SimpleLoginSettings = SelfHostedApiSettings & {
+  connectionId?: string;
+  aliasSync?: AliasSyncDocument;
+};
 export type SimpleLoginOptions = SelfHostedApiOptions;
 export type SimpleLoginConfiguration = ForwarderConfiguration<SimpleLoginSettings>;
 
@@ -32,6 +36,7 @@ const defaultSettings = Object.freeze({
   domain: "",
   baseUrl: "",
   connectionId: undefined,
+  aliasSync: undefined,
 });
 
 // forwarder configuration

@@ -2,6 +2,8 @@ import { Injectable } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { SyncService } from "@bitwarden/common/platform/sync";
+import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import {
   CreateSimpleLoginAliasRequest,
   CredentialGeneratorService,
@@ -23,6 +25,8 @@ export class WebSimpleLoginAliasService {
   constructor(
     private readonly accountService: AccountService,
     private readonly generatorService: CredentialGeneratorService,
+    private readonly cipherService?: CipherService,
+    private readonly syncService?: SyncService,
   ) {}
 
   async isConfigured(): Promise<boolean> {
@@ -66,6 +70,18 @@ export class WebSimpleLoginAliasService {
     return (await this.service()).delete(id);
   }
 
+  async removeConnection(): Promise<void> {
+    await (await this.service()).removeConnection();
+  }
+
+  async synchronizationState() {
+    return (await this.service()).synchronizationState();
+  }
+
+  async resolveSynchronizationConflict(conflictId: string, chosenEventId: string) {
+    return (await this.service()).resolveSynchronizationConflict(conflictId, chosenEventId);
+  }
+
   async domains(): Promise<SimpleLoginAliasDomain[]> {
     return (await this.service()).domains();
   }
@@ -92,7 +108,12 @@ export class WebSimpleLoginAliasService {
       throw new SimpleLoginAliasError("SimpleLogin credentials are missing", "invalid-credentials");
     }
     return createSimpleLoginAliasService(
-      await readSimpleLoginAliasSettings(this.generatorService, account),
+      await readSimpleLoginAliasSettings(
+        this.generatorService,
+        account,
+        this.cipherService,
+        this.syncService,
+      ),
     );
   }
 }

@@ -3,7 +3,14 @@ import { firstValueFrom } from "rxjs";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
+import {
+  AliasSyncStore,
+  createAliasSyncDocument,
+  mergeAliasSyncDocuments,
+  parseAliasSyncDocument,
+} from "@bitwarden/common/tools/alias";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
+import { AliasConnectionVaultStore } from "@bitwarden/common/vault/alias-connection";
 import {
   createSimpleLoginAliasService,
   integration,
@@ -43,14 +50,62 @@ export class AliasReconciliationCommand {
         "SimpleLogin is not configured with a valid persisted connection identity.",
       );
     }
+    const connectionId = settings.connectionId;
 
     try {
       await this.syncService.fullSync(true, true);
+      const unjournaled = createSimpleLoginAliasService({
+        token: settings.token,
+        baseUrl: settings.baseUrl,
+        connectionId,
+      });
+      let syncStore: AliasSyncStore | undefined;
+      if (apply) {
+        const local: AliasSyncStore = {
+          load: async () => {
+            const current = await firstValueFrom(
+              this.stateProvider.getUserState$(integration.SimpleLogin.forwarder.settings, userId),
+            );
+            return current?.aliasSync
+              ? parseAliasSyncDocument(current.aliasSync)
+              : createAliasSyncDocument();
+          },
+          save: async (document) => {
+            const current = await firstValueFrom(
+              this.stateProvider.getUserState$(integration.SimpleLogin.forwarder.settings, userId),
+            );
+            const stored = current?.aliasSync
+              ? parseAliasSyncDocument(current.aliasSync)
+              : createAliasSyncDocument(document.replicaId);
+            await this.stateProvider.setUserState(
+              integration.SimpleLogin.forwarder.settings,
+              { ...current, aliasSync: mergeAliasSyncDocuments(stored, document) },
+              userId,
+            );
+          },
+        };
+        const provider = unjournaled.providerIdentity();
+        syncStore = new AliasConnectionVaultStore({
+          cipherService: this.cipherService,
+          userId,
+          connection: {
+            provider: provider.provider,
+            providerInstance: provider.instance,
+            connectionId: provider.connectionId,
+          },
+          credential: { token: settings.token, baseUrl: provider.instance },
+          local,
+          refresh: async () => {
+            await this.syncService.fullSync(true, { allowThrowOnError: true });
+          },
+        });
+      }
       const service = new AliasReconciliationService(
         createSimpleLoginAliasService({
           token: settings.token,
           baseUrl: settings.baseUrl,
-          connectionId: settings.connectionId,
+          connectionId,
+          syncStore,
         }),
         this.cipherService,
       );

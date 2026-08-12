@@ -1,10 +1,12 @@
-import { EmailAliasCredentialMetadata, EmailAliasIdentity } from "@bitwarden/common/tools/alias";
+import { EmailAliasCredentialMetadata, EmailAliasIdentity , AliasSyncStore } from "@bitwarden/common/tools/alias";
 
 export type SimpleLoginAliasSettings = {
   token: string;
   baseUrl?: string;
   /** Stable UUID v4 persisted with the encrypted account-scoped provider settings. */
   connectionId: string;
+  /** Encrypted crash/offline journal used by every production client path. */
+  syncStore?: AliasSyncStore;
 };
 
 export type SimpleLoginMailbox = {

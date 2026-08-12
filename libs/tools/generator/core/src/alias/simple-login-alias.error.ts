@@ -3,6 +3,7 @@ export type SimpleLoginAliasErrorCode =
   | "forbidden"
   | "not-found"
   | "rate-limited"
+  | "conflict"
   | "remote-error"
   | "invalid-response";
 

@@ -2,9 +2,27 @@
 
 import { execFileSync } from "child_process";
 import { randomUUID } from "crypto";
+import { mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 import { asUuid } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
+import {
+  AliasSyncDocument,
+  AliasSyncStore,
+  appendAliasSyncEvent,
+  createAliasSyncDocument,
+  parseAliasSyncDocument,
+  projectAliasSync,
+} from "@bitwarden/common/tools/alias";
 import { UserId } from "@bitwarden/common/types/guid";
+import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
+import {
+  AliasConnectionVaultStore,
+  findAliasConnectionVaultPayloads,
+  isAliasConnectionCipher,
+  parseAliasConnectionCipher,
+} from "@bitwarden/common/vault/alias-connection";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherData } from "@bitwarden/common/vault/models/data/cipher.data";
 import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
@@ -14,31 +32,20 @@ import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { createSimpleLoginAliasService } from "@bitwarden/generator-core";
 import { ClientSettings, PasswordManagerClient, TokenProvider } from "@bitwarden/sdk-internal";
 
-import { AliasReconciliationService } from "./alias-reconciliation.service";
-
 const integrationEnabled =
-  process.env["ALIAS_RECONCILIATION_INTEGRATION"] === "1" &&
+  process.env["ALIAS_CROSS_DEVICE_INTEGRATION"] === "1" &&
   process.env["SIMPLELOGIN_INTEGRATION"] === "1" &&
   process.env["BITWARDEN_SERVER_INTEGRATION"] === "1";
 const describeIntegration = integrationEnabled ? describe : describe.skip;
-const fixtureSize = Number(process.env["ALIAS_RECONCILIATION_FIXTURE_SIZE"] ?? "1001");
-const fixtureMarkerPrefix = "bwrec";
+const fixtureSize = Number(process.env["ALIAS_SYNC_FIXTURE_SIZE"] ?? "10000");
 
 const bitwardenSettings: ClientSettings = {
   apiUrl: process.env["BITWARDEN_API_URL"] ?? "http://localhost:4000",
   identityUrl: process.env["BITWARDEN_IDENTITY_URL"] ?? "http://localhost:33656",
-  userAgent: "Bitwarden alias reconciliation integration test",
+  userAgent: "Bitwarden alias cross-device integration test",
   deviceType: "SDK",
   bitwardenClientVersion: "2026.7.2",
 };
-
-function requiredEnvironmentVariable(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`${name} is required for alias reconciliation integration tests`);
-  }
-  return value;
-}
 
 class MutableTokenProvider implements TokenProvider {
   token?: string;
@@ -48,10 +55,11 @@ class MutableTokenProvider implements TokenProvider {
   }
 }
 
-type AuthenticatedClient = {
+type AuthenticatedProfile = {
   client: PasswordManagerClient;
   accessToken: string;
   userId: UserId;
+  directory: string;
 };
 
 function userIdFromAccessToken(accessToken: string): UserId {
@@ -65,10 +73,11 @@ function userIdFromAccessToken(accessToken: string): UserId {
   return claims.sub as UserId;
 }
 
-async function authenticateBitwardenClient(
+async function authenticateBitwardenProfile(
   email: string,
   password: string,
-): Promise<AuthenticatedClient> {
+  directory: string,
+): Promise<AuthenticatedProfile> {
   const tokenProvider = new MutableTokenProvider();
   const client = new PasswordManagerClient(tokenProvider, bitwardenSettings);
   const loginClient = client.auth().login(bitwardenSettings);
@@ -79,7 +88,7 @@ async function authenticateBitwardenClient(
       device: {
         deviceType: "SDK",
         deviceIdentifier: randomUUID(),
-        deviceName: "Alias reconciliation integration test",
+        deviceName: `Alias profile ${directory.split("/").at(-1)}`,
         devicePushToken: undefined,
       },
     },
@@ -104,7 +113,7 @@ async function authenticateBitwardenClient(
     method: { masterPasswordUnlock: { password, master_password_unlock: unlock } },
   });
   await client.crypto().initialize_org_crypto({ organizationKeys: new Map() });
-  return { client, accessToken: login.accessToken, userId };
+  return { client, accessToken: login.accessToken, userId, directory };
 }
 
 async function vaultRequest(
@@ -122,336 +131,560 @@ async function vaultRequest(
     },
   });
   const text = await response.text();
-  return { response, text, json: text ? JSON.parse(text) : undefined };
+  let json: any;
+  if (text) {
+    json = JSON.parse(text);
+  }
+  return { response, text, json };
 }
 
-function simpleLoginSql(sql: string): string {
-  return execFileSync(
+function resetSimpleLoginTestRateLimits(): void {
+  const container = process.env["SIMPLELOGIN_REDIS_CONTAINER"] ?? "alias-core-sl-redis";
+  const keys = execFileSync(
     "docker",
-    [
-      "exec",
-      process.env["SIMPLELOGIN_DB_CONTAINER"] ?? "alias-core-sl-db",
-      "psql",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-qAt",
-      "-U",
-      "simplelogin",
-      "-d",
-      "simplelogin",
-      "-c",
-      sql,
-    ],
+    ["exec", container, "redis-cli", "--scan", "--pattern", "LIMITS:*"],
     { encoding: "utf8" },
-  ).trim();
-}
-
-function sqlite(sql: string): string {
-  return execFileSync("sqlite3", [requiredEnvironmentVariable("BITWARDEN_SQLITE_PATH"), sql], {
-    encoding: "utf8",
-  }).trim();
-}
-
-async function runInBatches<Input, Output>(
-  values: Input[],
-  operation: (value: Input) => Promise<Output>,
-): Promise<Output[]> {
-  const outputs: Output[] = [];
-  for (let offset = 0; offset < values.length; offset += 20) {
-    outputs.push(...(await Promise.all(values.slice(offset, offset + 20).map(operation))));
+  )
+    .split("\n")
+    .filter(Boolean);
+  for (const key of keys) {
+    execFileSync("docker", ["exec", container, "redis-cli", "DEL", key]);
   }
-  return outputs;
 }
 
-async function deleteCiphers(accessToken: string, cipherIds: string[]): Promise<void> {
-  for (let offset = 0; offset < cipherIds.length; offset += 250) {
-    const ids = cipherIds.slice(offset, offset + 250);
-    const deleted = await vaultRequest(accessToken, "/ciphers", {
-      method: "DELETE",
-      body: JSON.stringify({ ids }),
+function removeSimpleLoginTestAliases(aliasIds: number[] = []): void {
+  const container = process.env["SIMPLELOGIN_DB_CONTAINER"] ?? "alias-core-sl-db";
+  const ids = aliasIds.filter(Number.isSafeInteger).join(",");
+  const idPredicate = ids ? ` OR id IN (${ids})` : "";
+  execFileSync("docker", [
+    "exec",
+    container,
+    "psql",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-qAt",
+    "-U",
+    "simplelogin",
+    "-d",
+    "simplelogin",
+    "-c",
+    `DELETE FROM alias WHERE note IN ('cross-device primary', 'profile b', 'profile c')${idPredicate};`,
+  ]);
+}
+
+class DiskAliasSyncStore implements AliasSyncStore {
+  private readonly filename: string;
+
+  constructor(
+    directory: string,
+    private readonly replicaId: string,
+  ) {
+    this.filename = join(directory, "alias-sync.json");
+  }
+
+  async load(): Promise<AliasSyncDocument> {
+    try {
+      return parseAliasSyncDocument(JSON.parse(readFileSync(this.filename, "utf8")));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+      const created = createAliasSyncDocument(this.replicaId);
+      await this.save(created);
+      return created;
+    }
+  }
+
+  async save(document: AliasSyncDocument): Promise<void> {
+    const parsed = parseAliasSyncDocument(document);
+    const next = `${this.filename}.next`;
+    writeFileSync(next, JSON.stringify(parsed), { mode: 0o600 });
+    renameSync(next, this.filename);
+  }
+}
+
+class RealVaultCipherAdapter implements Pick<
+  CipherService,
+  "getAllDecryptedIncludingInternal" | "createWithServer" | "clearCache"
+> {
+  private cache?: CipherView[];
+  lastEncryptedSync = "";
+
+  constructor(private readonly profile: AuthenticatedProfile) {}
+
+  async fullSync(): Promise<CipherView[]> {
+    const sync = await vaultRequest(this.profile.accessToken, "/sync?excludeDomains=true");
+    if (sync.response.status !== 200) {
+      throw new Error(`Bitwarden sync failed (${sync.response.status})`);
+    }
+    this.lastEncryptedSync = sync.text;
+    const raw = (sync.json?.Ciphers ?? sync.json?.ciphers ?? []) as unknown[];
+    const ciphers = raw.map((value) => new Cipher(new CipherData(new CipherResponse(value))));
+    const result = await this.profile.client
+      .vault()
+      .ciphers()
+      .decrypt_list_full_with_failures(ciphers.map((cipher) => cipher.toSdkCipher()));
+    if (result.failures.length > 0) {
+      throw new Error(`${result.failures.length} vault ciphers failed to decrypt`);
+    }
+    this.cache = result.successes
+      .map((cipher) => CipherView.fromSdkCipherView(cipher))
+      .filter((cipher): cipher is CipherView => cipher !== null && cipher !== undefined);
+    return this.cache;
+  }
+
+  async getAllDecryptedIncludingInternal(_userId: UserId): Promise<CipherView[]> {
+    return this.cache ?? this.fullSync();
+  }
+
+  async createWithServer(cipher: CipherView, _userId: UserId): Promise<CipherView> {
+    const encryption = await this.profile.client
+      .vault()
+      .ciphers()
+      .encrypt(cipher.toSdkCipherView());
+    const request = new CipherRequest({
+      cipher: Cipher.fromSdkCipher(encryption.cipher)!,
+      encryptedFor: this.profile.userId,
     });
-    if (!deleted.response.ok) {
-      throw new Error(`Bitwarden bulk cipher deletion failed (${deleted.response.status})`);
+    const created = await vaultRequest(this.profile.accessToken, "/ciphers", {
+      method: "POST",
+      body: JSON.stringify(request),
+    });
+    if (created.response.status !== 200) {
+      throw new Error(`Bitwarden cipher create failed (${created.response.status})`);
     }
+    const createdView = await this.decryptResponse(created.json);
+    this.cache = [...(this.cache ?? []), createdView];
+    return createdView;
   }
-}
 
-function persistedCipherCount(cipherIds: string[]): number {
-  if (cipherIds.length === 0) {
-    return 0;
+  async clearCache(_userId: UserId): Promise<void> {
+    this.cache = undefined;
   }
-  if (cipherIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) {
-    throw new Error("Bitwarden returned an invalid cipher id");
-  }
-  const quotedIds = cipherIds.map((id) => `'${id.toLowerCase()}'`).join(",");
-  return Number(sqlite(`SELECT COUNT(*) FROM Cipher WHERE LOWER(Id) IN (${quotedIds});`));
-}
 
-async function decryptCiphers(
-  authenticated: AuthenticatedClient,
-  rawCiphers: unknown[],
-): Promise<CipherView[]> {
-  const result: CipherView[] = [];
-  for (const rawCipher of rawCiphers) {
-    const cipher = new Cipher(new CipherData(new CipherResponse(rawCipher)));
-    const decrypted = await authenticated.client.vault().ciphers().decrypt(cipher.toSdkCipher());
+  private async decryptResponse(value: unknown): Promise<CipherView> {
+    const encrypted = new Cipher(new CipherData(new CipherResponse(value)));
+    const decrypted = await this.profile.client.vault().ciphers().decrypt(encrypted.toSdkCipher());
     const view = CipherView.fromSdkCipherView(decrypted);
-    if (view) {
-      result.push(view);
+    if (!view) {
+      throw new Error("Bitwarden returned an unsupported cipher type");
     }
+    return view;
   }
-  return result;
 }
 
-describeIntegration("real current-schema alias reconciliation", () => {
-  jest.setTimeout(900_000);
+describeIntegration("real current-schema alias cross-device convergence", () => {
+  jest.setTimeout(1_800_000);
 
   const simpleLoginBaseUrl = process.env["SIMPLELOGIN_BASE_URL"] ?? "http://127.0.0.1:32769";
+  const simpleLoginEmail = process.env["SIMPLELOGIN_EMAIL"] ?? "john@wick.com";
+  const simpleLoginPassword = process.env["SIMPLELOGIN_PASSWORD"] ?? "password";
+  const bitwardenEmail = process.env["BITWARDEN_EMAIL"] ?? "alias.lab@individual.example";
+  const bitwardenPassword = process.env["BITWARDEN_PASSWORD"] ?? "alias-lab-password";
 
-  it("reconciles and verifies 1,001+ canonical bindings after real provider drift", async () => {
-    if (!Number.isSafeInteger(fixtureSize) || fixtureSize < 1_001) {
-      throw new Error("ALIAS_RECONCILIATION_FIXTURE_SIZE must be an integer of at least 1001");
-    }
-    const simpleLoginEmail = requiredEnvironmentVariable("SIMPLELOGIN_EMAIL");
-    const simpleLoginPassword = requiredEnvironmentVariable("SIMPLELOGIN_PASSWORD");
-    const bitwardenEmail = requiredEnvironmentVariable("BITWARDEN_EMAIL");
-    const bitwardenPassword = requiredEnvironmentVariable("BITWARDEN_PASSWORD");
-    const marker = `${fixtureMarkerPrefix}${Date.now()}${Math.floor(Math.random() * 1_000_000)}`;
-    const addressPrefix = `${marker}-`;
+  it("persists three profiles, survives offline replay and restart, and converges in a 10,000-item vault", async () => {
+    const started = performance.now();
+    const root = mkdtempSync(join(tmpdir(), "bitwarden-alias-cross-device-"));
+    const directories = [0, 1, 2].map((index) => {
+      const directory = join(root, `profile-${index}`);
+      mkdirSync(directory, { mode: 0o700 });
+      return directory;
+    });
+    const replicaIds = [
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    ];
     const connectionId = randomUUID();
+    const marker = `alias-sync-load-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+    const fixtureIds: string[] = [];
+    const aliasIds: number[] = [];
+    let profiles: AuthenticatedProfile[] = [];
     let providerToken = "";
-    let firstClient: AuthenticatedClient | undefined;
-    let secondClient: AuthenticatedClient | undefined;
-    const cipherIds: string[] = [];
+    let phase = "setup";
 
     try {
+      removeSimpleLoginTestAliases();
+      resetSimpleLoginTestRateLimits();
       const simpleLoginLogin = await fetch(`${simpleLoginBaseUrl}/api/auth/login`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({
           email: simpleLoginEmail,
           password: simpleLoginPassword,
-          device: "Bitwarden alias reconciliation integration test",
+          device: "Bitwarden alias cross-device integration test",
         }),
       });
-      const loginBody = (await simpleLoginLogin.json()) as { api_key?: unknown };
-      if (!simpleLoginLogin.ok || typeof loginBody.api_key !== "string") {
+      const simpleLoginBody = (await simpleLoginLogin.json()) as { api_key?: unknown };
+      if (!simpleLoginLogin.ok || typeof simpleLoginBody.api_key !== "string") {
         throw new Error(`SimpleLogin test login failed (${simpleLoginLogin.status})`);
       }
-      providerToken = loginBody.api_key;
-      const aliasService = createSimpleLoginAliasService({
+      providerToken = simpleLoginBody.api_key;
+
+      profiles = await Promise.all(
+        directories.map((directory) =>
+          authenticateBitwardenProfile(bitwardenEmail, bitwardenPassword, directory),
+        ),
+      );
+      expect(new Set(profiles.map((profile) => profile.directory)).size).toBe(3);
+      expect(new Set(profiles.map((profile) => profile.userId)).size).toBe(1);
+
+      const fixtureViews = Array.from({ length: fixtureSize }, (_, index) => {
+        const view = new CipherView();
+        view.type = CipherType.Login;
+        view.name = `${marker} ${index}`;
+        view.login.username = `unrelated-${index}@vault-load.invalid`;
+        view.login.password = randomUUID();
+        return view;
+      });
+      const encryptedFixture = await profiles[0].client
+        .vault()
+        .ciphers()
+        .encrypt_list(fixtureViews.map((view) => view.toSdkCipherView()));
+      const fixtureRequests = encryptedFixture.map(
+        (encrypted) =>
+          new CipherRequest({
+            cipher: Cipher.fromSdkCipher(encrypted.cipher)!,
+            encryptedFor: profiles[0].userId,
+          }),
+      );
+      const fixtureImport = JSON.stringify({
+        folders: [],
+        ciphers: fixtureRequests,
+        folderRelationships: [],
+      });
+      expect(fixtureImport).not.toContain(marker);
+      expect(fixtureImport).not.toContain(providerToken);
+      const imported = await vaultRequest(profiles[0].accessToken, "/ciphers/import", {
+        method: "POST",
+        body: fixtureImport,
+      });
+      expect(imported.response.status).toBe(200);
+
+      const adapters = profiles.map((profile) => new RealVaultCipherAdapter(profile));
+      const afterImport = await adapters[0].fullSync();
+      const fixtureCiphers = afterImport.filter((cipher) => cipher.name?.startsWith(marker));
+      expect(fixtureCiphers).toHaveLength(fixtureSize);
+      fixtureIds.push(...fixtureCiphers.map((cipher) => cipher.id!));
+      expect(adapters[0].lastEncryptedSync).not.toContain(marker);
+      expect(adapters[0].lastEncryptedSync).not.toContain(providerToken);
+
+      const locals = directories.map(
+        (directory, index) => new DiskAliasSyncStore(directory, replicaIds[index]),
+      );
+      const stores = adapters.map(
+        (adapter, index) =>
+          new AliasConnectionVaultStore({
+            cipherService: adapter,
+            userId: profiles[index].userId,
+            connection: {
+              provider: "simplelogin",
+              providerInstance: `${simpleLoginBaseUrl}/`,
+              connectionId,
+            },
+            credential: { token: providerToken, baseUrl: `${simpleLoginBaseUrl}/` },
+            local: locals[index],
+            refresh: async () => {
+              await adapter.fullSync();
+            },
+          }),
+      );
+      const services = stores.map((syncStore) =>
+        createSimpleLoginAliasService({
+          token: providerToken,
+          baseUrl: simpleLoginBaseUrl,
+          connectionId,
+          syncStore,
+        }),
+      );
+
+      const hostname = `cross-device-${Date.now()}.integration.test`;
+      phase = "primary create";
+      const primary = await services[0].create({ hostname, note: "cross-device primary" });
+      aliasIds.push(primary.id);
+      const afterPrimary = await stores[0].load();
+      expect(afterPrimary.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: "provider-dispatched" }),
+          expect.objectContaining({ kind: "provider-ack" }),
+        ]),
+      );
+      const primaryOperation = afterPrimary.events.find(
+        (event) => event.kind === "provider-operation",
+      )!;
+      expect(
+        afterPrimary.events
+          .filter((event) => event.kind === "provider-dispatched" || event.kind === "provider-ack")
+          .map((event) => event.operationId),
+      ).toEqual([primaryOperation.id, primaryOperation.id]);
+      expect(Object.values(projectAliasSync(afterPrimary).operations)).toEqual(
+        expect.arrayContaining([expect.objectContaining({ status: "applied" })]),
+      );
+      phase = "primary encrypted credential carrier";
+      const primaryRemote = await adapters[0].fullSync();
+      const primaryPayloads = primaryRemote
+        .filter(isAliasConnectionCipher)
+        .map(parseAliasConnectionCipher)
+        .filter((payload) => payload.connection.connectionId === connectionId);
+      expect(
+        primaryPayloads.map((payload) => ({
+          credential: payload.credential !== undefined,
+          events: payload.sync.events.map((event) => event.kind),
+        })),
+      ).toEqual(expect.arrayContaining([expect.objectContaining({ credential: true })]));
+      expect(
+        (await findAliasConnectionVaultPayloads(adapters[0], profiles[0].userId)).find(
+          (payload) => payload.connection.connectionId === connectionId,
+        )?.credential?.token,
+      ).toBe(providerToken);
+      await adapters[1].fullSync();
+      await stores[1].load();
+      await adapters[2].fullSync();
+      await stores[2].load();
+      expect(
+        Object.values(projectAliasSync(await stores[2].load()).operations).every(
+          (operation) => operation.status === "applied",
+        ),
+      ).toBe(true);
+
+      resetSimpleLoginTestRateLimits();
+      phase = "simultaneous create";
+      const simultaneousCreates = await Promise.allSettled([
+        services[1].create({ hostname: `${hostname}-b`, note: "profile b" }),
+        services[2].create({ hostname: `${hostname}-c`, note: "profile c" }),
+      ]);
+      const createdTogether = simultaneousCreates.flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : [],
+      );
+      aliasIds.push(...createdTogether.map((alias) => alias.id));
+      expect(createdTogether.length).toBeGreaterThan(0);
+      for (const result of simultaneousCreates) {
+        if (result.status === "rejected") {
+          expect(result.reason).toMatchObject({ code: "rate-limited" });
+        }
+      }
+
+      phase = "simultaneous update and disable";
+      await Promise.all([
+        services[1].update(primary.id, { name: "updated from profile b" }),
+        services[2].setEnabled(primary.id, false),
+      ]);
+      resetSimpleLoginTestRateLimits();
+      phase = "simultaneous enable and disable";
+      await Promise.allSettled([
+        services[1].setEnabled(primary.id, true),
+        services[2].setEnabled(primary.id, false),
+      ]);
+
+      // Profile zero goes offline: the durable local journal advances without touching Bitwarden.
+      phase = "offline replay and restart";
+      let offline = await locals[0].load();
+      offline = appendAliasSyncEvent(offline, {
+        kind: "reference-set",
+        cipherId: "offline-current-schema-reference",
+        expectedAliasKey: null,
+        alias: primary.identity,
+      });
+      await locals[0].save({ ...offline, events: [...offline.events].reverse() });
+
+      // Force a kill/restart boundary for the first profile and reuse only its persisted directory.
+      profiles[0].client.free();
+      profiles[0] = await authenticateBitwardenProfile(
+        bitwardenEmail,
+        bitwardenPassword,
+        directories[0],
+      );
+      adapters[0] = new RealVaultCipherAdapter(profiles[0]);
+      stores[0] = new AliasConnectionVaultStore({
+        cipherService: adapters[0],
+        userId: profiles[0].userId,
+        connection: {
+          provider: "simplelogin",
+          providerInstance: `${simpleLoginBaseUrl}/`,
+          connectionId,
+        },
+        credential: { token: providerToken, baseUrl: `${simpleLoginBaseUrl}/` },
+        local: new DiskAliasSyncStore(directories[0], replicaIds[0]),
+        refresh: async () => {
+          await adapters[0].fullSync();
+        },
+      });
+      await stores[0].load();
+
+      // Merge every shard twice. Full-document carriers replay duplicate events by construction.
+      for (let round = 0; round < 2; round++) {
+        for (let profile = 0; profile < 3; profile++) {
+          await adapters[profile].fullSync();
+          await stores[profile].load();
+        }
+      }
+      const projections = await Promise.all(
+        stores.map(async (store) => projectAliasSync(await store.load())),
+      );
+      expect(projections[0]).toEqual(projections[1]);
+      expect(projections[1]).toEqual(projections[2]);
+      expect(projections[0].references["offline-current-schema-reference"].alias).toEqual(
+        primary.identity,
+      );
+      expect(projections[0].conflicts).toEqual(
+        expect.arrayContaining([expect.objectContaining({ kind: "provider-state" })]),
+      );
+      const conflictResolver = createSimpleLoginAliasService({
         token: providerToken,
         baseUrl: simpleLoginBaseUrl,
         connectionId,
+        syncStore: stores[0],
       });
-      const provider = aliasService.providerIdentity();
-
-      firstClient = await authenticateBitwardenClient(bitwardenEmail, bitwardenPassword);
-      const existingSync = await vaultRequest(firstClient.accessToken, "/sync?excludeDomains=true");
-      expect(existingSync.response.status).toBe(200);
-      const existingRaw = (existingSync.json?.Ciphers ?? existingSync.json?.ciphers) as unknown[];
-      const existingViews = await decryptCiphers(firstClient, existingRaw);
-      const residualFixtures = existingViews.filter((cipher) =>
-        /^bwrec\d+ login \d+$/.test(cipher.name ?? ""),
-      );
-      if (residualFixtures.length > 0) {
-        const residualMarkers = new Set(
-          residualFixtures.map((cipher) => cipher.name!.slice(0, cipher.name!.indexOf(" login "))),
-        );
-        throw new Error(
-          `Residual alias reconciliation fixtures: ${[...residualMarkers].join(", ")}`,
+      await expect(conflictResolver.setEnabled(primary.id, true)).rejects.toMatchObject({
+        code: "conflict",
+      });
+      for (const conflict of projections[0].conflicts.filter(
+        (candidate) => candidate.kind === "provider-state" || candidate.kind === "alias-identity",
+      )) {
+        await conflictResolver.resolveSynchronizationConflict(
+          conflict.id,
+          conflict.eventIds.at(-1)!,
         );
       }
+      for (let profile = 0; profile < 3; profile++) {
+        await adapters[profile].fullSync();
+        await stores[profile].load();
+      }
+
+      // Normal encrypted export/import restoration of one current-schema carrier.
+      phase = "encrypted export/import restoration";
+      const profileZeroViews = await adapters[0].fullSync();
+      phase = "encrypted export before backup";
+      const beforeBackup = await findAliasConnectionVaultPayloads(adapters[0], profiles[0].userId);
       expect(
-        Number(
-          simpleLoginSql(
-            `SELECT COUNT(*) FROM alias WHERE email LIKE '${fixtureMarkerPrefix}%@alias.example';`,
-          ),
-        ),
-      ).toBe(0);
+        beforeBackup.find((payload) => payload.connection.connectionId === connectionId)?.credential
+          ?.token,
+      ).toBe(providerToken);
+      const carrier = profileZeroViews.find(
+        (cipher) =>
+          isAliasConnectionCipher(cipher) &&
+          parseAliasConnectionCipher(cipher).sync.replicaId === replicaIds[0] &&
+          parseAliasConnectionCipher(cipher).credential !== undefined,
+      )!;
+      const carrierEncryption = await profiles[0].client
+        .vault()
+        .ciphers()
+        .encrypt(carrier.toSdkCipherView());
+      const carrierRequest = new CipherRequest({
+        cipher: Cipher.fromSdkCipher(carrierEncryption.cipher)!,
+        encryptedFor: profiles[0].userId,
+      });
+      const carrierBackup = JSON.stringify({
+        folders: [],
+        ciphers: [carrierRequest],
+        folderRelationships: [],
+      });
+      expect(carrierBackup).not.toContain(providerToken);
+      expect(carrierBackup).not.toContain(connectionId);
+      expect(
+        (
+          await vaultRequest(profiles[0].accessToken, `/ciphers/${carrier.id}`, {
+            method: "DELETE",
+          })
+        ).response.status,
+      ).toBe(200);
+      expect(
+        (
+          await vaultRequest(profiles[0].accessToken, "/ciphers/import", {
+            method: "POST",
+            body: carrierBackup,
+          })
+        ).response.status,
+      ).toBe(200);
+      phase = "encrypted import after restore";
+      await adapters[0].fullSync();
+      const restored = await findAliasConnectionVaultPayloads(adapters[0], profiles[0].userId);
+      expect(
+        restored.find((payload) => payload.connection.connectionId === connectionId)?.credential
+          ?.token,
+      ).toBe(providerToken);
 
-      simpleLoginSql(`
-        INSERT INTO alias
-          (created_at, user_id, email, enabled, automatic_creation, mailbox_id,
-           disable_pgp, cannot_be_disabled, disable_email_spoofing_check, pinned)
-        SELECT CURRENT_TIMESTAMP + (series * INTERVAL '1 microsecond'),
-               1, '${addressPrefix}' || series || '@alias.example', TRUE, FALSE, 1,
-               FALSE, FALSE, FALSE, FALSE
-        FROM generate_series(0, ${fixtureSize - 1}) AS series;
-      `);
-      const aliasRows = simpleLoginSql(`
-        SELECT id || '|' || email
-        FROM alias
-        WHERE email LIKE '${addressPrefix}%@alias.example'
-        ORDER BY id;
-      `)
-        .split("\n")
-        .filter(Boolean)
-        .map((row) => {
-          const separator = row.indexOf("|");
-          return { id: row.slice(0, separator), address: row.slice(separator + 1) };
-        });
-      expect(aliasRows).toHaveLength(fixtureSize);
-      const expectedAliasIds = new Set(aliasRows.map((alias) => alias.id));
-
-      const serializedCreateRequests: string[] = [];
-      for (let index = 0; index < aliasRows.length; index++) {
-        const alias = aliasRows[index];
-        const view = new CipherView();
-        view.type = CipherType.Login;
-        view.name = `${marker} login ${index}`;
-        view.login.username = alias.address;
-        view.login.password = "account-password";
-        view.aliasBinding = {
-          version: 2,
-          provider: provider.provider,
-          providerInstance: provider.instance,
-          connectionId,
-          aliasId: alias.id,
-          address: alias.address,
-        };
-        const encrypted = await firstClient.client
-          .vault()
-          .ciphers()
-          .encrypt(view.toSdkCipherView());
-        const createRequest = new CipherRequest({
-          cipher: Cipher.fromSdkCipher(encrypted.cipher)!,
-          encryptedFor: firstClient.userId,
-        });
-        const serialized = JSON.stringify(createRequest);
-        expect(serialized).not.toContain(addressPrefix);
-        expect(serialized).not.toContain(providerToken);
-        serializedCreateRequests.push(serialized);
+      // Delete wins over a simultaneous stale enable and remains terminal after every replay.
+      phase = "simultaneous delete and enable";
+      resetSimpleLoginTestRateLimits();
+      await Promise.allSettled([
+        services[1].delete(primary.id),
+        services[2].setEnabled(primary.id, true),
+      ]);
+      for (let profile = 0; profile < 3; profile++) {
+        await adapters[profile].fullSync();
+        await stores[profile].load();
       }
-
-      const createResults = await runInBatches(serializedCreateRequests, (body) =>
-        vaultRequest(firstClient!.accessToken, "/ciphers", { method: "POST", body }),
+      const afterDelete = projectAliasSync(await stores[0].load());
+      const projectedPrimary = Object.values(afterDelete.aliases).find(
+        (alias) => alias.identity.aliasId === String(primary.id),
       );
-      for (const created of createResults) {
-        if (created.response.ok) {
-          cipherIds.push(new CipherResponse(created.json).id);
+      expect(projectedPrimary?.status).toBe("deleted");
+
+      const activeProfileZero = createSimpleLoginAliasService({
+        token: providerToken,
+        baseUrl: simpleLoginBaseUrl,
+        connectionId,
+        syncStore: stores[0],
+      });
+      await activeProfileZero.removeConnection();
+      phase = "connection removal";
+      await adapters[2].fullSync();
+      await stores[2].load();
+      await expect(services[2].create()).rejects.toMatchObject({ code: "conflict" });
+      const recoveredAfterRemoval = await findAliasConnectionVaultPayloads(
+        adapters[2],
+        profiles[2].userId,
+      );
+      expect(
+        recoveredAfterRemoval.find((payload) => payload.connection.connectionId === connectionId)
+          ?.credential,
+      ).toBeUndefined();
+
+      const elapsed = performance.now() - started;
+      expect(elapsed).toBeLessThan(1_800_000);
+      process.stdout.write(
+        `${JSON.stringify({
+          fixtureSize,
+          persistedProfiles: 3,
+          elapsedMilliseconds: Math.round(elapsed),
+          conflictsRetained: projections[0].conflicts.length,
+        })}\n`,
+      );
+    } catch (error) {
+      const wrapped = new Error(`${phase}: ${(error as Error).message}`) as Error & {
+        cause?: unknown;
+      };
+      wrapped.cause = error;
+      throw wrapped;
+    } finally {
+      const cleanupProfile = profiles.find((profile) => profile.accessToken);
+      if (cleanupProfile) {
+        const adapter = new RealVaultCipherAdapter(cleanupProfile);
+        const views = await adapter.fullSync().catch((): CipherView[] => []);
+        const carrierIds = views
+          .filter(isAliasConnectionCipher)
+          .filter((cipher) => {
+            try {
+              return parseAliasConnectionCipher(cipher).connection.connectionId === connectionId;
+            } catch {
+              return false;
+            }
+          })
+          .map((cipher) => cipher.id!);
+        const ids = [...fixtureIds, ...carrierIds];
+        for (let index = 0; index < ids.length; index += 500) {
+          await vaultRequest(cleanupProfile.accessToken, "/ciphers", {
+            method: "DELETE",
+            body: JSON.stringify({ ids: ids.slice(index, index + 500) }),
+          }).catch((): void => undefined);
         }
       }
-      expect(createResults.every((created) => created.response.status === 200)).toBe(true);
-      expect(cipherIds).toHaveLength(fixtureSize);
-
-      const driftedAlias = aliasRows[0];
-      const refreshedAddress = `${addressPrefix}refreshed@alias.example`;
-      simpleLoginSql(
-        `UPDATE alias SET email = '${refreshedAddress}' WHERE id = ${driftedAlias.id};`,
-      );
-      const cipherIdSet = new Set(cipherIds);
-
-      const realVaultAdapter = {
-        getAllDecrypted: async () => {
-          const sync = await vaultRequest(firstClient!.accessToken, "/sync?excludeDomains=true");
-          if (sync.response.status !== 200) {
-            throw new Error(`Bitwarden sync failed (${sync.response.status})`);
-          }
-          const raw = (sync.json?.Ciphers ?? sync.json?.ciphers) as unknown[];
-          return (await decryptCiphers(firstClient!, raw)).filter(
-            (cipher) => cipher.id !== undefined && cipherIdSet.has(cipher.id),
-          );
-        },
-        updateWithServer: async (view: CipherView) => {
-          const encrypted = await firstClient!.client
-            .vault()
-            .ciphers()
-            .encrypt(view.toSdkCipherView());
-          const request = new CipherRequest({
-            cipher: Cipher.fromSdkCipher(encrypted.cipher)!,
-            encryptedFor: firstClient!.userId,
-          });
-          const serialized = JSON.stringify(request);
-          if (serialized.includes(view.login.username) || serialized.includes(providerToken)) {
-            throw new Error("Alias update included plaintext alias data or provider credentials");
-          }
-          const updated = await vaultRequest(firstClient!.accessToken, `/ciphers/${view.id}`, {
-            method: "PUT",
-            body: serialized,
-          });
-          if (updated.response.status !== 200) {
-            throw new Error(`Bitwarden cipher update failed (${updated.response.status})`);
-          }
-          return view;
-        },
-      };
-      const reconciliation = new AliasReconciliationService(aliasService, realVaultAdapter);
-
-      const dryRun = await reconciliation.reconcile(firstClient.userId, false);
-      expect(dryRun.summary).toMatchObject({
-        loginCiphersScanned: fixtureSize,
-        exactMatches: fixtureSize - 1,
-        conflicts: 1,
-        plannedChanges: 1,
-        appliedChanges: 0,
-      });
-      expect(JSON.stringify(dryRun)).not.toContain(providerToken);
-
-      const applied = await reconciliation.reconcile(firstClient.userId, true);
-      expect(applied.summary).toMatchObject({
-        loginCiphersScanned: fixtureSize,
-        exactMatches: fixtureSize,
-        conflicts: 0,
-        plannedChanges: 1,
-        appliedChanges: 1,
-        failedChanges: 0,
-      });
-      expect(new Set(applied.exactMatches.map((match) => match.alias.aliasId))).toEqual(
-        expectedAliasIds,
-      );
-      expect(JSON.stringify(applied)).not.toContain(providerToken);
-
-      const idempotentRerun = await reconciliation.reconcile(firstClient.userId, true);
-      expect(idempotentRerun.summary).toMatchObject({
-        exactMatches: fixtureSize,
-        conflicts: 0,
-        plannedChanges: 0,
-        appliedChanges: 0,
-        failedChanges: 0,
-      });
-
-      secondClient = await authenticateBitwardenClient(bitwardenEmail, bitwardenPassword);
-      const finalSync = await vaultRequest(secondClient.accessToken, "/sync?excludeDomains=true");
-      expect(finalSync.response.status).toBe(200);
-      expect(finalSync.text).not.toContain(addressPrefix);
-      expect(finalSync.text).not.toContain(providerToken);
-      const finalRawCiphers = (finalSync.json?.Ciphers ?? finalSync.json?.ciphers) as unknown[];
-      const finalViews = (await decryptCiphers(secondClient, finalRawCiphers)).filter(
-        (cipher) => cipher.id !== undefined && cipherIdSet.has(cipher.id),
-      );
-      expect(finalViews).toHaveLength(fixtureSize);
-      expect(new Set(finalViews.map((cipher) => cipher.aliasBinding?.aliasId))).toEqual(
-        expectedAliasIds,
-      );
-      expect(finalViews.every((cipher) => cipher.aliasBinding?.version === 2)).toBe(true);
-      expect(finalViews.every((cipher) => cipher.fields?.length === 0)).toBe(true);
-      const refreshedView = finalViews.find(
-        (cipher) => cipher.aliasBinding?.aliasId === driftedAlias.id,
-      );
-      expect(refreshedView?.login.username).toBe(refreshedAddress);
-      expect(refreshedView?.aliasBinding).toMatchObject({
-        version: 2,
-        connectionId,
-        aliasId: driftedAlias.id,
-        address: refreshedAddress,
-      });
-    } finally {
-      if (cipherIds.length > 0 && (secondClient || firstClient)) {
-        const authenticated = secondClient ?? firstClient!;
-        await deleteCiphers(authenticated.accessToken, cipherIds);
+      removeSimpleLoginTestAliases(aliasIds);
+      for (const profile of profiles) {
+        profile.client.free();
       }
-      simpleLoginSql(`DELETE FROM alias WHERE email LIKE '${addressPrefix}%@alias.example';`);
-      expect(persistedCipherCount(cipherIds)).toBe(0);
-      expect(
-        Number(
-          simpleLoginSql(
-            `SELECT COUNT(*) FROM alias WHERE email LIKE '${addressPrefix}%@alias.example';`,
-          ),
-        ),
-      ).toBe(0);
-      firstClient?.client.free();
-      secondClient?.client.free();
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

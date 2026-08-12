@@ -1,3 +1,16 @@
+import {
+  ReadableStream as NodeReadableStream,
+  TransformStream as NodeTransformStream,
+  WritableStream as NodeWritableStream,
+} from "stream/web";
+import {
+  clearInterval as nodeClearInterval,
+  clearTimeout as nodeClearTimeout,
+  setInterval as nodeSetInterval,
+  setTimeout as nodeSetTimeout,
+} from "timers";
+import { MessagePort as NodeMessagePort } from "worker_threads";
+
 import { ChangeDetectionStrategy, Component, input } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { Router } from "@angular/router";
@@ -55,6 +68,23 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
   beforeAll(async () => {
     const email = requiredIntegrationSetting("SIMPLELOGIN_EMAIL");
     const password = requiredIntegrationSetting("SIMPLELOGIN_PASSWORD");
+    Object.assign(globalThis, {
+      ReadableStream: NodeReadableStream,
+      TransformStream: NodeTransformStream,
+      WritableStream: NodeWritableStream,
+      MessagePort: NodeMessagePort,
+      setTimeout: nodeSetTimeout,
+      clearTimeout: nodeClearTimeout,
+      setInterval: nodeSetInterval,
+      clearInterval: nodeClearInterval,
+    });
+    const { fetch: nodeFetch, Headers, Request, Response } = await import("undici");
+    Object.assign(globalThis, {
+      fetch: nodeFetch,
+      Headers,
+      Request,
+      Response,
+    });
     const login = await fetch(`${baseUrl}/api/auth/login`, {
       method: "POST",
       headers: new Headers({ Accept: "application/json", "Content-Type": "application/json" }),

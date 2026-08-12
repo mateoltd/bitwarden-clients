@@ -2,6 +2,7 @@ import { inject, Injectable } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
@@ -18,6 +19,7 @@ export class DesktopAliasService {
   private readonly accountService = inject(AccountService);
   private readonly cipherService = inject(CipherService);
   private readonly generatorService = inject(CredentialGeneratorService);
+  private readonly syncService = inject(SyncService, { optional: true }) ?? undefined;
 
   async client(): Promise<SimpleLoginAliasService> {
     const account = await firstValueFrom(this.accountService.activeAccount$);
@@ -25,7 +27,12 @@ export class DesktopAliasService {
       throw new SimpleLoginAliasError("SimpleLogin credentials are missing", "invalid-credentials");
     }
     return createSimpleLoginAliasService(
-      await readSimpleLoginAliasSettings(this.generatorService, account),
+      await readSimpleLoginAliasSettings(
+        this.generatorService,
+        account,
+        this.cipherService,
+        this.syncService,
+      ),
     );
   }
 

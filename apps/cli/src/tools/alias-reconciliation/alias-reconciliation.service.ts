@@ -426,6 +426,13 @@ export class AliasReconciliationService {
           if (!view) {
             throw new Error("SDK reconciliation did not return an updated cipher");
           }
+          if (changeIdentity) {
+            await this.aliasService.recordReference(
+              cipherId,
+              ciphers.find((cipher) => cipher.id === cipherId)?.aliasBinding,
+              changeIdentity,
+            );
+          }
           await this.cipherService.updateWithServer(view, userId);
           if (change) {
             changes.push({ ...change, status: "applied" });

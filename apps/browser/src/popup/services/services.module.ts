@@ -264,7 +264,7 @@ const safeProviders: SafeProvider[] = [
   safeProvider({
     provide: BrowserSimpleLoginAliasService,
     useClass: BrowserSimpleLoginAliasService,
-    deps: [AccountService, CredentialGeneratorService],
+    deps: [AccountService, CredentialGeneratorService, CipherService, SyncService],
   }),
   safeProvider(InitService),
   safeProvider(DebounceNavigationService),

@@ -161,6 +161,11 @@ describe("alias reconciliation", () => {
     expect(stored[0].login.username).toBe("current@sl.test");
     expect(rerun.summary).toMatchObject({ plannedChanges: 0, appliedChanges: 0, exactMatches: 1 });
     expect(cipherService.updateWithServer).toHaveBeenCalledTimes(1);
+    expect(aliasService.recordReference).toHaveBeenCalledWith(
+      cipherId(1),
+      expect.objectContaining({ aliasId: "3", address: "stale@sl.test" }),
+      expect.objectContaining({ aliasId: "3", address: "current@sl.test" }),
+    );
   });
 
   it("does not infer a binding from an unbound login address", async () => {

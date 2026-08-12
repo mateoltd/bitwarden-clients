@@ -2,6 +2,7 @@ import {
   Component,
   EventEmitter,
   Input,
+  inject,
   OnChanges,
   OnDestroy,
   OnInit,
@@ -23,8 +24,10 @@ import {
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { Account } from "@bitwarden/common/auth/abstractions/account.service";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { VendorId } from "@bitwarden/common/tools/extension";
 import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
+import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import {
   FormFieldModule,
   AriaDisableDirective,
@@ -34,9 +37,13 @@ import {
 } from "@bitwarden/components";
 import {
   CredentialGeneratorService,
+  attachSimpleLoginAliasSyncStore,
+  createSimpleLoginAliasService,
   createSimpleLoginConnectionId,
   ForwarderOptions,
   GeneratorMetadata,
+  isSimpleLoginConnectionId,
+  simpleLoginAliasSyncStore,
 } from "@bitwarden/generator-core";
 import { I18nPipe } from "@bitwarden/ui-common";
 
@@ -65,6 +72,8 @@ const Controls = Object.freeze({
   ],
 })
 export class ForwarderSettingsComponent implements OnInit, OnChanges, OnDestroy {
+  private readonly cipherService = inject(CipherService, { optional: true }) ?? undefined;
+  private readonly syncService = inject(SyncService, { optional: true }) ?? undefined;
   /** Instantiates the component
    *  @param generatorService settings and policy logic
    *  @param formBuilder reactive form controls
@@ -174,9 +183,30 @@ export class ForwarderSettingsComponent implements OnInit, OnChanges, OnDestroy 
           if (
             this.forwarder === Vendor.simplelogin &&
             saveValues.token?.trim() &&
-            !saveValues.connectionId
+            !isSimpleLoginConnectionId(saveValues.connectionId)
           ) {
             saveValues.connectionId = createSimpleLoginConnectionId();
+          }
+          if (
+            this.forwarder === Vendor.simplelogin &&
+            current.token?.trim() &&
+            !saveValues.token?.trim() &&
+            isSimpleLoginConnectionId(current.connectionId)
+          ) {
+            const settingsWithSync = attachSimpleLoginAliasSyncStore(
+              current,
+              settings,
+              this.account,
+              this.cipherService,
+              this.syncService,
+            );
+            const lifecycle = createSimpleLoginAliasService({
+              token: current.token,
+              baseUrl: current.baseUrl,
+              connectionId: current.connectionId,
+              syncStore: simpleLoginAliasSyncStore(settingsWithSync),
+            });
+            saveValues.aliasSync = (await lifecycle.removeConnection()) ?? current.aliasSync;
           }
           return { saveValues, settings };
         }),

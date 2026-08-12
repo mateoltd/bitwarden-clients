@@ -1,3 +1,10 @@
+import {
+  AliasSyncDocument,
+  appendAliasSyncEvent,
+  createAliasSyncDocument,
+  projectAliasSync,
+} from "@bitwarden/common/tools/alias";
+
 import { createSimpleLoginAliasService } from "./simple-login-alias.service";
 
 const connectionId = "11111111-1111-4111-8111-111111111111";
@@ -67,5 +74,49 @@ describe("SimpleLoginAliasService", () => {
       code: "invalid-response",
       message: "SimpleLogin page is invalid",
     });
+  });
+
+  it("makes connection removal terminal for a stale lifecycle instance", async () => {
+    let persisted = createAliasSyncDocument("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    const service = createSimpleLoginAliasService({
+      token: "provider-secret",
+      connectionId,
+      syncStore: {
+        load: async () => persisted,
+        save: async (document) => {
+          persisted = document;
+        },
+      },
+    });
+
+    await service.removeConnection();
+    await expect(service.create()).rejects.toMatchObject({ code: "conflict" });
+    expect(Object.values(projectAliasSync(persisted).connections)[0].status).toBe("removed");
+  });
+
+  it("does not resume a prepared provider mutation after observing connection removal", async () => {
+    const replicaId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const providerInstance = "https://app.simplelogin.io/";
+    const connection = { provider: "simplelogin" as const, providerInstance, connectionId };
+    let persisted: AliasSyncDocument = createAliasSyncDocument(replicaId);
+    persisted = appendAliasSyncEvent(persisted, { kind: "connection-upsert", connection });
+    persisted = appendAliasSyncEvent(persisted, {
+      kind: "provider-operation",
+      value: { operation: "create", connection, request: { kind: "random" } },
+    });
+    persisted = appendAliasSyncEvent(persisted, { kind: "connection-remove", connection });
+    const service = createSimpleLoginAliasService({
+      token: "provider-secret",
+      connectionId,
+      syncStore: {
+        load: async () => persisted,
+        save: async (document) => {
+          persisted = document;
+        },
+      },
+    });
+
+    await expect(service.create()).rejects.toMatchObject({ code: "conflict" });
+    expect(persisted.events.some((event) => event.kind === "provider-dispatched")).toBe(false);
   });
 });

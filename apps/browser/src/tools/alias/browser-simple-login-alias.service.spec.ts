@@ -12,6 +12,7 @@ import { BrowserSimpleLoginAliasService } from "./browser-simple-login-alias.ser
 describe("BrowserSimpleLoginAliasService", () => {
   const userId = "11111111-1111-4111-8111-111111111111" as UserId;
   const baseUrl = "https://app.simplelogin.io";
+  const connectionId = "33333333-3333-4333-8333-333333333333";
 
   let generatorService: MockProxy<CredentialGeneratorService>;
   let accountService: FakeAccountService;
@@ -24,14 +25,14 @@ describe("BrowserSimpleLoginAliasService", () => {
     settings$ = new BehaviorSubject<ForwarderOptions>({
       token: "provider-token-must-not-leak",
       baseUrl,
-      connectionId: "33333333-3333-4333-8333-333333333333",
+      connectionId,
     });
     generatorService.forwarder.mockReturnValue({} as any);
     generatorService.settings.mockReturnValue(settings$ as any);
     service = new BrowserSimpleLoginAliasService(accountService, generatorService);
   });
 
-  it("reads the persisted connection identity without rewriting settings", async () => {
+  it("requires the UUIDv4 persisted by explicit settings save without mutating settings", async () => {
     const next = jest.spyOn(settings$, "next");
     const client = await service["lifecycle"]();
     const identity = client.providerIdentity();
@@ -39,10 +40,22 @@ describe("BrowserSimpleLoginAliasService", () => {
     expect(identity).toMatchObject({
       provider: "simplelogin",
       instance: "https://app.simplelogin.io/",
-      connectionId: settings$.value.connectionId,
+      connectionId,
     });
+    expect(settings$.value.connectionId).toBe(identity.connectionId);
     expect(next).not.toHaveBeenCalled();
     expect(JSON.stringify(identity)).not.toContain(settings$.value.token);
+  });
+
+  it("rejects missing persisted identity instead of creating one during a read", async () => {
+    const missing = { token: settings$.value.token, baseUrl };
+    settings$ = new BehaviorSubject<ForwarderOptions>(missing);
+    generatorService.settings.mockReturnValue(settings$ as any);
+    const next = jest.spyOn(settings$, "next");
+
+    await expect(service["lifecycle"]()).rejects.toMatchObject({ code: "invalid-credentials" });
+    expect(settings$.value).toEqual(missing);
+    expect(next).not.toHaveBeenCalled();
   });
 
   it("reads fresh encrypted settings after an account switch", async () => {

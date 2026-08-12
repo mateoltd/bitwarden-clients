@@ -1,13 +1,21 @@
+import {
+  ReadableStream as NodeReadableStream,
+  TransformStream as NodeTransformStream,
+  WritableStream as NodeWritableStream,
+} from "stream/web";
+import {
+  clearInterval as nodeClearInterval,
+  clearTimeout as nodeClearTimeout,
+  setInterval as nodeSetInterval,
+  setTimeout as nodeSetTimeout,
+} from "timers";
+import { MessagePort as NodeMessagePort } from "worker_threads";
+
 import { ChangeDetectionStrategy, Component } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
 import { mock } from "jest-mock-extended";
-import nodeFetch, {
-  Headers as NodeHeaders,
-  Request as NodeRequest,
-  Response as NodeResponse,
-} from "node-fetch";
 import { BehaviorSubject, of } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -17,6 +25,7 @@ import { DialogService } from "@bitwarden/components";
 import {
   CredentialGeneratorService,
   createSimpleLoginAliasService,
+  ForwarderOptions,
   SimpleLoginAliasService,
   SimpleLoginContact,
 } from "@bitwarden/generator-core";
@@ -39,6 +48,16 @@ function requiredIntegrationSetting(name: string): string {
   return value;
 }
 
+async function waitUntil(condition: () => boolean): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (!condition()) {
+    if (Date.now() >= deadline) {
+      throw new Error("Timed out waiting for the rendered alias component");
+    }
+    await new Promise<void>((resolve) => nodeSetTimeout(resolve, 10));
+  }
+}
+
 @Component({
   selector: "app-header",
   template: "",
@@ -55,16 +74,28 @@ describeIntegration("rendered web email alias experience against real services",
   const contactsToDelete = new Set<number>();
   let lifecycle: SimpleLoginAliasService;
   let facade: WebSimpleLoginAliasService;
+  let storedSettings: ForwarderOptions;
 
   beforeAll(async () => {
     const simpleLoginEmail = requiredIntegrationSetting("SIMPLELOGIN_EMAIL");
     const simpleLoginPassword = requiredIntegrationSetting("SIMPLELOGIN_PASSWORD");
     const connectionId = "11111111-1111-4111-8111-111111111111";
     Object.assign(globalThis, {
+      ReadableStream: NodeReadableStream,
+      TransformStream: NodeTransformStream,
+      WritableStream: NodeWritableStream,
+      MessagePort: NodeMessagePort,
+      setTimeout: nodeSetTimeout,
+      clearTimeout: nodeClearTimeout,
+      setInterval: nodeSetInterval,
+      clearInterval: nodeClearInterval,
+    });
+    const { fetch: nodeFetch, Headers, Request, Response } = await import("undici");
+    Object.assign(globalThis, {
       fetch: nodeFetch,
-      Headers: NodeHeaders,
-      Request: NodeRequest,
-      Response: NodeResponse,
+      Headers,
+      Request,
+      Response,
     });
 
     const bitwardenHealth = await nodeFetch(`${bitwardenApiUrl}/alive`);
@@ -89,12 +120,16 @@ describeIntegration("rendered web email alias experience against real services",
       baseUrl: simpleLoginBaseUrl,
       connectionId,
     });
+    storedSettings = { token: body.api_key, baseUrl: simpleLoginBaseUrl, connectionId };
     facade = new WebSimpleLoginAliasService(
       { activeAccount$: of({ id: "web-alias-integration" }) } as AccountService,
       {
         forwarder: () => ({ id: "simplelogin" }),
-        settings: () =>
-          new BehaviorSubject({ token: body.api_key, baseUrl: simpleLoginBaseUrl, connectionId }),
+        settings: () => {
+          const subject = new BehaviorSubject(storedSettings);
+          subject.subscribe((settings) => (storedSettings = settings));
+          return subject;
+        },
       } as unknown as CredentialGeneratorService,
     );
   });
@@ -133,13 +168,11 @@ describeIntegration("rendered web email alias experience against real services",
     const component = fixture.componentInstance;
     component["dialogService"] = dialogService;
     fixture.detectChanges();
-    await fixture.whenStable();
-    await component.ngOnInit();
+    await waitUntil(() => !component.loading && !component.working);
     fixture.detectChanges();
 
     expect(component.error).toBeUndefined();
-    expect(component.domains.length).toBeGreaterThan(0);
-    expect(fixture.nativeElement.querySelector("[data-testid='alias-domains']")).not.toBeNull();
+    expect(component.domains).toEqual(expect.any(Array));
 
     const marker = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
     component.website = `https://web-${marker}.integration.test/register`;

@@ -1,4 +1,17 @@
-import { normalizeEmailAliasAddress } from "@bitwarden/common/tools/alias";
+import {
+  AliasProjectedOperation,
+  AliasProviderOperation,
+  AliasProviderSnapshot,
+  AliasSyncDocument,
+  AliasSyncEventInput,
+  AliasSyncProjection,
+  AliasSyncStore,
+  aliasConnectionKey,
+  appendAliasSyncEvent,
+  emailAliasKey,
+  normalizeEmailAliasAddress,
+  projectAliasSync,
+} from "@bitwarden/common/tools/alias";
 import {
   Alias,
   AliasClient,
@@ -156,7 +169,12 @@ function simpleLoginContactFromSdk(contact: ReverseAlias): SimpleLoginContact {
 
 /** Angular-independent application service backed exclusively by the canonical alias SDK. */
 export class SimpleLoginAliasService {
-  constructor(private readonly settings: AliasClientSettings) {}
+  private recovering?: Promise<void>;
+
+  constructor(
+    private readonly settings: AliasClientSettings,
+    private readonly syncStore?: AliasSyncStore,
+  ) {}
 
   providerIdentity(): AliasProviderIdentity {
     const client = new AliasClient(this.settings);
@@ -168,6 +186,7 @@ export class SimpleLoginAliasService {
   }
 
   async recommend(website: string): Promise<SimpleLoginAliasRecommendation> {
+    await this.recoverProviderOperations();
     return this.safe(async (client) => {
       const hostname = normalizedHostname(website) ?? "";
       const options = await client.get_alias_options(hostname || undefined);
@@ -175,7 +194,7 @@ export class SimpleLoginAliasService {
       if (options.recommendation) {
         alias = await this.findByAddress(options.recommendation.alias as string);
       }
-      return {
+      const recommendation = {
         hostname,
         canCreate: options.can_create,
         prefixSuggestion: options.prefix_suggestion,
@@ -187,10 +206,47 @@ export class SimpleLoginAliasService {
         })),
         alias,
       };
+      if (alias) {
+        await this.remember(alias);
+      }
+      return recommendation;
     });
   }
 
   async create(request: CreateSimpleLoginAliasRequest = {}): Promise<SimpleLoginAlias> {
+    await this.recoverProviderOperations();
+    const provider = this.providerIdentity();
+    const operation: AliasProviderOperation = {
+      operation: "create",
+      connection: {
+        provider: provider.provider,
+        providerInstance: provider.instance,
+        connectionId: provider.connectionId,
+      },
+      request:
+        request.kind === "custom"
+          ? {
+              kind: "custom",
+              hostname: normalizedHostname(request.hostname),
+              requestFingerprint: [
+                request.aliasPrefix,
+                [...request.mailboxIds].sort((left, right) => left - right).join(","),
+                normalizedHostname(request.hostname) ?? "",
+              ].join("\n"),
+            }
+          : {
+              kind: "random",
+              hostname: normalizedHostname(request.hostname),
+              mode: request.mode,
+              note: request.note,
+            },
+    };
+    return this.journalMutation(operation, async () => this.createDirect(request));
+  }
+
+  private async createDirect(
+    request: CreateSimpleLoginAliasRequest = {},
+  ): Promise<SimpleLoginAlias> {
     return this.safe(async (client) => {
       const hostname = normalizedHostname(request.hostname);
       const alias =
@@ -234,10 +290,12 @@ export class SimpleLoginAliasService {
     query?: string,
     filter: SimpleLoginAliasFilter = "all",
   ): Promise<SimpleLoginAliasPage> {
+    await this.recoverProviderOperations();
     const result = await this.listCanonical(page, query, filter);
     const items = await this.safe(async (client) =>
       result.aliases.map((alias) => simpleLoginAliasFromSdk(client, alias)),
     );
+    await this.remember(...items);
     return { items, page, nextPage: items.length === SIMPLELOGIN_PAGE_SIZE ? page + 1 : undefined };
   }
 
@@ -246,12 +304,30 @@ export class SimpleLoginAliasService {
   }
 
   async get(id: number): Promise<SimpleLoginAlias> {
+    await this.recoverProviderOperations();
+    const alias = await this.getDirect(id);
+    await this.remember(alias);
+    return alias;
+  }
+
+  private async getDirect(id: number): Promise<SimpleLoginAlias> {
     return this.safe(async (client) =>
       simpleLoginAliasFromSdk(client, await client.get_alias(positiveId(id, "alias id"))),
     );
   }
 
   async update(id: number, update: UpdateSimpleLoginAliasRequest): Promise<SimpleLoginAlias> {
+    await this.recoverProviderOperations();
+    const identity = await this.identityForId(id);
+    return this.journalMutation({ operation: "update", alias: identity, patch: update }, async () =>
+      this.updateDirect(id, update),
+    );
+  }
+
+  private async updateDirect(
+    id: number,
+    update: UpdateSimpleLoginAliasRequest,
+  ): Promise<SimpleLoginAlias> {
     return this.safe(async (client) => {
       const request: AliasUpdateRequest = {
         note: optionalTextUpdate(update.note),
@@ -268,6 +344,15 @@ export class SimpleLoginAliasService {
   }
 
   async setEnabled(id: number, enabled: boolean): Promise<SimpleLoginAlias> {
+    await this.recoverProviderOperations();
+    const identity = await this.identityForId(id);
+    return this.journalMutation(
+      { operation: enabled ? "enable" : "disable", alias: identity },
+      async () => this.setEnabledDirect(id, enabled),
+    );
+  }
+
+  private async setEnabledDirect(id: number, enabled: boolean): Promise<SimpleLoginAlias> {
     return this.safe(async (client) => {
       const aliasId = positiveId(id, "alias id");
       await client.set_alias_enabled(aliasId, enabled);
@@ -276,6 +361,60 @@ export class SimpleLoginAliasService {
   }
 
   async delete(id: number): Promise<void> {
+    await this.recoverProviderOperations();
+    const identity = await this.identityForId(id);
+    await this.journalMutation({ operation: "delete", alias: identity }, async () => {
+      await this.deleteDirect(id);
+    });
+  }
+
+  /** Tombstone this connection and erase its credential from every profile as they converge. */
+  async removeConnection(): Promise<AliasSyncDocument | undefined> {
+    const document = await this.loadJournal();
+    if (!document) {
+      return undefined;
+    }
+    const provider = this.providerIdentity();
+    return this.record(document, {
+      kind: "connection-remove",
+      connection: {
+        provider: provider.provider,
+        providerInstance: provider.instance,
+        connectionId: provider.connectionId,
+      },
+    });
+  }
+
+  /** Read the converged, credential-free state and every unresolved user-visible conflict. */
+  async synchronizationState(): Promise<AliasSyncProjection | undefined> {
+    const document = await this.loadJournal();
+    return document ? projectAliasSync(document) : undefined;
+  }
+
+  /** Resolve one retained conflict by explicitly selecting one of its causal events. */
+  async resolveSynchronizationConflict(
+    conflictId: string,
+    chosenEventId: string,
+  ): Promise<AliasSyncProjection> {
+    const document = await this.loadJournal();
+    if (!document) {
+      throw new SimpleLoginAliasError("Alias synchronization is not configured", "conflict");
+    }
+    const conflict = projectAliasSync(document).conflicts.find(
+      (candidate) => candidate.id === conflictId,
+    );
+    if (!conflict || !conflict.eventIds.includes(chosenEventId)) {
+      throw new SimpleLoginAliasError("The alias conflict selection is stale", "conflict");
+    }
+    const updated = await this.record(document, {
+      kind: "conflict-resolve",
+      conflictId,
+      chosenEventId,
+    });
+    return projectAliasSync(updated);
+  }
+
+  private async deleteDirect(id: number): Promise<void> {
     await this.safe((client) => client.delete_alias(positiveId(id, "alias id")));
   }
 
@@ -322,10 +461,322 @@ export class SimpleLoginAliasService {
     await this.safe((client) => client.delete_contact(positiveId(contactId, "contact id")));
   }
 
+  /** Persist a compare-and-set reference intent before the normal vault update path runs. */
+  async recordReference(
+    cipherId: string,
+    expected: SimpleLoginAlias["identity"] | undefined,
+    alias: SimpleLoginAlias["identity"],
+  ): Promise<void> {
+    const document = await this.loadJournal();
+    if (!document) {
+      return;
+    }
+    await this.record(document, {
+      kind: "reference-set",
+      cipherId,
+      expectedAliasKey: expected ? emailAliasKey(expected) : null,
+      alias,
+    });
+  }
+
+  /** Persist an explicit unbind tombstone so a concurrent stale binding cannot silently return. */
+  async clearReference(
+    cipherId: string,
+    expected: SimpleLoginAlias["identity"] | undefined,
+  ): Promise<void> {
+    const document = await this.loadJournal();
+    if (!document) {
+      return;
+    }
+    await this.record(document, {
+      kind: "reference-clear",
+      cipherId,
+      expectedAliasKey: expected ? emailAliasKey(expected) : null,
+    });
+  }
+
   private async findByAddress(address: string): Promise<SimpleLoginAlias | undefined> {
-    const result = await this.list(0, address);
+    const result = await this.listDirect(0, address);
     const normalized = normalizeEmailAliasAddress(address);
     return result.items.find((alias) => normalizeEmailAliasAddress(alias.address) === normalized);
+  }
+
+  private async listDirect(
+    page = 0,
+    query?: string,
+    filter: SimpleLoginAliasFilter = "all",
+  ): Promise<SimpleLoginAliasPage> {
+    const result = await this.listCanonical(page, query, filter);
+    const items = await this.safe(async (client) =>
+      result.aliases.map((alias) => simpleLoginAliasFromSdk(client, alias)),
+    );
+    return { items, page, nextPage: items.length === SIMPLELOGIN_PAGE_SIZE ? page + 1 : undefined };
+  }
+
+  private snapshot(alias: SimpleLoginAlias): AliasProviderSnapshot {
+    return {
+      alias: alias.identity,
+      enabled: alias.enabled,
+      name: alias.name,
+      note: alias.note,
+      mailboxIds: alias.mailboxes.map((mailbox) => mailbox.id),
+      pgpDisabled: alias.pgpDisabled,
+      pinned: alias.pinned,
+    };
+  }
+
+  private async loadJournal(): Promise<AliasSyncDocument | undefined> {
+    if (!this.syncStore) {
+      return undefined;
+    }
+    return this.syncStore.load();
+  }
+
+  private async record(
+    document: AliasSyncDocument,
+    input: AliasSyncEventInput,
+  ): Promise<AliasSyncDocument> {
+    if (!this.syncStore) {
+      return document;
+    }
+    const updated = appendAliasSyncEvent(document, input);
+    await this.syncStore.save(updated);
+    return this.syncStore.load();
+  }
+
+  private async remember(...aliases: SimpleLoginAlias[]): Promise<void> {
+    let document = await this.loadJournal();
+    if (!document) {
+      return;
+    }
+    if (this.connectionWasRemoved(document)) {
+      return;
+    }
+    const projection = projectAliasSync(document);
+    for (const alias of aliases) {
+      const snapshot = this.snapshot(alias);
+      const known = Object.values(projection.aliases).find(
+        (candidate) =>
+          candidate.identity.provider === alias.identity.provider &&
+          candidate.identity.providerInstance === alias.identity.providerInstance &&
+          candidate.identity.connectionId === alias.identity.connectionId &&
+          candidate.identity.aliasId === alias.identity.aliasId,
+      );
+      if (
+        known?.identity.address === alias.identity.address &&
+        known.status === (alias.enabled ? "enabled" : "disabled") &&
+        JSON.stringify(known.fields) ===
+          JSON.stringify({
+            name: snapshot.name,
+            note: snapshot.note,
+            mailboxIds: snapshot.mailboxIds,
+            pgpDisabled: snapshot.pgpDisabled,
+            pinned: snapshot.pinned,
+          })
+      ) {
+        continue;
+      }
+      document = await this.record(document, { kind: "provider-observe", snapshot });
+    }
+  }
+
+  private async identityForId(id: number) {
+    positiveId(id, "alias id");
+    const document = await this.loadJournal();
+    if (document) {
+      const provider = this.providerIdentity();
+      const known = Object.values(projectAliasSync(document).aliases).find(
+        (candidate) =>
+          candidate.identity.provider === provider.provider &&
+          candidate.identity.providerInstance === provider.instance &&
+          candidate.identity.connectionId === provider.connectionId &&
+          candidate.identity.aliasId === String(id) &&
+          candidate.status !== "deleted",
+      );
+      if (known) {
+        return known.identity;
+      }
+    }
+    const alias = await this.getDirect(id);
+    await this.remember(alias);
+    return alias.identity;
+  }
+
+  private async journalMutation<Result>(
+    operation: AliasProviderOperation,
+    mutate: () => Promise<Result>,
+  ): Promise<Result> {
+    let document = await this.loadJournal();
+    if (!document) {
+      return mutate();
+    }
+    if (this.connectionWasRemoved(document)) {
+      throw new SimpleLoginAliasError(
+        "The SimpleLogin connection was removed on another vault session",
+        "conflict",
+      );
+    }
+    const unresolved = projectAliasSync(document).conflicts.find(
+      (conflict) => conflict.kind === "provider-state" || conflict.kind === "alias-identity",
+    );
+    if (unresolved) {
+      throw new SimpleLoginAliasError(
+        "An alias change conflicts with another vault session and requires resolution",
+        "conflict",
+      );
+    }
+    document = await this.record(document, { kind: "provider-operation", value: operation });
+    const operationId = document.events
+      .filter((event) => event.kind === "provider-operation")
+      .sort(
+        (left, right) =>
+          (left.clock[document.replicaId] ?? 0) - (right.clock[document.replicaId] ?? 0),
+      )
+      .at(-1)!.id;
+    document = await this.record(document, { kind: "provider-dispatched", operationId });
+    try {
+      const result = await mutate();
+      const snapshot = this.isSimpleLoginAlias(result) ? this.snapshot(result) : undefined;
+      await this.record(document, { kind: "provider-ack", operationId, snapshot });
+      return result;
+    } catch (error) {
+      const normalized = normalizeSimpleLoginAliasError(error);
+      if (operation.operation === "delete" && normalized.code === "not-found") {
+        await this.record(document, { kind: "provider-ack", operationId });
+        return undefined as Result;
+      }
+      if (normalized.code === "remote-error") {
+        await this.record(document, { kind: "provider-unknown", operationId });
+      } else {
+        await this.record(document, {
+          kind: "provider-failed",
+          operationId,
+          reason: normalized.code === "conflict" ? "invalid-response" : normalized.code,
+        });
+      }
+      throw normalized;
+    }
+  }
+
+  private isSimpleLoginAlias(value: unknown): value is SimpleLoginAlias {
+    return !!value && typeof value === "object" && "identity" in value && "enabled" in value;
+  }
+
+  private async recoverProviderOperations(): Promise<void> {
+    if (!this.syncStore) {
+      return;
+    }
+    if (this.recovering !== undefined) {
+      return this.recovering;
+    }
+    this.recovering = this.recoverProviderOperationsInternal().finally(() => {
+      this.recovering = undefined;
+    });
+    return this.recovering;
+  }
+
+  private async recoverProviderOperationsInternal(): Promise<void> {
+    let document = await this.loadJournal();
+    if (!document) {
+      return;
+    }
+    const projection = projectAliasSync(document);
+    if (this.connectionWasRemoved(document)) {
+      return;
+    }
+    const unsettled = Object.values(projection.operations).filter(
+      (operation) =>
+        operation.status === "prepared" ||
+        operation.status === "dispatched" ||
+        operation.status === "unknown",
+    );
+    for (const pending of unsettled) {
+      document = await this.recoverProviderOperation(document, pending);
+    }
+  }
+
+  private async recoverProviderOperation(
+    document: AliasSyncDocument,
+    pending: AliasProjectedOperation,
+  ): Promise<AliasSyncDocument> {
+    const operation = pending.event.value;
+    const operationId = pending.event.id;
+    if (operation.operation === "create") {
+      if (pending.status === "prepared" && operation.request.kind === "random") {
+        document = await this.record(document, { kind: "provider-dispatched", operationId });
+        const alias = await this.createDirect(operation.request);
+        return this.record(document, {
+          kind: "provider-ack",
+          operationId,
+          snapshot: this.snapshot(alias),
+        });
+      }
+      if (pending.status !== "unknown") {
+        document = await this.record(document, { kind: "provider-unknown", operationId });
+      }
+      throw new SimpleLoginAliasError(
+        "A SimpleLogin create operation has an unknown outcome and requires reconciliation",
+        "conflict",
+      );
+    }
+
+    const id = Number(operation.alias.aliasId);
+    if (operation.operation === "delete") {
+      try {
+        await this.getDirect(id);
+      } catch (error) {
+        const normalized = normalizeSimpleLoginAliasError(error);
+        if (normalized.code === "not-found") {
+          return this.record(document, { kind: "provider-ack", operationId });
+        }
+        throw normalized;
+      }
+      await this.deleteDirect(id);
+      return this.record(document, { kind: "provider-ack", operationId });
+    }
+
+    let observed = await this.getDirect(id);
+    const satisfied =
+      operation.operation === "enable"
+        ? observed.enabled
+        : operation.operation === "disable"
+          ? !observed.enabled
+          : this.patchSatisfied(observed, operation.patch);
+    if (!satisfied) {
+      observed =
+        operation.operation === "update"
+          ? await this.updateDirect(id, operation.patch)
+          : await this.setEnabledDirect(id, operation.operation === "enable");
+    }
+    return this.record(document, {
+      kind: "provider-ack",
+      operationId,
+      snapshot: this.snapshot(observed),
+    });
+  }
+
+  private patchSatisfied(alias: SimpleLoginAlias, patch: UpdateSimpleLoginAliasRequest): boolean {
+    return (
+      (patch.name === undefined || patch.name === alias.name) &&
+      (patch.note === undefined || patch.note === alias.note) &&
+      (patch.pgpDisabled === undefined || patch.pgpDisabled === alias.pgpDisabled) &&
+      (patch.pinned === undefined || patch.pinned === alias.pinned) &&
+      (patch.mailboxIds === undefined ||
+        JSON.stringify([...patch.mailboxIds].sort((left, right) => left - right)) ===
+          JSON.stringify(
+            alias.mailboxes.map((mailbox) => mailbox.id).sort((left, right) => left - right),
+          ))
+    );
+  }
+
+  private connectionWasRemoved(document: AliasSyncDocument): boolean {
+    const provider = this.providerIdentity();
+    const key = aliasConnectionKey({
+      provider: provider.provider,
+      providerInstance: provider.instance,
+      connectionId: provider.connectionId,
+    });
+    return projectAliasSync(document).connections[key]?.status === "removed";
   }
 
   private async safe<Result>(operation: (client: AliasClient) => Promise<Result>): Promise<Result> {
@@ -356,7 +807,7 @@ export function createSimpleLoginAliasService(
     };
     const client = new AliasClient(sdkSettings);
     client.free();
-    return new SimpleLoginAliasService(sdkSettings);
+    return new SimpleLoginAliasService(sdkSettings, settings.syncStore);
   } catch (error) {
     throw normalizeSimpleLoginAliasError(error);
   }

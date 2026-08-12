@@ -1,6 +1,11 @@
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 
-import { createSimpleLoginAliasService, toSimpleLoginCredentialMetadata } from "../alias";
+import {
+  createSimpleLoginAliasService,
+  isSimpleLoginConnectionId,
+  simpleLoginAliasSyncStore,
+  toSimpleLoginCredentialMetadata,
+} from "../alias";
 import { Type } from "../metadata";
 import {
   CredentialGenerator,
@@ -24,7 +29,7 @@ export class SimpleLoginForwarder implements CredentialGenerator<ForwarderOption
     request: GenerateRequest,
     settings: ForwarderOptions,
   ): Promise<GeneratedCredential> {
-    if (!settings.token?.trim() || !settings.connectionId) {
+    if (!settings.token?.trim() || !isSimpleLoginConnectionId(settings.connectionId)) {
       throw new Error(this.i18n.t("forwarderInvalidToken", this.configuration.name));
     }
     const context = new ForwarderContext(this.configuration, settings, this.i18n);
@@ -32,6 +37,7 @@ export class SimpleLoginForwarder implements CredentialGenerator<ForwarderOption
       token: settings.token,
       baseUrl: settings.baseUrl,
       connectionId: settings.connectionId,
+      syncStore: simpleLoginAliasSyncStore(settings),
     }).create({
       hostname: request.website,
       note: context.generatedBy({ website: request.website }),

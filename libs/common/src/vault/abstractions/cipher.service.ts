@@ -69,6 +69,8 @@ export abstract class CipherService implements UserKeyRotationDataProvider<Ciphe
   abstract get(id: string, userId: UserId): Promise<Cipher>;
   abstract getAll(userId: UserId): Promise<Cipher[]>;
   abstract getAllDecrypted(userId: UserId): Promise<CipherView[]>;
+  /** Internal records are excluded from normal vault consumers and are available only here. */
+  abstract getAllDecryptedIncludingInternal(userId: UserId): Promise<CipherView[]>;
   abstract getAllDecryptedForGrouping(
     groupingId: string,
     userId: UserId,

@@ -2270,6 +2270,8 @@ export default class MainBackground {
       this.i18nService,
       this.apiService,
       this.sdkService,
+      this.cipherService,
+      this.syncService,
     );
 
     // LocalGeneratorHistoryService is always the correct implementation for the
@@ -2298,7 +2300,12 @@ export default class MainBackground {
       this.accountService,
       this.generatorHistoryService,
       this.credentialGeneratorService,
-      new BrowserSimpleLoginAliasService(this.accountService, this.credentialGeneratorService),
+      new BrowserSimpleLoginAliasService(
+        this.accountService,
+        this.credentialGeneratorService,
+        this.cipherService,
+        this.syncService,
+      ),
     );
 
     this.autofillBadgeUpdaterService = new AutofillBadgeUpdaterService(
