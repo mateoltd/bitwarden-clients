@@ -25,15 +25,12 @@ build_once() {
     tail -n 200 "$log" >&2
     return 1
   }
-  find "$output" -maxdepth 1 -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print -quit
+  local artifact
+  artifact="$(find "$output" -maxdepth 1 -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print -quit)"
+  rm -rf -- "$source"
+  printf '%s\n' "$artifact"
 }
 
 first="$(build_once first)"
 second="$(build_once second)"
-first_hash="$(node -e 'const c=require("node:crypto"),f=require("node:fs"); console.log(c.createHash("sha256").update(f.readFileSync(process.argv[1])).digest("hex"))' "$first")"
-second_hash="$(node -e 'const c=require("node:crypto"),f=require("node:fs"); console.log(c.createHash("sha256").update(f.readFileSync(process.argv[1])).digest("hex"))' "$second")"
-if [[ "$first_hash" != "$second_hash" ]]; then
-  echo "clean-room rebuild mismatch: $first_hash != $second_hash" >&2
-  exit 1
-fi
-echo "$target reproducible SHA-256 $first_hash"
+node "$repository_root/scripts/release/compare-rebuilds.mjs" "$target" "$first" "$second"
