@@ -1,0 +1,13 @@
+{
+  "name": "@bitwarden/alias-release-tooling",
+  "version": "1.0.0",
+  "private": true,
+  "license": "GPL-3.0",
+  "packageManager": "npm@11.18.0",
+  "dependencies": {
+    "@cyclonedx/cyclonedx-npm": "6.0.1",
+    "spdx-expression-parse": "4.0.0",
+    "spdx-license-ids": "3.0.23",
+    "web-ext": "10.6.0"
+  }
+}

@@ -13,10 +13,16 @@ import {
 const integrationEnabled = process.env["SIMPLELOGIN_INTEGRATION"] === "1";
 const describeIntegration = integrationEnabled ? describe : describe.skip;
 
+function requiredIntegrationSetting(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required for SimpleLogin integration tests`);
+  }
+  return value;
+}
+
 describeIntegration("SimpleLogin real API integration", () => {
   const baseUrl = process.env["SIMPLELOGIN_BASE_URL"] ?? "http://127.0.0.1:7777";
-  const email = process.env["SIMPLELOGIN_EMAIL"] ?? "john@wick.com";
-  const password = process.env["SIMPLELOGIN_PASSWORD"] ?? "password";
   const connectionId = "11111111-1111-4111-8111-111111111111";
   const i18n = {
     t: (key: string, ...values: string[]) => `${key} ${values.join(" ")}`.trim(),
@@ -29,6 +35,8 @@ describeIntegration("SimpleLogin real API integration", () => {
   const contactsToDelete = new Set<number>();
 
   beforeAll(async () => {
+    const email = requiredIntegrationSetting("SIMPLELOGIN_EMAIL");
+    const password = requiredIntegrationSetting("SIMPLELOGIN_PASSWORD");
     const response = await fetch(`${baseUrl}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },

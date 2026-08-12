@@ -12,6 +12,7 @@
     "url": "https://github.com/bitwarden/clients/issues"
   },
   "homepage": "https://bitwarden.com",
+  "packageManager": "npm@11.18.0",
   "scripts": {
     "prepare": "husky",
     "lint": "eslint . --cache --cache-strategy content && prettier --check .",
@@ -38,7 +39,17 @@
     "icons:build": "ts-node scripts/material-icons/build-with-bwi-names.ts",
     "icons:migrate": "ts-node scripts/material-icons/migrate-icon-names.ts",
     "icons:reverse-migrate": "ts-node scripts/material-icons/reverse-migrate-icon-names.ts",
-    "dev:reverse-proxy": "node --experimental-strip-types scripts/reverse-proxy-emulator/index.ts"
+    "dev:reverse-proxy": "node --experimental-strip-types scripts/reverse-proxy-emulator/index.ts",
+    "release:verify": "node scripts/release/verify-release.mjs",
+    "release:verify-sdk": "node scripts/release/verify-sdk.mjs",
+    "release:scope-audit": "node scripts/release/scope-audit.mjs",
+    "release:sdk:repin": "node scripts/release/repin-sdk.mjs",
+    "release:build": "node scripts/release/build-target.mjs",
+    "release:smoke": "node scripts/release/smoke-target.mjs",
+    "release:metadata": "node scripts/release/generate-metadata.mjs",
+    "release:license-inventory": "node scripts/release/license-inventory.mjs",
+    "release:license-check": "node scripts/release/license-policy.mjs",
+    "release:upstream-drift": "node scripts/release/upstream-drift.mjs"
   },
   "workspaces": [
     "apps/*",
@@ -136,6 +147,7 @@
     "mini-css-extract-plugin": "2.10.2",
     "nx": "22.6.5",
     "path-browserify": "1.0.1",
+    "playwright": "1.59.1",
     "postcss": "8.5.10",
     "postcss-loader": "8.2.1",
     "prettier": "3.9.5",
@@ -175,7 +187,7 @@
     "@angular/router": "21.2.17",
     "@bitwarden/commercial-sdk-internal": "0.2.0-main.950",
     "@bitwarden/desktop-napi": "file:apps/desktop/desktop_native/napi",
-    "@bitwarden/sdk-internal": "file:vendor/bitwarden-sdk-internal-0.2.0-main.950.tgz",
+    "@bitwarden/sdk-internal": "file:vendor/bitwarden-sdk-internal-0.2.0-alias-platform.1.tgz",
     "@bufbuild/protobuf": "2.13.0",
     "@electron/fuses": "2.1.1",
     "@emotion/css": "11.13.5",

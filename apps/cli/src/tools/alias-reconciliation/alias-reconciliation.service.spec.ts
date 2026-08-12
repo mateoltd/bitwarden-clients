@@ -1,14 +1,9 @@
-import { mock } from "jest-mock-extended";
+import { MockProxy, mock } from "jest-mock-extended";
 
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
-import {
-  ALIAS_BINDING_FIELD_NAME,
-  hydrateAliasBinding,
-} from "@bitwarden/common/vault/alias-binding";
-import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
+import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
-import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { SimpleLoginAliasError, SimpleLoginAliasService } from "@bitwarden/generator-core";
 import { Alias, AliasProviderIdentity, SensitiveString } from "@bitwarden/sdk-internal";
 
@@ -66,31 +61,36 @@ function login(index: number, username: string, aliasId?: number): CipherView {
   return cipher;
 }
 
-function serviceWithAliases(aliases: Alias[]): SimpleLoginAliasService {
+function serviceWithAliases(aliases: Alias[]): MockProxy<SimpleLoginAliasService> {
   const aliasService = mock<SimpleLoginAliasService>();
   aliasService.providerIdentity.mockReturnValue(provider);
   aliasService.listCanonical.mockImplementation(async (page) => ({
     aliases: page === 0 ? aliases : [],
     page,
   }));
+  aliasService.getCanonical.mockImplementation(async (id) => {
+    const alias = aliases.find((candidate) => candidate.id === id);
+    if (!alias) {
+      throw new SimpleLoginAliasError("missing", "not-found", 404);
+    }
+    return alias;
+  });
   return aliasService;
 }
 
 describe("alias reconciliation", () => {
-  it("uses the SDK to detect exact, duplicate, conflict, missing and unbound records", async () => {
+  it("uses the SDK to detect exact, duplicate, drifted, and missing current records", async () => {
     const aliases = [
       sdkAlias(1, "exact@sl.test"),
       sdkAlias(2, "duplicate@sl.test"),
-      sdkAlias(3, "unbound@sl.test"),
-      sdkAlias(4, "provider-only@sl.test"),
+      sdkAlias(3, "provider-only@sl.test"),
       sdkAlias(5, "changed@sl.test"),
       sdkAlias(6, "conflict@sl.test"),
     ];
     const ciphers = [
       login(1, "exact@sl.test", 1),
-      login(2, "duplicate@sl.test"),
-      login(3, "duplicate@sl.test"),
-      login(4, "unbound@sl.test"),
+      login(2, "duplicate@sl.test", 2),
+      login(3, "duplicate@sl.test", 2),
       login(5, "old-address@sl.test", 5),
       login(6, "conflict@sl.test", 999),
       login(7, "gone@sl.test", 404),
@@ -109,11 +109,10 @@ describe("alias reconciliation", () => {
       alias: { aliasId: "1" },
     });
     expect(report.duplicates[0]).toMatchObject({ alias: { aliasId: "2" } });
-    expect(report.unbound[0]).toMatchObject({ cipherId: cipherId(4), alias: { aliasId: "3" } });
     expect(report.conflicts).toEqual([expect.objectContaining({ cipherId: cipherId(5) })]);
     expect(report.missing).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ alias: expect.objectContaining({ aliasId: "4" }) }),
+        expect.objectContaining({ alias: expect.objectContaining({ aliasId: "3" }) }),
         expect.objectContaining({ alias: expect.objectContaining({ aliasId: "6" }) }),
         expect.objectContaining({ cipherId: cipherId(6) }),
         expect.objectContaining({ cipherId: cipherId(7) }),
@@ -122,10 +121,10 @@ describe("alias reconciliation", () => {
     expect(JSON.stringify(report)).not.toContain("provider-secret-must-not-enter-report");
   });
 
-  it("keeps a canonical dry run non-mutating", async () => {
-    const aliasService = serviceWithAliases([sdkAlias(3, "unbound@sl.test")]);
+  it("keeps a current-binding refresh dry run non-mutating", async () => {
+    const aliasService = serviceWithAliases([sdkAlias(3, "current@sl.test")]);
     const cipherService = mock<CipherService>();
-    const cipher = login(1, "unbound@sl.test");
+    const cipher = login(1, "stale@sl.test", 3);
     cipherService.getAllDecrypted.mockResolvedValue([cipher]);
 
     const report = await new AliasReconciliationService(aliasService, cipherService).reconcile(
@@ -133,15 +132,16 @@ describe("alias reconciliation", () => {
       false,
     );
 
-    expect(report.summary).toMatchObject({ plannedChanges: 1, appliedChanges: 0, unbound: 1 });
-    expect(cipher.aliasBinding).toBeUndefined();
+    expect(report.summary).toMatchObject({ plannedChanges: 1, appliedChanges: 0, conflicts: 1 });
+    expect(cipher.aliasBinding).toMatchObject({ aliasId: "3", address: "stale@sl.test" });
+    expect(cipher.login.username).toBe("stale@sl.test");
     expect(cipherService.updateWithServer).not.toHaveBeenCalled();
   });
 
-  it("applies the SDK plan through normal vault persistence and is idempotent", async () => {
-    const aliasService = serviceWithAliases([sdkAlias(3, "unbound@sl.test")]);
+  it("refreshes a current binding through normal vault persistence and is idempotent", async () => {
+    const aliasService = serviceWithAliases([sdkAlias(3, "current@sl.test")]);
     const cipherService = mock<CipherService>();
-    let stored = [login(1, "unbound@sl.test")];
+    let stored = [login(1, "stale@sl.test", 3)];
     cipherService.getAllDecrypted.mockImplementation(async () => stored);
     cipherService.updateWithServer.mockImplementation(async (view) => {
       stored = [view];
@@ -153,85 +153,40 @@ describe("alias reconciliation", () => {
     const rerun = await service.reconcile(userId, true);
 
     expect(applied.summary).toMatchObject({ plannedChanges: 1, appliedChanges: 1 });
-    expect(stored[0].aliasBinding).toMatchObject({ aliasId: "3", connectionId });
+    expect(stored[0].aliasBinding).toMatchObject({
+      aliasId: "3",
+      connectionId,
+      address: "current@sl.test",
+    });
+    expect(stored[0].login.username).toBe("current@sl.test");
     expect(rerun.summary).toMatchObject({ plannedChanges: 0, appliedChanges: 0, exactMatches: 1 });
     expect(cipherService.updateWithServer).toHaveBeenCalledTimes(1);
   });
 
-  it("dry-runs and applies an SDK v1 reference migration through the SDK", async () => {
-    const aliasService = serviceWithAliases([sdkAlias(3, "legacy@sl.test")]);
+  it("does not infer a binding from an unbound login address", async () => {
+    const aliasService = serviceWithAliases([sdkAlias(1, "address-only@sl.test")]);
     const cipherService = mock<CipherService>();
-    const cipher = login(1, "legacy@sl.test");
-    const legacy = new FieldView();
-    legacy.name = ALIAS_BINDING_FIELD_NAME;
-    legacy.type = FieldType.Hidden;
-    legacy.value = JSON.stringify({
-      version: 1,
-      provider: "simplelogin",
-      providerInstance: provider.instance,
-      aliasId: 3,
-      address: "legacy@sl.test",
-    });
-    cipher.fields = [legacy];
-    hydrateAliasBinding(cipher);
-    cipherService.getAllDecrypted.mockResolvedValue([cipher]);
-    let persisted: CipherView | undefined;
-    cipherService.updateWithServer.mockImplementation(async (view) => {
-      persisted = view;
-      return view;
-    });
-    const service = new AliasReconciliationService(aliasService, cipherService);
+    cipherService.getAllDecrypted.mockResolvedValue([login(1, "address-only@sl.test")]);
 
-    const dryRun = await service.reconcile(userId, false);
-    const applied = await service.reconcile(userId, true);
+    const report = await new AliasReconciliationService(aliasService, cipherService).reconcile(
+      userId,
+      true,
+    );
 
-    expect(dryRun.summary).toMatchObject({ plannedChanges: 1, appliedChanges: 0 });
-    expect(applied.summary).toMatchObject({ plannedChanges: 1, appliedChanges: 1 });
-    expect(persisted?.aliasBinding).toMatchObject({ aliasId: "3", connectionId });
-    expect(persisted?.fields).toEqual([]);
-  });
-
-  it("reports an SDK v1 migration when its provider alias is already missing", async () => {
-    const cipherService = mock<CipherService>();
-    const cipher = login(1, "missing-legacy@sl.test");
-    const legacy = new FieldView();
-    legacy.name = ALIAS_BINDING_FIELD_NAME;
-    legacy.type = FieldType.Hidden;
-    legacy.value = JSON.stringify({
-      version: 1,
-      provider: "simplelogin",
-      providerInstance: provider.instance,
-      aliasId: 404,
-      address: "missing-legacy@sl.test",
-    });
-    cipher.fields = [legacy];
-    hydrateAliasBinding(cipher);
-    cipherService.getAllDecrypted.mockResolvedValue([cipher]);
-    let persisted: CipherView | undefined;
-    cipherService.updateWithServer.mockImplementation(async (view) => {
-      persisted = view;
-      return view;
-    });
-
-    const report = await new AliasReconciliationService(
-      serviceWithAliases([]),
-      cipherService,
-    ).reconcile(userId, true);
-
-    expect(report.summary).toMatchObject({ plannedChanges: 1, appliedChanges: 1 });
-    expect(report.changes).toEqual([
+    expect(report.summary).toMatchObject({ plannedChanges: 0, appliedChanges: 0 });
+    expect(report.missing).toEqual([
       expect.objectContaining({
-        status: "applied",
-        alias: expect.objectContaining({ aliasId: "404", connectionId }),
+        kind: "provider-alias-without-login",
+        alias: expect.objectContaining({ aliasId: "1" }),
       }),
     ]);
-    expect(persisted?.aliasBinding).toMatchObject({ aliasId: "404", connectionId });
+    expect(cipherService.updateWithServer).not.toHaveBeenCalled();
   });
 
-  it("keeps failed vault writes unbound without exposing the failure", async () => {
-    const aliasService = serviceWithAliases([sdkAlias(1, "failed@sl.test")]);
+  it("keeps a failed current-binding refresh unchanged without exposing the failure", async () => {
+    const aliasService = serviceWithAliases([sdkAlias(1, "current@sl.test")]);
     const cipherService = mock<CipherService>();
-    cipherService.getAllDecrypted.mockResolvedValue([login(1, "failed@sl.test")]);
+    cipherService.getAllDecrypted.mockResolvedValue([login(1, "stale@sl.test", 1)]);
     cipherService.updateWithServer.mockRejectedValue(
       new Error("provider-token-should-not-be-reported"),
     );
@@ -241,26 +196,30 @@ describe("alias reconciliation", () => {
       true,
     );
 
-    expect(report.summary).toMatchObject({ appliedChanges: 0, failedChanges: 1, unbound: 1 });
+    expect(report.summary).toMatchObject({ appliedChanges: 0, failedChanges: 1, conflicts: 1 });
     expect(JSON.stringify(report)).not.toContain("provider-token-should-not-be-reported");
   });
 
-  it("plans 1,001 address pairs through the SDK without conflicts", async () => {
+  it("reconciles 1,001 canonical bindings without manufacturing changes", async () => {
     const aliases = Array.from({ length: 1_001 }, (_, index) =>
       sdkAlias(index + 1, `alias-${index}@sl.test`),
     );
-    const ciphers = aliases.map((item, index) => login(index + 1, item.email as string));
+    const ciphers = aliases.map((item, index) => login(index + 1, item.email as string, index + 1));
     const cipherService = mock<CipherService>();
     cipherService.getAllDecrypted.mockResolvedValue(ciphers);
 
     const report = await new AliasReconciliationService(
       serviceWithAliases(aliases),
       cipherService,
-    ).reconcile(userId, false);
+    ).reconcile(userId, true);
 
-    expect(report.unbound).toHaveLength(1_001);
-    expect(report.duplicates).toHaveLength(0);
-    expect(report.conflicts).toHaveLength(0);
+    expect(report.summary).toMatchObject({
+      loginCiphersScanned: 1_001,
+      exactMatches: 1_001,
+      plannedChanges: 0,
+      appliedChanges: 0,
+    });
+    expect(cipherService.updateWithServer).not.toHaveBeenCalled();
   });
 
   it("honors provider rate limiting while paging", async () => {
@@ -282,5 +241,103 @@ describe("alias reconciliation", () => {
     expect(report.summary.aliasesScanned).toBe(0);
     expect(aliasService.listCanonical).toHaveBeenCalledTimes(2);
     expect(waitForRetry).toHaveBeenCalledWith(7_000);
+  });
+
+  it("deduplicates identical overlap from live offset pagination", async () => {
+    const aliases = Array.from({ length: 20 }, (_, index) =>
+      sdkAlias(index + 1, `alias-${index}@sl.test`),
+    );
+    const aliasService = mock<SimpleLoginAliasService>();
+    const cipherService = mock<CipherService>();
+    aliasService.providerIdentity.mockReturnValue(provider);
+    aliasService.listCanonical.mockImplementation(async (page) => ({
+      aliases: page < 2 ? aliases : [],
+      page,
+    }));
+    cipherService.getAllDecrypted.mockResolvedValue([]);
+
+    const report = await new AliasReconciliationService(aliasService, cipherService).reconcile(
+      userId,
+      false,
+    );
+
+    expect(report.summary.aliasesScanned).toBe(20);
+    expect(report.missing).toHaveLength(20);
+    expect(aliasService.listCanonical).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects conflicting duplicates from live offset pagination", async () => {
+    const firstPage = Array.from({ length: 20 }, (_, index) =>
+      sdkAlias(index + 1, `alias-${index}@sl.test`),
+    );
+    const aliasService = mock<SimpleLoginAliasService>();
+    const cipherService = mock<CipherService>();
+    aliasService.providerIdentity.mockReturnValue(provider);
+    aliasService.listCanonical.mockImplementation(async (page) => ({
+      aliases: page === 0 ? firstPage : page === 1 ? [sdkAlias(1, "changed@sl.test")] : [],
+      page,
+    }));
+    cipherService.getAllDecrypted.mockResolvedValue([]);
+
+    await expect(
+      new AliasReconciliationService(aliasService, cipherService).reconcile(userId, false),
+    ).rejects.toMatchObject({ code: "invalid-response" });
+  });
+
+  it("recovers an omitted bound alias through the detail endpoint", async () => {
+    const listedAliases = Array.from({ length: 20 }, (_, index) =>
+      sdkAlias(index + 1, `alias-${index}@sl.test`),
+    );
+    const recoveredAlias = sdkAlias(21, "recovered@sl.test");
+    const aliasService = serviceWithAliases(listedAliases);
+    const cipherService = mock<CipherService>();
+    const waitForRetry = jest.fn().mockResolvedValue(undefined);
+    aliasService.getCanonical
+      .mockRejectedValueOnce(new SimpleLoginAliasError("limited", "rate-limited", 429, 4))
+      .mockResolvedValueOnce(recoveredAlias);
+    cipherService.getAllDecrypted.mockResolvedValue([login(21, "recovered@sl.test", 21)]);
+
+    const report = await new AliasReconciliationService(
+      aliasService,
+      cipherService,
+      waitForRetry,
+    ).reconcile(userId, false);
+
+    expect(report.summary).toMatchObject({ aliasesScanned: 21, exactMatches: 1 });
+    expect(report.exactMatches[0].alias.aliasId).toBe("21");
+    expect(aliasService.getCanonical).toHaveBeenCalledTimes(2);
+    expect(aliasService.getCanonical).toHaveBeenCalledWith(BigInt(21));
+    expect(waitForRetry).toHaveBeenCalledWith(4_000);
+  });
+
+  it("treats a detail 404 as a genuinely missing bound alias", async () => {
+    const aliasService = serviceWithAliases([]);
+    const cipherService = mock<CipherService>();
+    aliasService.getCanonical.mockRejectedValue(
+      new SimpleLoginAliasError("missing", "not-found", 404),
+    );
+    cipherService.getAllDecrypted.mockResolvedValue([login(22, "missing@sl.test", 22)]);
+
+    const report = await new AliasReconciliationService(aliasService, cipherService).reconcile(
+      userId,
+      false,
+    );
+
+    expect(report.missing).toEqual([
+      expect.objectContaining({ kind: "bound-login-without-provider-alias" }),
+    ]);
+  });
+
+  it("fails conservatively when a bound alias detail cannot be resolved", async () => {
+    const aliasService = serviceWithAliases([]);
+    const cipherService = mock<CipherService>();
+    aliasService.getCanonical.mockRejectedValue(
+      new SimpleLoginAliasError("unavailable", "remote-error", 503),
+    );
+    cipherService.getAllDecrypted.mockResolvedValue([login(23, "unresolved@sl.test", 23)]);
+
+    await expect(
+      new AliasReconciliationService(aliasService, cipherService).reconcile(userId, false),
+    ).rejects.toMatchObject({ code: "remote-error" });
   });
 });

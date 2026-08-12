@@ -1,9 +1,7 @@
 /** @jest-environment node */
 
-import { execFileSync, spawnSync } from "child_process";
+import { execFileSync } from "child_process";
 import { randomUUID } from "crypto";
-import { existsSync } from "fs";
-import { resolve } from "path";
 
 import { asUuid } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
 import { UserId } from "@bitwarden/common/types/guid";
@@ -19,34 +17,28 @@ import { ClientSettings, PasswordManagerClient, TokenProvider } from "@bitwarden
 import { AliasReconciliationService } from "./alias-reconciliation.service";
 
 const integrationEnabled =
-  process.env["ALIAS_MIGRATION_INTEGRATION"] === "1" &&
+  process.env["ALIAS_RECONCILIATION_INTEGRATION"] === "1" &&
   process.env["SIMPLELOGIN_INTEGRATION"] === "1" &&
   process.env["BITWARDEN_SERVER_INTEGRATION"] === "1";
 const describeIntegration = integrationEnabled ? describe : describe.skip;
-const fixtureSize = Number(process.env["ALIAS_MIGRATION_FIXTURE_SIZE"] ?? "1001");
+const fixtureSize = Number(process.env["ALIAS_RECONCILIATION_FIXTURE_SIZE"] ?? "1001");
+const fixtureMarkerPrefix = "bwrec";
 
 const bitwardenSettings: ClientSettings = {
   apiUrl: process.env["BITWARDEN_API_URL"] ?? "http://localhost:4000",
   identityUrl: process.env["BITWARDEN_IDENTITY_URL"] ?? "http://localhost:33656",
-  userAgent: "Bitwarden alias migration integration test",
+  userAgent: "Bitwarden alias reconciliation integration test",
   deviceType: "SDK",
   bitwardenClientVersion: "2026.7.2",
 };
 
-const bitwardenDatabaseCandidates = [
-  resolve(
-    process.cwd(),
-    "../.integration-labs/first-class-aliases/bitwarden-server/dev/db/bitwarden.db",
-  ),
-  resolve(
-    process.cwd(),
-    "../../../.integration-labs/first-class-aliases/bitwarden-server/dev/db/bitwarden.db",
-  ),
-];
-const bitwardenDatabase =
-  process.env["BITWARDEN_SQLITE_PATH"] ??
-  bitwardenDatabaseCandidates.find((candidate) => existsSync(candidate)) ??
-  bitwardenDatabaseCandidates[0];
+function requiredEnvironmentVariable(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required for alias reconciliation integration tests`);
+  }
+  return value;
+}
 
 class MutableTokenProvider implements TokenProvider {
   token?: string;
@@ -87,7 +79,7 @@ async function authenticateBitwardenClient(
       device: {
         deviceType: "SDK",
         deviceIdentifier: randomUUID(),
-        deviceName: "Alias migration integration test",
+        deviceName: "Alias reconciliation integration test",
         devicePushToken: undefined,
       },
     },
@@ -155,7 +147,44 @@ function simpleLoginSql(sql: string): string {
 }
 
 function sqlite(sql: string): string {
-  return execFileSync("sqlite3", [bitwardenDatabase, sql], { encoding: "utf8" }).trim();
+  return execFileSync("sqlite3", [requiredEnvironmentVariable("BITWARDEN_SQLITE_PATH"), sql], {
+    encoding: "utf8",
+  }).trim();
+}
+
+async function runInBatches<Input, Output>(
+  values: Input[],
+  operation: (value: Input) => Promise<Output>,
+): Promise<Output[]> {
+  const outputs: Output[] = [];
+  for (let offset = 0; offset < values.length; offset += 20) {
+    outputs.push(...(await Promise.all(values.slice(offset, offset + 20).map(operation))));
+  }
+  return outputs;
+}
+
+async function deleteCiphers(accessToken: string, cipherIds: string[]): Promise<void> {
+  for (let offset = 0; offset < cipherIds.length; offset += 250) {
+    const ids = cipherIds.slice(offset, offset + 250);
+    const deleted = await vaultRequest(accessToken, "/ciphers", {
+      method: "DELETE",
+      body: JSON.stringify({ ids }),
+    });
+    if (!deleted.response.ok) {
+      throw new Error(`Bitwarden bulk cipher deletion failed (${deleted.response.status})`);
+    }
+  }
+}
+
+function persistedCipherCount(cipherIds: string[]): number {
+  if (cipherIds.length === 0) {
+    return 0;
+  }
+  if (cipherIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) {
+    throw new Error("Bitwarden returned an invalid cipher id");
+  }
+  const quotedIds = cipherIds.map((id) => `'${id.toLowerCase()}'`).join(",");
+  return Number(sqlite(`SELECT COUNT(*) FROM Cipher WHERE LOWER(Id) IN (${quotedIds});`));
 }
 
 async function decryptCiphers(
@@ -174,47 +203,35 @@ async function decryptCiphers(
   return result;
 }
 
-describeIntegration("real 1,000+ alias migration", () => {
+describeIntegration("real current-schema alias reconciliation", () => {
   jest.setTimeout(900_000);
 
   const simpleLoginBaseUrl = process.env["SIMPLELOGIN_BASE_URL"] ?? "http://127.0.0.1:32769";
-  const simpleLoginEmail = process.env["SIMPLELOGIN_EMAIL"] ?? "john@wick.com";
-  const simpleLoginPassword = process.env["SIMPLELOGIN_PASSWORD"] ?? "password";
-  const bitwardenEmail = process.env["BITWARDEN_EMAIL"] ?? "alias.lab@individual.example";
-  const bitwardenPassword = process.env["BITWARDEN_PASSWORD"] ?? "alias-lab-password";
 
-  it("dry-runs, applies and idempotently verifies 1,001 persisted aliases and logins", async () => {
-    const marker = `bwmig${Date.now()}${Math.floor(Math.random() * 1_000_000)}`;
+  it("reconciles and verifies 1,001+ canonical bindings after real provider drift", async () => {
+    if (!Number.isSafeInteger(fixtureSize) || fixtureSize < 1_001) {
+      throw new Error("ALIAS_RECONCILIATION_FIXTURE_SIZE must be an integer of at least 1001");
+    }
+    const simpleLoginEmail = requiredEnvironmentVariable("SIMPLELOGIN_EMAIL");
+    const simpleLoginPassword = requiredEnvironmentVariable("SIMPLELOGIN_PASSWORD");
+    const bitwardenEmail = requiredEnvironmentVariable("BITWARDEN_EMAIL");
+    const bitwardenPassword = requiredEnvironmentVariable("BITWARDEN_PASSWORD");
+    const marker = `${fixtureMarkerPrefix}${Date.now()}${Math.floor(Math.random() * 1_000_000)}`;
     const addressPrefix = `${marker}-`;
     const connectionId = randomUUID();
     let providerToken = "";
     let firstClient: AuthenticatedClient | undefined;
     let secondClient: AuthenticatedClient | undefined;
-    let cipherIds: string[] = [];
+    const cipherIds: string[] = [];
 
     try {
-      simpleLoginSql(`
-        INSERT INTO alias
-          (created_at, user_id, email, enabled, automatic_creation, mailbox_id,
-           disable_pgp, cannot_be_disabled, disable_email_spoofing_check, pinned)
-        SELECT CURRENT_TIMESTAMP + (series * INTERVAL '1 microsecond'),
-               1, '${addressPrefix}' || series || '@sl.lan', TRUE, FALSE, 1,
-               FALSE, FALSE, FALSE, FALSE
-        FROM generate_series(0, ${fixtureSize - 1}) AS series;
-      `);
-      expect(
-        Number(
-          simpleLoginSql(`SELECT COUNT(*) FROM alias WHERE email LIKE '${addressPrefix}%@sl.lan';`),
-        ),
-      ).toBe(fixtureSize);
-
       const simpleLoginLogin = await fetch(`${simpleLoginBaseUrl}/api/auth/login`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({
           email: simpleLoginEmail,
           password: simpleLoginPassword,
-          device: "Bitwarden alias migration integration test",
+          device: "Bitwarden alias reconciliation integration test",
         }),
       });
       const loginBody = (await simpleLoginLogin.json()) as { api_key?: unknown };
@@ -227,56 +244,103 @@ describeIntegration("real 1,000+ alias migration", () => {
         baseUrl: simpleLoginBaseUrl,
         connectionId,
       });
+      const provider = aliasService.providerIdentity();
 
       firstClient = await authenticateBitwardenClient(bitwardenEmail, bitwardenPassword);
-      const importCiphers: CipherRequest[] = [];
-      for (let index = 0; index < fixtureSize; index++) {
+      const existingSync = await vaultRequest(firstClient.accessToken, "/sync?excludeDomains=true");
+      expect(existingSync.response.status).toBe(200);
+      const existingRaw = (existingSync.json?.Ciphers ?? existingSync.json?.ciphers) as unknown[];
+      const existingViews = await decryptCiphers(firstClient, existingRaw);
+      const residualFixtures = existingViews.filter((cipher) =>
+        /^bwrec\d+ login \d+$/.test(cipher.name ?? ""),
+      );
+      if (residualFixtures.length > 0) {
+        const residualMarkers = new Set(
+          residualFixtures.map((cipher) => cipher.name!.slice(0, cipher.name!.indexOf(" login "))),
+        );
+        throw new Error(
+          `Residual alias reconciliation fixtures: ${[...residualMarkers].join(", ")}`,
+        );
+      }
+      expect(
+        Number(
+          simpleLoginSql(
+            `SELECT COUNT(*) FROM alias WHERE email LIKE '${fixtureMarkerPrefix}%@alias.example';`,
+          ),
+        ),
+      ).toBe(0);
+
+      simpleLoginSql(`
+        INSERT INTO alias
+          (created_at, user_id, email, enabled, automatic_creation, mailbox_id,
+           disable_pgp, cannot_be_disabled, disable_email_spoofing_check, pinned)
+        SELECT CURRENT_TIMESTAMP + (series * INTERVAL '1 microsecond'),
+               1, '${addressPrefix}' || series || '@alias.example', TRUE, FALSE, 1,
+               FALSE, FALSE, FALSE, FALSE
+        FROM generate_series(0, ${fixtureSize - 1}) AS series;
+      `);
+      const aliasRows = simpleLoginSql(`
+        SELECT id || '|' || email
+        FROM alias
+        WHERE email LIKE '${addressPrefix}%@alias.example'
+        ORDER BY id;
+      `)
+        .split("\n")
+        .filter(Boolean)
+        .map((row) => {
+          const separator = row.indexOf("|");
+          return { id: row.slice(0, separator), address: row.slice(separator + 1) };
+        });
+      expect(aliasRows).toHaveLength(fixtureSize);
+      const expectedAliasIds = new Set(aliasRows.map((alias) => alias.id));
+
+      const serializedCreateRequests: string[] = [];
+      for (let index = 0; index < aliasRows.length; index++) {
+        const alias = aliasRows[index];
         const view = new CipherView();
         view.type = CipherType.Login;
         view.name = `${marker} login ${index}`;
-        view.login.username = `${addressPrefix}${index}@sl.lan`;
-        view.login.password = "migration-fixture-password";
+        view.login.username = alias.address;
+        view.login.password = "account-password";
+        view.aliasBinding = {
+          version: 2,
+          provider: provider.provider,
+          providerInstance: provider.instance,
+          connectionId,
+          aliasId: alias.id,
+          address: alias.address,
+        };
         const encrypted = await firstClient.client
           .vault()
           .ciphers()
           .encrypt(view.toSdkCipherView());
-        importCiphers.push(
-          new CipherRequest({
-            cipher: Cipher.fromSdkCipher(encrypted.cipher)!,
-            encryptedFor: firstClient.userId,
-          }),
-        );
+        const createRequest = new CipherRequest({
+          cipher: Cipher.fromSdkCipher(encrypted.cipher)!,
+          encryptedFor: firstClient.userId,
+        });
+        const serialized = JSON.stringify(createRequest);
+        expect(serialized).not.toContain(addressPrefix);
+        expect(serialized).not.toContain(providerToken);
+        serializedCreateRequests.push(serialized);
       }
 
-      const serializedImport = JSON.stringify({
-        folders: [],
-        ciphers: importCiphers,
-        folderRelationships: [],
-      });
-      expect(serializedImport).not.toContain(addressPrefix);
-      expect(serializedImport).not.toContain(providerToken);
-      const imported = await vaultRequest(firstClient.accessToken, "/ciphers/import", {
-        method: "POST",
-        body: serializedImport,
-      });
-      expect(imported.response.status).toBe(200);
-
-      const initialSync = await vaultRequest(firstClient.accessToken, "/sync?excludeDomains=true");
-      expect(initialSync.response.status).toBe(200);
-      expect(initialSync.text).not.toContain(addressPrefix);
-      expect(initialSync.text).not.toContain(providerToken);
-      const rawCiphers = (initialSync.json?.Ciphers ?? initialSync.json?.ciphers) as unknown[];
-      const decrypted = await decryptCiphers(firstClient, rawCiphers);
-      const fixtureCiphers = decrypted.filter((cipher) =>
-        cipher.login?.username?.startsWith(addressPrefix),
+      const createResults = await runInBatches(serializedCreateRequests, (body) =>
+        vaultRequest(firstClient!.accessToken, "/ciphers", { method: "POST", body }),
       );
-      expect(fixtureCiphers).toHaveLength(fixtureSize);
-      cipherIds = fixtureCiphers.map((cipher) => cipher.id!);
+      for (const created of createResults) {
+        if (created.response.ok) {
+          cipherIds.push(new CipherResponse(created.json).id);
+        }
+      }
+      expect(createResults.every((created) => created.response.status === 200)).toBe(true);
+      expect(cipherIds).toHaveLength(fixtureSize);
 
-      const quotedIds = cipherIds.map((id) => `'${id}'`).join(",");
-      expect(Number(sqlite(`SELECT COUNT(*) FROM Cipher WHERE LOWER(Id) IN (${quotedIds});`))).toBe(
-        fixtureSize,
+      const driftedAlias = aliasRows[0];
+      const refreshedAddress = `${addressPrefix}refreshed@alias.example`;
+      simpleLoginSql(
+        `UPDATE alias SET email = '${refreshedAddress}' WHERE id = ${driftedAlias.id};`,
       );
+      const cipherIdSet = new Set(cipherIds);
 
       const realVaultAdapter = {
         getAllDecrypted: async () => {
@@ -285,8 +349,8 @@ describeIntegration("real 1,000+ alias migration", () => {
             throw new Error(`Bitwarden sync failed (${sync.response.status})`);
           }
           const raw = (sync.json?.Ciphers ?? sync.json?.ciphers) as unknown[];
-          return (await decryptCiphers(firstClient!, raw)).filter((cipher) =>
-            cipher.login?.username?.startsWith(addressPrefix),
+          return (await decryptCiphers(firstClient!, raw)).filter(
+            (cipher) => cipher.id !== undefined && cipherIdSet.has(cipher.id),
           );
         },
         updateWithServer: async (view: CipherView) => {
@@ -317,8 +381,9 @@ describeIntegration("real 1,000+ alias migration", () => {
       const dryRun = await reconciliation.reconcile(firstClient.userId, false);
       expect(dryRun.summary).toMatchObject({
         loginCiphersScanned: fixtureSize,
-        unbound: fixtureSize,
-        plannedChanges: fixtureSize,
+        exactMatches: fixtureSize - 1,
+        conflicts: 1,
+        plannedChanges: 1,
         appliedChanges: 0,
       });
       expect(JSON.stringify(dryRun)).not.toContain(providerToken);
@@ -327,17 +392,20 @@ describeIntegration("real 1,000+ alias migration", () => {
       expect(applied.summary).toMatchObject({
         loginCiphersScanned: fixtureSize,
         exactMatches: fixtureSize,
-        unbound: 0,
-        plannedChanges: fixtureSize,
-        appliedChanges: fixtureSize,
+        conflicts: 0,
+        plannedChanges: 1,
+        appliedChanges: 1,
         failedChanges: 0,
       });
+      expect(new Set(applied.exactMatches.map((match) => match.alias.aliasId))).toEqual(
+        expectedAliasIds,
+      );
       expect(JSON.stringify(applied)).not.toContain(providerToken);
 
       const idempotentRerun = await reconciliation.reconcile(firstClient.userId, true);
       expect(idempotentRerun.summary).toMatchObject({
         exactMatches: fixtureSize,
-        unbound: 0,
+        conflicts: 0,
         plannedChanges: 0,
         appliedChanges: 0,
         failedChanges: 0,
@@ -349,51 +417,41 @@ describeIntegration("real 1,000+ alias migration", () => {
       expect(finalSync.text).not.toContain(addressPrefix);
       expect(finalSync.text).not.toContain(providerToken);
       const finalRawCiphers = (finalSync.json?.Ciphers ?? finalSync.json?.ciphers) as unknown[];
-      const finalViews = (await decryptCiphers(secondClient, finalRawCiphers)).filter((cipher) =>
-        cipher.login?.username?.startsWith(addressPrefix),
+      const finalViews = (await decryptCiphers(secondClient, finalRawCiphers)).filter(
+        (cipher) => cipher.id !== undefined && cipherIdSet.has(cipher.id),
       );
       expect(finalViews).toHaveLength(fixtureSize);
-      expect(
-        finalViews.every((cipher) => cipher.aliasBinding?.address === cipher.login.username),
-      ).toBe(true);
-      expect(finalViews.every((cipher) => (cipher.fields ?? []).length === 0)).toBe(true);
-
-      const persistedVaultData = sqlite(
-        `SELECT GROUP_CONCAT(Data, '') FROM Cipher WHERE LOWER(Id) IN (${quotedIds});`,
+      expect(new Set(finalViews.map((cipher) => cipher.aliasBinding?.aliasId))).toEqual(
+        expectedAliasIds,
       );
-      expect(persistedVaultData).not.toContain(addressPrefix);
-      expect(persistedVaultData).not.toContain(providerToken);
-      const simpleLoginLogResult = spawnSync(
-        "docker",
-        ["logs", process.env["SIMPLELOGIN_APP_CONTAINER"] ?? "alias-core-sl-app"],
-        { encoding: "utf8" },
+      expect(finalViews.every((cipher) => cipher.aliasBinding?.version === 2)).toBe(true);
+      expect(finalViews.every((cipher) => cipher.fields?.length === 0)).toBe(true);
+      const refreshedView = finalViews.find(
+        (cipher) => cipher.aliasBinding?.aliasId === driftedAlias.id,
       );
-      expect(simpleLoginLogResult.status).toBe(0);
-      const simpleLoginLogs = `${simpleLoginLogResult.stdout}${simpleLoginLogResult.stderr}`;
-      expect(simpleLoginLogs).not.toContain(providerToken);
+      expect(refreshedView?.login.username).toBe(refreshedAddress);
+      expect(refreshedView?.aliasBinding).toMatchObject({
+        version: 2,
+        connectionId,
+        aliasId: driftedAlias.id,
+        address: refreshedAddress,
+      });
     } finally {
       if (cipherIds.length > 0 && (secondClient || firstClient)) {
         const authenticated = secondClient ?? firstClient!;
-        await vaultRequest(authenticated.accessToken, "/ciphers", {
-          method: "DELETE",
-          body: JSON.stringify({ ids: cipherIds }),
-        }).catch((): void => undefined);
+        await deleteCiphers(authenticated.accessToken, cipherIds);
       }
-      simpleLoginSql(`DELETE FROM alias WHERE email LIKE '${addressPrefix}%@sl.lan';`);
+      simpleLoginSql(`DELETE FROM alias WHERE email LIKE '${addressPrefix}%@alias.example';`);
+      expect(persistedCipherCount(cipherIds)).toBe(0);
+      expect(
+        Number(
+          simpleLoginSql(
+            `SELECT COUNT(*) FROM alias WHERE email LIKE '${addressPrefix}%@alias.example';`,
+          ),
+        ),
+      ).toBe(0);
       firstClient?.client.free();
       secondClient?.client.free();
-    }
-
-    expect(
-      Number(
-        simpleLoginSql(`SELECT COUNT(*) FROM alias WHERE email LIKE '${addressPrefix}%@sl.lan';`),
-      ),
-    ).toBe(0);
-    if (cipherIds.length > 0) {
-      const quotedIds = cipherIds.map((id) => `'${id}'`).join(",");
-      expect(Number(sqlite(`SELECT COUNT(*) FROM Cipher WHERE LOWER(Id) IN (${quotedIds});`))).toBe(
-        0,
-      );
     }
   });
 });

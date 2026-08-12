@@ -18,8 +18,6 @@ import { FieldView } from "../models/view/field.view";
 
 /** Reserved encrypted custom-field name. It is removed before fields reach user-facing views. */
 export const ALIAS_BINDING_FIELD_NAME = "bitwarden.alias.reference";
-/** Pre-SDK first-class-client field. Read only to keep it hidden during canonical migration. */
-export const LEGACY_ALIAS_BINDING_FIELD_NAME = "bitwarden.internal.alias-binding";
 
 /** Versioned public identity persisted inside the encrypted cipher field path. */
 export type AliasBinding = EmailAliasIdentity;
@@ -30,9 +28,6 @@ type AliasBindableCipher = {
   fields?: FieldView[];
   aliasBinding?: AliasBinding;
 };
-
-type RetainedLegacyField = { field: FieldView; address: string };
-const retainedLegacyFields = new WeakMap<AliasBindableCipher, RetainedLegacyField[]>();
 
 type GeneratedCredentialLike = {
   credential: string;
@@ -58,63 +53,8 @@ function parseBindingField(field: FieldView): AliasBinding | undefined {
   }
 }
 
-function sanitizedLegacyField(field: FieldView): RetainedLegacyField | undefined {
-  if (!field.value) {
-    return undefined;
-  }
-
-  try {
-    const value = JSON.parse(field.value) as Record<string, unknown>;
-    let sanitized: Record<string, unknown>;
-    if (
-      field.name === ALIAS_BINDING_FIELD_NAME &&
-      value.version === 1 &&
-      value.provider === "simplelogin" &&
-      typeof value.providerInstance === "string" &&
-      typeof value.aliasId === "number" &&
-      Number.isSafeInteger(value.aliasId) &&
-      value.aliasId > 0 &&
-      typeof value.address === "string" &&
-      normalizeEmailAliasAddress(value.address) !== ""
-    ) {
-      sanitized = {
-        version: 1,
-        provider: "simplelogin",
-        providerInstance: value.providerInstance,
-        aliasId: value.aliasId,
-        address: value.address,
-      };
-    } else if (
-      field.name === LEGACY_ALIAS_BINDING_FIELD_NAME &&
-      value.version === 1 &&
-      value.provider === "simplelogin" &&
-      typeof value.id === "string" &&
-      /^[1-9]\d*$/.test(value.id) &&
-      typeof value.address === "string" &&
-      normalizeEmailAliasAddress(value.address) !== ""
-    ) {
-      sanitized = {
-        version: 1,
-        provider: "simplelogin",
-        id: value.id,
-        address: value.address,
-      };
-    } else {
-      return undefined;
-    }
-
-    const retained = new FieldView();
-    retained.type = FieldType.Hidden;
-    retained.name = field.name;
-    retained.value = JSON.stringify(sanitized);
-    return { field: retained, address: value.address as string };
-  } catch {
-    return undefined;
-  }
-}
-
 function isReservedAliasField(field: FieldView): boolean {
-  return field.name === ALIAS_BINDING_FIELD_NAME || field.name === LEGACY_ALIAS_BINDING_FIELD_NAME;
+  return field.name === ALIAS_BINDING_FIELD_NAME;
 }
 
 function aliasReference(binding: AliasBinding): AliasReference {
@@ -146,36 +86,16 @@ function aliasBindingFromReference(reference: AliasReference): AliasBinding {
 export function hydrateAliasBinding(cipher: AliasBindableCipher, candidate?: unknown): void {
   let binding = parseEmailAliasIdentity(candidate);
   const visibleFields: FieldView[] = [];
-  const retained: RetainedLegacyField[] = [];
 
   for (const field of cipher.fields ?? []) {
     if (isReservedAliasField(field)) {
-      if (field.name === ALIAS_BINDING_FIELD_NAME) {
-        const parsed = parseBindingField(field);
-        binding ??= parsed;
-        if (!parsed) {
-          const legacy = sanitizedLegacyField(field);
-          if (legacy) {
-            retained.push(legacy);
-          }
-        }
-      } else {
-        const legacy = sanitizedLegacyField(field);
-        if (legacy) {
-          retained.push(legacy);
-        }
-      }
+      binding ??= parseBindingField(field);
     } else {
       visibleFields.push(field);
     }
   }
 
   cipher.fields = visibleFields;
-  if (retained.length > 0) {
-    retainedLegacyFields.set(cipher, retained);
-  } else {
-    retainedLegacyFields.delete(cipher);
-  }
   if (
     cipher.type === CipherType.Login &&
     binding &&
@@ -247,16 +167,7 @@ export function fieldsWithAliasBinding(cipher: AliasBindableCipher): FieldView[]
 
 /** Remove all reserved generations from the user field path before SDK validation/persistence. */
 export function fieldsWithoutAliasReferences(cipher: AliasBindableCipher): FieldView[] {
-  const visible = (cipher.fields ?? []).filter((field) => !isReservedAliasField(field));
-  if (parseEmailAliasIdentity(cipher.aliasBinding)) {
-    return visible;
-  }
-
-  const username = normalizeEmailAliasAddress(cipher.login?.username);
-  const retained = (retainedLegacyFields.get(cipher) ?? [])
-    .filter((entry) => normalizeEmailAliasAddress(entry.address) === username)
-    .map((entry) => entry.field);
-  return [...visible, ...retained];
+  return (cipher.fields ?? []).filter((field) => !isReservedAliasField(field));
 }
 
 /** Let the canonical SDK validate and attach the reference to a decrypted SDK cipher view. */

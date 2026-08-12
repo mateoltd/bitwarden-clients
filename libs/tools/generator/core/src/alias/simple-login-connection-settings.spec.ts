@@ -1,64 +1,63 @@
+import { mock } from "jest-mock-extended";
 import { BehaviorSubject } from "rxjs";
 
 import { Account } from "@bitwarden/common/auth/abstractions/account.service";
-import { UserStateSubject } from "@bitwarden/common/tools/state/user-state-subject";
 import { UserId } from "@bitwarden/common/types/guid";
 
+import { CredentialGeneratorService } from "../abstractions";
 import { ForwarderOptions } from "../types";
 
 import {
-  ensureSimpleLoginConnectionSettings,
+  createSimpleLoginConnectionId,
   isSimpleLoginConnectionId,
+  readSimpleLoginAliasSettings,
 } from "./simple-login-connection-settings";
 
 const account = { id: "11111111-1111-4111-8111-111111111111" as UserId } as Account;
 
-describe("SimpleLogin encrypted connection settings", () => {
-  it("migrates a configured account once and waits for the persisted echo", async () => {
-    const behavior = new BehaviorSubject<ForwarderOptions>({
+describe("SimpleLogin connection settings", () => {
+  function reader(settings: ForwarderOptions) {
+    const generatorService = mock<CredentialGeneratorService>();
+    const subject = new BehaviorSubject(settings);
+    generatorService.forwarder.mockReturnValue({} as any);
+    generatorService.settings.mockReturnValue(subject as any);
+    return { generatorService, subject, next: jest.spyOn(subject, "next") };
+  }
+
+  it("reads valid current settings without writing them", async () => {
+    const current = {
       token: "provider-secret",
       baseUrl: "https://app.simplelogin.io",
+      connectionId: "22222222-2222-4222-8222-222222222222",
+    };
+    const { generatorService, next } = reader(current);
+
+    await expect(readSimpleLoginAliasSettings(generatorService, account)).resolves.toEqual(current);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing connection identities without writing settings", async () => {
+    const { generatorService, next } = reader({ token: "provider-secret" });
+
+    await expect(readSimpleLoginAliasSettings(generatorService, account)).rejects.toMatchObject({
+      code: "invalid-credentials",
     });
-    const subject = behavior as unknown as UserStateSubject<ForwarderOptions>;
-    const next = jest.spyOn(subject, "next");
-
-    const migrated = await ensureSimpleLoginConnectionSettings(subject, behavior.value, account);
-    const restarted = await ensureSimpleLoginConnectionSettings(subject, migrated, account);
-
-    expect(isSimpleLoginConnectionId(migrated.connectionId)).toBe(true);
-    expect(restarted.connectionId).toBe(migrated.connectionId);
-    expect(next).toHaveBeenCalledTimes(1);
+    expect(next).not.toHaveBeenCalled();
   });
 
-  it("coalesces concurrent first reads onto one durable identity", async () => {
-    const current = { token: "provider-secret" };
-    const behavior = new BehaviorSubject<ForwarderOptions>(current);
-    const subject = behavior as unknown as UserStateSubject<ForwarderOptions>;
-    const next = jest.spyOn(subject, "next");
+  it("rejects invalid connection identities without writing settings", async () => {
+    const { generatorService, next } = reader({
+      token: "provider-secret",
+      connectionId: "invalid",
+    });
 
-    const [first, second] = await Promise.all([
-      ensureSimpleLoginConnectionSettings(subject, current, account),
-      ensureSimpleLoginConnectionSettings(subject, current, account),
-    ]);
-
-    expect(first.connectionId).toBe(second.connectionId);
-    expect(next).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not create identities for unconfigured accounts or replace malformed state", async () => {
-    const empty = new BehaviorSubject<ForwarderOptions>(
-      {},
-    ) as unknown as UserStateSubject<ForwarderOptions>;
-    await expect(ensureSimpleLoginConnectionSettings(empty, {}, account)).resolves.toEqual({});
-
-    const invalid = { token: "provider-secret", connectionId: "invalid" };
-    const behavior = new BehaviorSubject<ForwarderOptions>(invalid);
-    const subject = behavior as unknown as UserStateSubject<ForwarderOptions>;
-    await expect(
-      ensureSimpleLoginConnectionSettings(subject, invalid, account),
-    ).rejects.toMatchObject({
+    await expect(readSimpleLoginAliasSettings(generatorService, account)).rejects.toMatchObject({
       code: "invalid-response",
     });
-    expect(behavior.value).toEqual(invalid);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("creates valid identities for configuration saves", () => {
+    expect(isSimpleLoginConnectionId(createSimpleLoginConnectionId())).toBe(true);
   });
 });

@@ -25,6 +25,14 @@ const integrationEnabled =
   process.env["BITWARDEN_SERVER_INTEGRATION"] === "1";
 const describeIntegration = integrationEnabled ? describe : describe.skip;
 
+function requiredIntegrationSetting(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required for alias integration tests`);
+  }
+  return value;
+}
+
 const bitwardenSettings: ClientSettings = {
   apiUrl: process.env["BITWARDEN_API_URL"] ?? "http://localhost:4000",
   identityUrl: process.env["BITWARDEN_IDENTITY_URL"] ?? "http://localhost:33656",
@@ -127,15 +135,15 @@ describeIntegration("real SimpleLogin to Bitwarden encrypted alias binding", () 
   jest.setTimeout(120_000);
 
   const simpleLoginBaseUrl = process.env["SIMPLELOGIN_BASE_URL"] ?? "http://127.0.0.1:7777";
-  const simpleLoginEmail = process.env["SIMPLELOGIN_EMAIL"] ?? "john@wick.com";
-  const simpleLoginPassword = process.env["SIMPLELOGIN_PASSWORD"] ?? "password";
-  const bitwardenEmail = process.env["BITWARDEN_EMAIL"] ?? "alias.lab@individual.example";
-  const bitwardenPassword = process.env["BITWARDEN_PASSWORD"] ?? "alias-lab-password";
   const i18n = {
     t: (key: string, ...values: string[]) => `${key} ${values.join(" ")}`.trim(),
   } as I18nService;
 
   it("creates a real alias, syncs its encrypted identity, and recovers it in another client", async () => {
+    const simpleLoginEmail = requiredIntegrationSetting("SIMPLELOGIN_EMAIL");
+    const simpleLoginPassword = requiredIntegrationSetting("SIMPLELOGIN_PASSWORD");
+    const bitwardenEmail = requiredIntegrationSetting("BITWARDEN_EMAIL");
+    const bitwardenPassword = requiredIntegrationSetting("BITWARDEN_PASSWORD");
     const simpleLoginLogin = await fetch(`${simpleLoginBaseUrl}/api/auth/login`, {
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/json" },

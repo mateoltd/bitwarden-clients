@@ -6,7 +6,6 @@ import { SyncService } from "@bitwarden/common/platform/sync";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import {
   createSimpleLoginAliasService,
-  createSimpleLoginConnectionId,
   integration,
   isSimpleLoginConnectionId,
 } from "@bitwarden/generator-core";
@@ -39,16 +38,9 @@ export class AliasReconciliationCommand {
       );
     }
 
-    let connectionId = settings.connectionId;
-    if (connectionId !== undefined && !isSimpleLoginConnectionId(connectionId)) {
-      return Response.badRequest("The stored SimpleLogin connection identity is invalid.");
-    }
-    if (!connectionId) {
-      connectionId = createSimpleLoginConnectionId();
-      await this.stateProvider.setUserState(
-        integration.SimpleLogin.forwarder.settings,
-        { ...settings, connectionId },
-        userId,
+    if (!isSimpleLoginConnectionId(settings.connectionId)) {
+      return Response.badRequest(
+        "SimpleLogin is not configured with a valid persisted connection identity.",
       );
     }
 
@@ -58,7 +50,7 @@ export class AliasReconciliationCommand {
         createSimpleLoginAliasService({
           token: settings.token,
           baseUrl: settings.baseUrl,
-          connectionId,
+          connectionId: settings.connectionId,
         }),
         this.cipherService,
       );

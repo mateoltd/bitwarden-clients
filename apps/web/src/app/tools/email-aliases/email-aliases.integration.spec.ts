@@ -31,6 +31,14 @@ const integrationEnabled =
   process.env["BITWARDEN_SERVER_INTEGRATION"] === "1";
 const describeIntegration = integrationEnabled ? describe : describe.skip;
 
+function requiredIntegrationSetting(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required for SimpleLogin integration tests`);
+  }
+  return value;
+}
+
 @Component({
   selector: "app-header",
   template: "",
@@ -42,8 +50,6 @@ describeIntegration("rendered web email alias experience against real services",
   jest.setTimeout(120_000);
 
   const simpleLoginBaseUrl = process.env["SIMPLELOGIN_BASE_URL"] ?? "http://127.0.0.1:7777";
-  const simpleLoginEmail = process.env["SIMPLELOGIN_EMAIL"] ?? "john@wick.com";
-  const simpleLoginPassword = process.env["SIMPLELOGIN_PASSWORD"] ?? "password";
   const bitwardenApiUrl = process.env["BITWARDEN_API_URL"] ?? "http://localhost:4000";
   const aliasesToDelete = new Set<number>();
   const contactsToDelete = new Set<number>();
@@ -51,6 +57,8 @@ describeIntegration("rendered web email alias experience against real services",
   let facade: WebSimpleLoginAliasService;
 
   beforeAll(async () => {
+    const simpleLoginEmail = requiredIntegrationSetting("SIMPLELOGIN_EMAIL");
+    const simpleLoginPassword = requiredIntegrationSetting("SIMPLELOGIN_PASSWORD");
     const connectionId = "11111111-1111-4111-8111-111111111111";
     Object.assign(globalThis, {
       fetch: nodeFetch,

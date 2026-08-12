@@ -59,6 +59,10 @@ describe("SimpleLoginAliasService", () => {
       code: "invalid-response",
       message: "SimpleLogin alias id is invalid",
     });
+    await expect(service.getCanonical(BigInt(0))).rejects.toMatchObject({
+      code: "invalid-response",
+      message: "SimpleLogin alias id is invalid",
+    });
     await expect(service.contacts(1, -1)).rejects.toMatchObject({
       code: "invalid-response",
       message: "SimpleLogin page is invalid",

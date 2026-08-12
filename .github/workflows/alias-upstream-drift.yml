@@ -1,0 +1,46 @@
+name: Alias upstream drift report
+
+on:
+  push:
+    branches: [build/alias-client-release]
+    paths:
+      - release/**
+      - scripts/release/**
+      - package.json
+      - package-lock.json
+      - .github/workflows/alias-upstream-drift.yml
+  schedule:
+    - cron: "19 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alias-upstream-drift-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with: { node-version: 24.17.0 }
+      - name: Record configured remotes
+        run: git remote --verbose > "$RUNNER_TEMP/remotes.before"
+      - name: Evaluate client and SDK drift
+        run: npm run release:upstream-drift -- --output upstream-compatibility-report.md
+      - name: Prove workflow did not change remotes or history
+        run: |
+          git remote --verbose > "$RUNNER_TEMP/remotes.after"
+          diff --unified "$RUNNER_TEMP/remotes.before" "$RUNNER_TEMP/remotes.after"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: alias-upstream-compatibility-${{ github.run_id }}
+          path: upstream-compatibility-report.md
+          if-no-files-found: error

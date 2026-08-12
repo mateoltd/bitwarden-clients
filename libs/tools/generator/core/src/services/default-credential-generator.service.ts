@@ -5,7 +5,6 @@ import {
   distinctUntilChanged,
   filter,
   first,
-  firstValueFrom,
   map,
   of,
   share,
@@ -21,14 +20,12 @@ import {
 import { Account } from "@bitwarden/common/auth/abstractions/account.service";
 import { BoundDependency, OnDependency } from "@bitwarden/common/tools/dependencies";
 import { VendorId } from "@bitwarden/common/tools/extension";
-import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
 import { SemanticLogger } from "@bitwarden/common/tools/log";
 import { SystemServiceProvider } from "@bitwarden/common/tools/providers";
 import { anyComplete, memoizedMap } from "@bitwarden/common/tools/rx";
 import { UserStateSubject } from "@bitwarden/common/tools/state/user-state-subject";
 
 import { CredentialGeneratorService } from "../abstractions";
-import { ensureSimpleLoginConnectionSettings } from "../alias";
 import {
   CredentialAlgorithm,
   Profile,
@@ -94,16 +91,8 @@ export class DefaultCredentialGeneratorService implements CredentialGeneratorSer
 
           // settings$ stays hot and buffers the most recent value in the cache
           // for the next `request`
-          const settingsSubject = this.settings(metadata, { account$ }, profile);
-          const settings$ = settingsSubject.pipe(
+          const settings$ = this.settings(metadata, { account$ }, profile).pipe(
             tap(() => this.log.debug({ algorithm, profile }, "settings update received")),
-            concatMap(async (settings) => {
-              if (toVendorId(metadata.id) !== Vendor.simplelogin) {
-                return settings;
-              }
-              const account = await firstValueFrom(account$.pipe(first()));
-              return ensureSimpleLoginConnectionSettings(settingsSubject, settings, account);
-            }),
             share({
               connector: () => new ReplaySubject<object>(1, THREE_MINUTES),
               resetOnRefCountZero: () => timer(THREE_MINUTES),

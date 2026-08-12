@@ -20,6 +20,14 @@ import { DesktopAliasService } from "./desktop-alias.service";
 const integrationEnabled = process.env["SIMPLELOGIN_INTEGRATION"] === "1";
 const describeIntegration = integrationEnabled ? describe : describe.skip;
 
+function requiredIntegrationSetting(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required for SimpleLogin integration tests`);
+  }
+  return value;
+}
+
 @Component({
   selector: "app-header",
   template: "<ng-content />",
@@ -34,8 +42,6 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
   jest.setTimeout(120_000);
 
   const baseUrl = process.env["SIMPLELOGIN_BASE_URL"] ?? "http://127.0.0.1:32769";
-  const email = process.env["SIMPLELOGIN_EMAIL"] ?? "john@wick.com";
-  const password = process.env["SIMPLELOGIN_PASSWORD"] ?? "password";
 
   let client: SimpleLoginAliasService;
   let facade: {
@@ -47,6 +53,8 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
   let contactId: number | undefined;
 
   beforeAll(async () => {
+    const email = requiredIntegrationSetting("SIMPLELOGIN_EMAIL");
+    const password = requiredIntegrationSetting("SIMPLELOGIN_PASSWORD");
     const login = await fetch(`${baseUrl}/api/auth/login`, {
       method: "POST",
       headers: new Headers({ Accept: "application/json", "Content-Type": "application/json" }),
