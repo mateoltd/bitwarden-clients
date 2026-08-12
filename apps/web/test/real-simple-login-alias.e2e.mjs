@@ -8,12 +8,7 @@ import { DatabaseSync } from "node:sqlite";
 import { chromium } from "playwright";
 
 const root = process.cwd();
-const browserExecutable =
-  process.env.CHROMIUM_PATH ??
-  path.join(
-    os.homedir(),
-    "Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
-  );
+const browserExecutable = process.env.CHROMIUM_PATH ?? chromium.executablePath();
 const webUrl = new URL(process.env.WEB_URL ?? "https://localhost:8080");
 const bitwardenEmail = requiredEnvironment("BITWARDEN_EMAIL");
 const bitwardenPassword = requiredEnvironment("BITWARDEN_PASSWORD");

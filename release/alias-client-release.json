@@ -1,0 +1,250 @@
+{
+  "$schema": "./alias-client-release.schema.json",
+  "schemaVersion": 1,
+  "releaseLane": {
+    "branch": "build/alias-client-release",
+    "baseRef": "origin/integration/canonical-alias-sdk",
+    "baseCommit": "79a59a7945cb1490104185e48f901348bcda2576",
+    "sourceRepository": "https://github.com/mateoltd/bitwarden-clients.git",
+    "upstreamRepository": "https://github.com/bitwarden/clients.git",
+    "upstreamRef": "refs/heads/main",
+    "cleanupTrackingRef": "refs/heads/refactor/remove-legacy-alias-migration",
+    "cleanupCommit": "de5a4c6be71cdcb71038f1fab432bc484ffbc364",
+    "sourceDateEpoch": 1786536436,
+    "license": "GPL-3.0"
+  },
+  "canonicalSdk": {
+    "package": "@bitwarden/sdk-internal",
+    "version": "0.2.0-alias-platform.1",
+    "artifact": "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.1.tgz",
+    "metadata": "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.1.md",
+    "sha256": "513fc09282335910ea50dfcdd46608e89b81469763f668f4f0ea4ad056e5aa97",
+    "integrity": "sha512-zl5Xtv3jJUlrie26uBfjal2YJGHkKfky1Nsvqg9pnYNSSNvMr+WWwQtm3PHFkAvMdyh12QNp5IyflNIBjOHT6A==",
+    "sourceRepository": "https://github.com/mateoltd/bitwarden-sdk-internal.git",
+    "sourceCommit": "ff60528b2f899baec1cea72fd8efbdc509fbab4e",
+    "functionalCleanupCommit": "7032b6d9ad7f592c6d0f33f164e06f8e02d5127d",
+    "trackingRef": "refs/heads/integration/alias-secure-connection",
+    "cleanupTrackingRef": "refs/heads/integration/alias-platform",
+    "candidateRef": "refs/heads/build/alias-sdk-release-lane",
+    "provenance": "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.1.handoff.json",
+    "provenanceSha256": "7ad7bc6f3c61f2e70c96bd7a7e105c285dcbfd4f3c0cde32a7e55bbdda5a4900",
+    "candidateChecksums": "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.1.candidate.SHA256SUMS",
+    "candidateChecksumsSha256": "03bcf59515baaba98606ceb12ae62fc3b4dc9d0b3d9a1625ed0958f7d11f91c6",
+    "buildEnvironment": "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.1.build-environment.txt"
+  },
+  "testInfrastructure": {
+    "simpleLogin": {
+      "repository": "https://github.com/mateoltd/simplelogin-owned-provider.git",
+      "operationsCommit": "e157b6804f7b1b60e149207cebe2d414f6e4a73f",
+      "upstreamRepository": "https://github.com/simple-login/app.git",
+      "upstreamCommit": "dbc45fcce4e8e6b4fa615cc729ca95a67bf75266",
+      "containerName": "simplelogin-owned-provider-app-1"
+    },
+    "vault": {
+      "image": "docker.io/vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8",
+      "version": "1.37.1",
+      "containerName": "alias-client-release-vault"
+    }
+  },
+  "toolchains": {
+    "node": "24.17.0",
+    "cliNode": "22.22.0",
+    "npm": "11.18.0",
+    "python": "3.14.2",
+    "rust": "1.96.0",
+    "electron": "43.2.0",
+    "electronBuilder": "26.9.0",
+    "playwright": "1.59.1",
+    "actionlintImage": "docker.io/rhysd/actionlint:1.7.10@sha256:ef8299f97635c4c30e2298f48f30763ab782a4ad2c95b744649439a039421e36",
+    "gitleaksImage": "docker.io/zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f"
+  },
+  "targets": [
+    {
+      "id": "browser-chrome",
+      "family": "browser",
+      "configuration": "chrome",
+      "runner": "ubuntu-24.04",
+      "artifactFormat": "zip",
+      "smoke": "chromium"
+    },
+    {
+      "id": "browser-edge",
+      "family": "browser",
+      "configuration": "edge",
+      "runner": "ubuntu-24.04",
+      "artifactFormat": "zip",
+      "smoke": "chromium"
+    },
+    {
+      "id": "browser-firefox-mv2",
+      "family": "browser",
+      "configuration": "firefox-mv2",
+      "runner": "ubuntu-24.04",
+      "artifactFormat": "zip",
+      "smoke": "firefox"
+    },
+    {
+      "id": "browser-firefox-mv3",
+      "family": "browser",
+      "configuration": "firefox",
+      "runner": "ubuntu-24.04",
+      "artifactFormat": "zip",
+      "smoke": "firefox"
+    },
+    {
+      "id": "browser-opera",
+      "family": "browser",
+      "configuration": "opera",
+      "runner": "ubuntu-24.04",
+      "artifactFormat": "zip",
+      "smoke": "chromium"
+    },
+    {
+      "id": "browser-safari-mv2",
+      "family": "browser",
+      "configuration": "safari-mv2",
+      "runner": "macos-15",
+      "artifactFormat": "zip",
+      "smoke": "safari-project"
+    },
+    {
+      "id": "browser-safari-mv3",
+      "family": "browser",
+      "configuration": "safari",
+      "runner": "macos-15",
+      "artifactFormat": "zip",
+      "smoke": "safari-project"
+    },
+    {
+      "id": "desktop-linux-x64",
+      "family": "desktop",
+      "platform": "linux",
+      "architecture": "x64",
+      "rustTarget": "x86_64-unknown-linux-gnu",
+      "runner": "ubuntu-22.04",
+      "artifactFormat": "tar.gz",
+      "smoke": "electron"
+    },
+    {
+      "id": "desktop-linux-arm64",
+      "family": "desktop",
+      "platform": "linux",
+      "architecture": "arm64",
+      "rustTarget": "aarch64-unknown-linux-gnu",
+      "runner": "ubuntu-24.04-arm",
+      "artifactFormat": "tar.gz",
+      "smoke": "electron"
+    },
+    {
+      "id": "desktop-macos-x64",
+      "family": "desktop",
+      "platform": "mac",
+      "architecture": "x64",
+      "rustTarget": "x86_64-apple-darwin",
+      "runner": "macos-15-intel",
+      "artifactFormat": "tar.gz",
+      "smoke": "electron"
+    },
+    {
+      "id": "desktop-macos-arm64",
+      "family": "desktop",
+      "platform": "mac",
+      "architecture": "arm64",
+      "rustTarget": "aarch64-apple-darwin",
+      "runner": "macos-15",
+      "artifactFormat": "tar.gz",
+      "smoke": "electron"
+    },
+    {
+      "id": "desktop-windows-x64",
+      "family": "desktop",
+      "platform": "win",
+      "architecture": "x64",
+      "rustTarget": "x86_64-pc-windows-msvc",
+      "runner": "windows-2022",
+      "artifactFormat": "zip",
+      "smoke": "electron"
+    },
+    {
+      "id": "desktop-windows-arm64",
+      "family": "desktop",
+      "platform": "win",
+      "architecture": "arm64",
+      "rustTarget": "aarch64-pc-windows-msvc",
+      "runner": "windows-11-arm",
+      "artifactFormat": "zip",
+      "smoke": "electron"
+    },
+    {
+      "id": "desktop-windows-ia32",
+      "family": "desktop",
+      "platform": "win",
+      "architecture": "ia32",
+      "rustTarget": "i686-pc-windows-msvc",
+      "runner": "windows-2022",
+      "artifactFormat": "zip",
+      "smoke": "electron"
+    },
+    {
+      "id": "web-selfhost",
+      "family": "web",
+      "configuration": "oss-selfhost",
+      "runner": "ubuntu-24.04",
+      "artifactFormat": "zip",
+      "smoke": "http"
+    },
+    {
+      "id": "cli-linux-x64",
+      "family": "cli",
+      "platform": "lin",
+      "architecture": "x64",
+      "runner": "ubuntu-22.04",
+      "artifactFormat": "zip",
+      "smoke": "cli"
+    },
+    {
+      "id": "cli-linux-arm64",
+      "family": "cli",
+      "platform": "lin",
+      "architecture": "arm64",
+      "runner": "ubuntu-24.04-arm",
+      "artifactFormat": "zip",
+      "smoke": "cli"
+    },
+    {
+      "id": "cli-macos-x64",
+      "family": "cli",
+      "platform": "mac",
+      "architecture": "x64",
+      "runner": "macos-15-intel",
+      "artifactFormat": "zip",
+      "smoke": "cli"
+    },
+    {
+      "id": "cli-macos-arm64",
+      "family": "cli",
+      "platform": "mac",
+      "architecture": "arm64",
+      "runner": "macos-15",
+      "artifactFormat": "zip",
+      "smoke": "cli"
+    },
+    {
+      "id": "cli-windows-x64",
+      "family": "cli",
+      "platform": "win",
+      "architecture": "x64",
+      "runner": "windows-2022",
+      "artifactFormat": "zip",
+      "smoke": "cli"
+    }
+  ],
+  "handoff": {
+    "signing": [
+      "Apple Developer ID and notarization credentials",
+      "Microsoft Authenticode certificate and timestamp service",
+      "Mozilla and Chromium-family store credentials"
+    ],
+    "mobile": "No native iOS or Android client source exists in this repository."
+  }
+}
