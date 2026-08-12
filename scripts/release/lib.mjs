@@ -47,8 +47,8 @@ export function git(args, options = {}) {
 }
 
 export function tarText(archive, member) {
-  return execFileSync("tar", ["-xOzf", archive, member], {
-    cwd: repositoryRoot,
+  return execFileSync("tar", ["-xOzf", path.basename(archive), member], {
+    cwd: path.dirname(archive),
     encoding: "utf8",
   }).trim();
 }
