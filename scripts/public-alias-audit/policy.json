@@ -1,0 +1,80 @@
+{
+  "branch": "integration/public-alias-clients",
+  "baseCommit": "1f881babc15eb7d3a88cad41730ce167d8e49a41",
+  "snapshotCommit": "113a59638afbe4379e259a2cec8fa38597445eb6",
+  "releaseCommit": "95c5655065172c7505d7f82428b8bf7b46792b82",
+  "sourceCommits": [
+    "113a59638afbe4379e259a2cec8fa38597445eb6",
+    "95c5655065172c7505d7f82428b8bf7b46792b82"
+  ],
+  "portabilityCommits": [
+    "709dd6462823bcd82da30e1323d9656ecdcdd4af",
+    "6e242e66267140696d7a1201446fda8ba483a0ca",
+    "95c5655065172c7505d7f82428b8bf7b46792b82"
+  ],
+  "protectedUpstreamPaths": [
+    "apps/browser/src/tools/popup/settings/import",
+    "apps/browser/src/tools/popup/settings/export",
+    "apps/cli/src/tools/import.command.ts",
+    "apps/cli/src/tools/export.command.ts",
+    "apps/desktop/src/app/tools/import",
+    "apps/desktop/src/app/tools/export",
+    "libs/importer",
+    "libs/tools/export-vault-ui"
+  ],
+  "requiredUpstreamPaths": [
+    "libs/importer/src/importers/protonpass/protonpass-json-importer.ts",
+    "libs/importer/src/importers/protonpass/protonpass-json-importer.spec.ts",
+    "libs/importer/src/importers/spec-data/bitwarden-json/account-encrypted.json.ts",
+    "libs/importer/src/importers/spec-data/bitwarden-json/password-protected.json.ts",
+    "libs/tools/export-vault-ui/src/enums/encrypted-export-type.enum.ts"
+  ],
+  "forbiddenPathPatterns": [
+    "(^|/)node_modules(/|$)",
+    "(^|/)(dist|coverage|\\.nx|\\.angular|\\.cache|playwright-report|test-results)(/|$)",
+    "(^|/)\\.eslintcache$",
+    "^vendor/.*alias-platform\\.2([.-]|$)"
+  ],
+  "forbiddenAddedTextPatterns": [
+    "ALIAS_MIGRATION_(?:INTEGRATION|FIXTURE_SIZE)",
+    "\\.integration-labs/first-class-aliases",
+    "process\\.env\\[\"(?:SIMPLELOGIN|BITWARDEN)_(?:EMAIL|PASSWORD)\"\\]\\s*\\?\\?",
+    "(?:john@wick\\.com|alias\\.lab@individual\\.example|alias-lab-password)",
+    "(?:legacyAlias|AliasMigration)",
+    "alias-platform\\.2(?:[.-]|$)"
+  ],
+  "generatedPathPatterns": [
+    "(^|/)(node_modules|dist|coverage|\\.nx|\\.angular|\\.cache|playwright-report|test-results)(/|$)",
+    "(^|/)\\.eslintcache$",
+    "\\.(?:log|tmp|swp|orig|rej)$",
+    "^release-out/",
+    "^artifacts/"
+  ],
+  "allowedArtifacts": {
+    "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.1.tgz": "513fc09282335910ea50dfcdd46608e89b81469763f668f4f0ea4ad056e5aa97"
+  },
+  "allowedLicensePatterns": [
+    "^0BSD$",
+    "^Apache-2\\.0$",
+    "^BSD(?:-2-Clause|-3-Clause)?$",
+    "^BlueOak-1\\.0\\.0$",
+    "^CC-BY-3\\.0$",
+    "^CC0-1\\.0$",
+    "^GPL-2\\.0$",
+    "^GPL-3\\.0(?:-only)?$",
+    "^ISC$",
+    "^MIT$",
+    "^MPL-2\\.0$",
+    "^Python-2\\.0$",
+    "^Unlicense$",
+    "^UNLICENSED$",
+    "^WTFPL$",
+    "^Zlib$",
+    "^\\(MIT OR WTFPL\\)$",
+    "^\\(MIT OR GPL-3\\.0-or-later\\)$",
+    "^\\(BSD-3-Clause OR GPL-2\\.0\\)$",
+    "^\\(MIT AND Zlib\\)$",
+    "^\\(BSD-2-Clause OR MIT OR Apache-2\\.0\\)$",
+    "^\\(MIT OR CC0-1\\.0\\)$"
+  ]
+}
