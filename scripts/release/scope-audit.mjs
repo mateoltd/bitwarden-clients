@@ -78,6 +78,7 @@ function sourceFiles() {
 for (const relative of sourceFiles()) {
   if (
     relative.startsWith("bitwarden_license/") ||
+    relative.startsWith("scripts/public-alias-audit/") ||
     relative === manifest.canonicalSdk.artifact ||
     relative === "scripts/release/scope-audit.mjs" ||
     /package-lock\.json$/.test(relative)

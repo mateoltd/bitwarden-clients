@@ -6,11 +6,12 @@ store, registry, release, signing, or notarization operation is part of the lane
 
 ## Trust inputs
 
-`alias-client-release.json` is the single release manifest. It pins the starting client commit,
-toolchains, canonical SDK artifact and source commit, real provider test deployment, vault test
-backend, supported targets, and explicit handoffs. `npm run release:verify` fails if the checked-out
-branch does not descend from the pinned base, the SDK archive or lock entry differs, a target is
-duplicated, a lock is missing, or commercial source is present in an OSS clean room.
+`alias-client-release.json` is the single release manifest. It pins `origin/main`, the two state-only
+client and release inputs, toolchains, canonical SDK artifact and source commit, real provider test
+deployment, vault test backend, supported targets, and explicit handoffs. `npm run release:verify`
+fails if the linear public history does not begin directly at the pinned base, either development
+history is inherited, the SDK archive or lock entry differs, a target is duplicated, a lock is
+missing, or commercial source is present in an OSS clean room.
 
 The build scripts consume the canonical SDK tarball only through the root lockfile. The archive
 SHA-256, npm integrity, embedded package version, embedded source commit, and the published SDK
