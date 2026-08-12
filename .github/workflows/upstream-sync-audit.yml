@@ -1,0 +1,89 @@
+name: Upstream compatibility audit
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: Full public Bitwarden upstream branch or tag ref
+        required: true
+        default: refs/heads/main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-sync-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Compare public fork with upstream
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      _UPSTREAM_SOURCE_REF: ${{ inputs.upstream_ref || 'refs/heads/main' }}
+    steps:
+      - name: Check out fork commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Fetch upstream into an isolated audit ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$_UPSTREAM_SOURCE_REF" in
+            refs/heads/*|refs/tags/*) ;;
+            *)
+              echo "upstream_ref must be a full refs/heads/* or refs/tags/* ref" >&2
+              exit 2
+              ;;
+          esac
+          git check-ref-format "$_UPSTREAM_SOURCE_REF"
+          git fetch --no-tags https://github.com/bitwarden/clients.git \
+            "$_UPSTREAM_SOURCE_REF:refs/upstream-sync-audit/candidate"
+
+      - name: Test audit automation
+        run: node --test scripts/upstream-sync-audit/audit.test.mjs
+
+      - name: Run upstream compatibility audit
+        id: audit
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          node scripts/upstream-sync-audit/audit.mjs \
+            --upstream refs/upstream-sync-audit/candidate \
+            --fork HEAD \
+            --output-dir .artifacts/upstream-sync-audit
+          audit_status=$?
+          set -e
+          if [[ -f .artifacts/upstream-sync-audit/report.md ]]; then
+            cat .artifacts/upstream-sync-audit/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$audit_status"
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: upstream-sync-audit
+          path: .artifacts/upstream-sync-audit/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce audit result
+        if: always() && steps.audit.outcome == 'failure'
+        run: exit 1

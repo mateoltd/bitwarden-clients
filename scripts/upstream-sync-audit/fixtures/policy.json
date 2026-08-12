@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "metadata": {
+    "implementationBase": "synthetic",
+    "implementationBaseRef": "synthetic"
+  },
+  "scanExcludes": [],
+  "commercialSourceRoots": ["bitwarden_license/**"],
+  "commercialReferencePatterns": [
+    "bitwarden_license/[A-Za-z0-9_./@-]+",
+    "@bitwarden/bit-(?:common|web|browser|cli)(?:/[A-Za-z0-9_./@-]+)?"
+  ],
+  "generatedArtifacts": [
+    {
+      "id": "fixture-generator",
+      "sourcePaths": ["schema/**"],
+      "artifactPaths": ["generated/**"],
+      "requireArtifactsWithSources": true
+    }
+  ],
+  "riskSurfaces": [
+    {
+      "id": "extension",
+      "severity": "high",
+      "patterns": ["apps/browser/**"]
+    },
+    {
+      "id": "autofill",
+      "severity": "high",
+      "patterns": ["**/*autofill*"]
+    },
+    {
+      "id": "lockfile-toolchain",
+      "severity": "high",
+      "patterns": ["**/package-lock.json", "package-lock.json", ".nvmrc"]
+    },
+    {
+      "id": "package-patches",
+      "severity": "high",
+      "patterns": ["patches/**", "**/*.patch"]
+    }
+  ],
+  "forbiddenPaths": [
+    {
+      "id": "personal-migration-path",
+      "pattern": "(^|/)personal-migration(?:/|$)",
+      "flags": "i"
+    }
+  ],
+  "forbiddenContent": [
+    {
+      "id": "personal-home",
+      "pattern": "/Users/[A-Za-z0-9._-]+/",
+      "flags": "i"
+    }
+  ],
+  "forbiddenDomains": [
+    {
+      "id": "private-domain",
+      "pattern": "(?:^|\\.)internal$",
+      "flags": "i"
+    }
+  ],
+  "domainReviewAllowlist": ["example.com"],
+  "allowlist": []
+}

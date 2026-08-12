@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "metadata": {
+    "implementationBase": "1f881babc15eb7d3a88cad41730ce167d8e49a41",
+    "implementationBaseRef": "origin/main"
+  },
+  "scanExcludes": [
+    "docs/upstream-sync-audit.md",
+    "scripts/upstream-sync-audit/policy.json",
+    "scripts/upstream-sync-audit/*.test.mjs",
+    "scripts/upstream-sync-audit/fixtures/**"
+  ],
+  "commercialSourceRoots": ["bitwarden_license/**"],
+  "commercialReferencePatterns": [
+    "bitwarden_license/[A-Za-z0-9_./@-]+",
+    "@bitwarden/bit-(?:common|web|browser|cli)(?:/[A-Za-z0-9_./@-]+)?"
+  ],
+  "generatedArtifacts": [
+    {
+      "id": "material-icons",
+      "sourcePaths": [
+        "libs/assets/src/material-icons/**",
+        "scripts/material-icons/build-with-bwi-names.ts"
+      ],
+      "artifactPaths": [
+        "libs/angular/src/scss/bwicons/fonts/**",
+        "libs/angular/src/scss/bwicons/styles/style.css",
+        "libs/angular/src/scss/bwicons/styles/style.scss",
+        "libs/components/src/shared/icon.ts"
+      ],
+      "requireArtifactsWithSources": true
+    },
+    {
+      "id": "keeper-protobuf",
+      "sourcePaths": ["libs/importer/src/importers/keeper/access/proto/**"],
+      "artifactPaths": ["libs/importer/src/importers/keeper/access/generated/**"],
+      "requireArtifactsWithSources": true
+    }
+  ],
+  "riskSurfaces": [
+    {
+      "id": "licensing-commercial",
+      "severity": "high",
+      "patterns": [
+        "bitwarden_license/**",
+        "LICENSE*.txt",
+        "**/LICENSE*",
+        "**/COPYING*"
+      ]
+    },
+    {
+      "id": "extension",
+      "severity": "high",
+      "patterns": [
+        "apps/browser/**",
+        "**/manifest.json",
+        "**/manifest.v3.json",
+        "**/*extension*"
+      ]
+    },
+    {
+      "id": "mobile-native",
+      "severity": "high",
+      "patterns": [
+        "apps/mobile/**",
+        "**/android/**",
+        "**/ios/**",
+        "**/*mobile*",
+        "**/autofill_provider/**"
+      ]
+    },
+    {
+      "id": "crypto-auth",
+      "severity": "high",
+      "patterns": [
+        "**/*crypto*",
+        "**/*encryption*",
+        "**/*webauthn*",
+        "**/*passkey*",
+        "**/*biometric*",
+        "**/secure_memory/**",
+        "libs/key-management/**",
+        "libs/user-crypto-management/**"
+      ]
+    },
+    {
+      "id": "autofill",
+      "severity": "high",
+      "patterns": ["**/*autofill*", "**/autofill/**", "**/autofill_provider/**"]
+    },
+    {
+      "id": "updates-release",
+      "severity": "high",
+      "patterns": [
+        "**/*updater*",
+        "**/*auto-update*",
+        ".github/workflows/*release*",
+        ".github/workflows/publish-*",
+        ".github/workflows/version-auto-bump-*",
+        ".github/renovate.json5"
+      ]
+    },
+    {
+      "id": "lockfile-toolchain",
+      "severity": "high",
+      "patterns": [
+        "package-lock.json",
+        "**/package-lock.json",
+        "**/npm-shrinkwrap.json",
+        "**/yarn.lock",
+        "**/pnpm-lock.yaml",
+        "**/Cargo.lock",
+        "**/rust-toolchain*",
+        ".nvmrc",
+        "**/.nvmrc",
+        "**/gradle-wrapper.properties",
+        "**/Podfile.lock"
+      ]
+    },
+    {
+      "id": "package-patches",
+      "severity": "high",
+      "patterns": [
+        "patches/**",
+        "**/patches/**",
+        "*.patch",
+        "**/*.patch",
+        "package.json",
+        "**/package.json"
+      ]
+    },
+    {
+      "id": "generated-artifacts",
+      "severity": "medium",
+      "patterns": [
+        "libs/angular/src/scss/bwicons/fonts/**",
+        "libs/angular/src/scss/bwicons/styles/style.css",
+        "libs/angular/src/scss/bwicons/styles/style.scss",
+        "libs/components/src/shared/icon.ts",
+        "libs/importer/src/importers/keeper/access/generated/**"
+      ]
+    },
+    {
+      "id": "github-automation",
+      "severity": "medium",
+      "patterns": [".github/workflows/**", ".github/actions/**"]
+    }
+  ],
+  "forbiddenPaths": [
+    {
+      "id": "personal-migration-path",
+      "pattern": "(^|/)(?:(?:personal|private|one[-_]?off)[-_]?(?:migration|domains?)|(?:migration|domains?)[-_]?(?:personal|private|one[-_]?off))(?:/|$)",
+      "flags": "i"
+    }
+  ],
+  "forbiddenContent": [
+    {
+      "id": "personal-posix-home",
+      "pattern": "/(?:Users|home)/[A-Za-z0-9._-]+/",
+      "flags": "i"
+    },
+    {
+      "id": "personal-windows-home",
+      "pattern": "[A-Za-z]:\\\\Users\\\\[^\\\\\\s]+\\\\",
+      "flags": "i"
+    },
+    {
+      "id": "private-network-url",
+      "pattern": "(?:https?|wss?)://(?:10(?:\\.[0-9]{1,3}){3}|192\\.168(?:\\.[0-9]{1,3}){2}|172\\.(?:1[6-9]|2[0-9]|3[01])(?:\\.[0-9]{1,3}){2})(?::[0-9]+)?(?:/|$)",
+      "flags": "i"
+    }
+  ],
+  "forbiddenDomains": [
+    {
+      "id": "private-network-domain",
+      "pattern": "(?:^|\\.)(?:internal|lan|home|local)$",
+      "flags": "i"
+    }
+  ],
+  "domainReviewAllowlist": [
+    "bitwarden.com",
+    "github.com",
+    "githubusercontent.com",
+    "example.com",
+    "example.net",
+    "example.org",
+    "w3.org"
+  ],
+  "allowlist": []
+}
