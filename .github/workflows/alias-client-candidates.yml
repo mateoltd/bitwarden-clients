@@ -145,13 +145,21 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with: { node-version: 24.17.0, cache: npm }
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        if: matrix.id != 'desktop-windows-arm64'
         with: { python-version: 3.14.2 }
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        if: matrix.id == 'desktop-windows-arm64'
+        with:
+          python-version: 3.14.2
+          architecture: x64
       - run: npm install --global npm@11.18.0
       - name: Install Linux build and launch dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes pkg-config libxss-dev libasound2 xvfb
+          audio_package=libasound2
+          if apt-cache show libasound2t64 >/dev/null 2>&1; then audio_package=libasound2t64; fi
+          sudo apt-get install --yes pkg-config libxss-dev "$audio_package" xvfb
       - name: Prepare OSS clean room
         shell: bash
         run: |
