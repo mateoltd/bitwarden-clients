@@ -50,14 +50,23 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        if: matrix.id != 'desktop-windows-arm64'
         with: { python-version: 3.14.2 }
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        if: matrix.id == 'desktop-windows-arm64'
+        with:
+          python-version: 3.14.2
+          architecture: x64
       - run: npm install --global npm@11.18.0
       - name: Install desktop build dependencies
         if: matrix.family == 'desktop' && runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes pkg-config libxss-dev libasound2
+          audio_package=libasound2
+          if apt-cache show libasound2t64 >/dev/null 2>&1; then audio_package=libasound2t64; fi
+          sudo apt-get install --yes pkg-config libxss-dev "$audio_package"
       - name: Compare isolated rebuilds
+        shell: bash
         run: scripts/release/clean-room-rebuild.sh ${{ matrix.id }} | tee reproducibility-${{ matrix.id }}.txt
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
