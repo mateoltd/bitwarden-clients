@@ -100,11 +100,17 @@ for (const relative of sourceFiles()) {
 
 if (!args["source-only"]) {
   const archive = path.join(repositoryRoot, manifest.canonicalSdk.artifact);
-  const members = execFileSync("tar", ["-tzf", archive], { encoding: "utf8" })
+  const archiveDirectory = path.dirname(archive);
+  const archiveName = path.basename(archive);
+  const members = execFileSync("tar", ["-tzf", archiveName], {
+    cwd: archiveDirectory,
+    encoding: "utf8",
+  })
     .split("\n")
     .filter((member) => /(?:\.d\.ts|\.js|\.json|\.md|\.txt|\/VERSION)$/.test(member));
   for (const member of members) {
-    const text = execFileSync("tar", ["-xOzf", archive, member], {
+    const text = execFileSync("tar", ["-xOzf", archiveName, member], {
+      cwd: archiveDirectory,
       encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,
     });
