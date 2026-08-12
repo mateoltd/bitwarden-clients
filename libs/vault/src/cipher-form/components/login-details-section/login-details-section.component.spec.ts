@@ -259,9 +259,11 @@ describe("LoginDetailsSectionComponent", () => {
 
     it("binds generated alias identity and clears it after the username changes", fakeAsync(() => {
       const alias = {
-        version: 1 as const,
+        version: 2 as const,
         provider: "simplelogin" as const,
-        id: "42",
+        providerInstance: "https://app.simplelogin.io/",
+        connectionId: "11111111-1111-4111-8111-111111111111",
+        aliasId: "42",
         address: "bound-alias@sl.test",
       };
       generationService.generateUsername.mockResolvedValue({

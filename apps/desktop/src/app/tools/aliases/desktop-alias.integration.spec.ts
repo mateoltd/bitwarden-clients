@@ -1,19 +1,15 @@
-import { request as httpRequest } from "node:http";
-import { request as httpsRequest } from "node:https";
-
 import { ChangeDetectionStrategy, Component, input } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { Router } from "@angular/router";
 import { mock } from "jest-mock-extended";
 
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { DialogService, ToastService } from "@bitwarden/components";
 import {
   SimpleLoginAliasError,
+  createSimpleLoginAliasService,
   SimpleLoginAliasService,
-  SimpleLoginAliasTransport,
 } from "@bitwarden/generator-core";
 
 import { DesktopHeaderComponent } from "../../layout/header";
@@ -34,70 +30,12 @@ class MockDesktopHeaderComponent {
   readonly icon = input<string>();
 }
 
-class NodeRequest {
-  readonly url: string;
-  readonly method: string;
-  readonly headers: Headers;
-  readonly body?: string;
-
-  constructor(input: URL, init: RequestInit = {}) {
-    this.url = input.toString();
-    this.method = init.method ?? "GET";
-    this.headers = init.headers as Headers;
-    this.body = init.body as string | undefined;
-  }
-}
-
-async function nodeFetch(input: string | NodeRequest, init: RequestInit = {}): Promise<Response> {
-  const request = typeof input === "string" ? new NodeRequest(new URL(input), init) : input;
-  const url = new URL(request.url);
-  const send = url.protocol === "https:" ? httpsRequest : httpRequest;
-
-  return new Promise<Response>((resolve, reject) => {
-    const outgoing = send(
-      url,
-      {
-        method: request.method,
-        headers: Object.fromEntries(request.headers.entries()),
-      },
-      (incoming) => {
-        const chunks: Buffer[] = [];
-        incoming.on("data", (chunk: Buffer) => chunks.push(chunk));
-        incoming.on("end", () => {
-          const headers = new Headers();
-          for (const [key, value] of Object.entries(incoming.headers)) {
-            if (Array.isArray(value)) {
-              value.forEach((item) => headers.append(key, item));
-            } else if (value != null) {
-              headers.set(key, value);
-            }
-          }
-          const text = Buffer.concat(chunks).toString("utf8");
-          resolve({
-            status: incoming.statusCode ?? 0,
-            ok: (incoming.statusCode ?? 0) >= 200 && (incoming.statusCode ?? 0) < 300,
-            headers,
-            text: async () => text,
-            json: async () => JSON.parse(text),
-          } as Response);
-        });
-      },
-    );
-    outgoing.on("error", reject);
-    if (request.body != null) {
-      outgoing.write(request.body);
-    }
-    outgoing.end();
-  });
-}
-
 describeIntegration("Desktop alias rendered real SimpleLogin integration", () => {
   jest.setTimeout(120_000);
 
   const baseUrl = process.env["SIMPLELOGIN_BASE_URL"] ?? "http://127.0.0.1:32769";
   const email = process.env["SIMPLELOGIN_EMAIL"] ?? "john@wick.com";
   const password = process.env["SIMPLELOGIN_PASSWORD"] ?? "password";
-  const originalRequest = global.Request;
 
   let client: SimpleLoginAliasService;
   let facade: {
@@ -109,8 +47,7 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
   let contactId: number | undefined;
 
   beforeAll(async () => {
-    global.Request = NodeRequest as any;
-    const login = await nodeFetch(`${baseUrl}/api/auth/login`, {
+    const login = await fetch(`${baseUrl}/api/auth/login`, {
       method: "POST",
       headers: new Headers({ Accept: "application/json", "Content-Type": "application/json" }),
       body: JSON.stringify({
@@ -124,12 +61,10 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
       throw new Error(`SimpleLogin test login failed (${login.status})`);
     }
 
-    const api = {
-      nativeFetch: (request: globalThis.Request) => nodeFetch(request as any),
-    } as ApiService;
-    client = new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), {
+    client = createSimpleLoginAliasService({
       token: body.api_key,
       baseUrl,
+      connectionId: "11111111-1111-4111-8111-111111111111",
     });
   });
 
@@ -140,7 +75,6 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
     if (aliasId != null) {
       await client.delete(aliasId).catch((_error: unknown): void => undefined);
     }
-    global.Request = originalRequest;
   });
 
   beforeEach(async () => {
@@ -184,12 +118,7 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
     boundLogin.id = "real-synced-cipher" as any;
     boundLogin.name = `Bound desktop login ${marker}`;
     boundLogin.login.username = created.address;
-    boundLogin.aliasBinding = {
-      version: 1,
-      provider: "simplelogin",
-      id: created.id.toString(),
-      address: created.address,
-    };
+    boundLogin.aliasBinding = created.identity;
     facade.boundLogins.mockResolvedValue([boundLogin]);
 
     fixture = TestBed.createComponent(DesktopAliasComponent);

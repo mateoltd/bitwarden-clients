@@ -11,9 +11,11 @@ import { ALIAS_BINDING_FIELD_NAME } from "./alias-binding";
 
 const userId = "89d55fa7-395c-48a0-966a-3d412954082f";
 const alias = {
-  version: 1 as const,
+  version: 2 as const,
   provider: "simplelogin" as const,
-  id: "314159",
+  providerInstance: "https://app.simplelogin.io/",
+  connectionId: "11111111-1111-4111-8111-111111111111",
+  aliasId: "314159",
   address: "sdk-round-trip@sl.test",
 };
 
@@ -57,7 +59,7 @@ describe("alias binding SDK encryption", () => {
 
     expect(serializedVaultData).not.toContain(ALIAS_BINDING_FIELD_NAME);
     expect(serializedVaultData).not.toContain(alias.address);
-    expect(serializedVaultData).not.toContain(alias.id);
+    expect(serializedVaultData).not.toContain(alias.aliasId);
 
     const decryptedSdkView = await client.vault().ciphers().decrypt(encrypted.toSdkCipher());
     const restored = CipherView.fromSdkCipherView(decryptedSdkView)!;

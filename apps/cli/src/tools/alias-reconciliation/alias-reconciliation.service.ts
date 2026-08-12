@@ -1,31 +1,27 @@
-import {
-  EMAIL_ALIAS_IDENTITY_VERSION,
-  normalizeEmailAliasAddress,
-} from "@bitwarden/common/tools/alias";
+import { EmailAliasIdentity } from "@bitwarden/common/tools/alias";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { SimpleLoginAliasError, SimpleLoginAliasService } from "@bitwarden/generator-core";
 import {
-  SimpleLoginAlias,
-  SimpleLoginAliasError,
-  SimpleLoginAliasService,
-  toSimpleLoginAliasIdentity,
-} from "@bitwarden/generator-core";
+  Alias,
+  AliasProviderIdentity,
+  AliasReconciliationOutcome,
+  AliasReconciliationPlan,
+  CipherId,
+  apply_alias_reconciliation,
+  create_alias_reference,
+  migrate_cipher_alias_reference,
+  parse_alias_reference,
+  plan_alias_reconciliation,
+} from "@bitwarden/sdk-internal";
 
 export const ALIAS_RECONCILIATION_REPORT_VERSION = 1 as const;
 
-export type AliasReconciliationVault = Pick<
-  CipherService,
-  "getAllDecrypted" | "updateWithServer"
->;
+export type AliasReconciliationVault = Pick<CipherService, "getAllDecrypted" | "updateWithServer">;
 
-export type AliasReconciliationIdentity = {
-  version: typeof EMAIL_ALIAS_IDENTITY_VERSION;
-  provider: "simplelogin";
-  id: string;
-  address: string;
-};
+export type AliasReconciliationIdentity = EmailAliasIdentity;
 
 export type AliasReconciliationCipher = {
   cipherId: string;
@@ -44,7 +40,8 @@ export type AliasReconciliationDuplicate = {
 export type AliasReconciliationConflictReason =
   | "binding-does-not-match-provider"
   | "cipher-id-missing"
-  | "provider-address-not-unique";
+  | "provider-address-not-unique"
+  | "sdk-skipped-cipher";
 
 export type AliasReconciliationConflict = AliasReconciliationCipher & {
   reason: AliasReconciliationConflictReason;
@@ -95,10 +92,6 @@ export type AliasReconciliationReport = AliasReconciliationAnalysis & {
   changes: AliasReconciliationChange[];
 };
 
-function identity(alias: SimpleLoginAlias): AliasReconciliationIdentity {
-  return toSimpleLoginAliasIdentity(alias);
-}
-
 function cipherReference(cipher: CipherView): AliasReconciliationCipher {
   return {
     cipherId: cipher.id ?? "",
@@ -106,171 +99,19 @@ function cipherReference(cipher: CipherView): AliasReconciliationCipher {
   };
 }
 
-function sortByAddressAndId<T extends { address: string; id: string }>(left: T, right: T): number {
-  return left.address.localeCompare(right.address) || left.id.localeCompare(right.id);
+function sortByAddressAndId<T extends { address: string; aliasId: string }>(
+  left: T,
+  right: T,
+): number {
+  return left.address.localeCompare(right.address) || left.aliasId.localeCompare(right.aliasId);
 }
 
 function sortMatches(left: AliasReconciliationMatch, right: AliasReconciliationMatch): number {
   return (
     left.alias.address.localeCompare(right.alias.address) ||
-    left.alias.id.localeCompare(right.alias.id) ||
+    left.alias.aliasId.localeCompare(right.alias.aliasId) ||
     left.cipherId.localeCompare(right.cipherId)
   );
-}
-
-/**
- * Build a deterministic reconciliation plan. Only a one-to-one live provider alias and unbound
- * login username is considered safe to apply automatically.
- */
-export function analyzeAliasReconciliation(
-  aliases: SimpleLoginAlias[],
-  ciphers: CipherView[],
-): AliasReconciliationAnalysis {
-  const loginCiphers = ciphers.filter(
-    (cipher) =>
-      cipher.type === CipherType.Login &&
-      !cipher.deletedDate &&
-      normalizeEmailAliasAddress(cipher.login?.username) !== "",
-  );
-  const aliasesByAddress = new Map<string, SimpleLoginAlias[]>();
-  const aliasesById = new Map<string, SimpleLoginAlias>();
-  const ciphersByAddress = new Map<string, CipherView[]>();
-
-  for (const alias of aliases) {
-    const address = normalizeEmailAliasAddress(alias.address);
-    const matching = aliasesByAddress.get(address) ?? [];
-    matching.push(alias);
-    aliasesByAddress.set(address, matching);
-    aliasesById.set(alias.id.toString(), alias);
-  }
-
-  for (const cipher of loginCiphers) {
-    const address = normalizeEmailAliasAddress(cipher.login?.username);
-    const matching = ciphersByAddress.get(address) ?? [];
-    matching.push(cipher);
-    ciphersByAddress.set(address, matching);
-  }
-
-  const result: AliasReconciliationAnalysis = {
-    exactMatches: [],
-    duplicates: [],
-    conflicts: [],
-    missing: [],
-    unbound: [],
-  };
-  const conflictedCipherIds = new Set<string>();
-
-  for (const [address, providerAliases] of aliasesByAddress) {
-    const matchingCiphers = ciphersByAddress.get(address) ?? [];
-    if (providerAliases.length > 1) {
-      const providerIdentities = providerAliases.map(identity).sort(sortByAddressAndId);
-      for (const cipher of matchingCiphers) {
-        conflictedCipherIds.add(cipher.id ?? "");
-        result.conflicts.push({
-          ...cipherReference(cipher),
-          reason: "provider-address-not-unique",
-          binding: cipher.aliasBinding,
-          providerAliases: providerIdentities,
-        });
-      }
-      continue;
-    }
-
-    const providerAlias = providerAliases[0];
-    const aliasIdentity = identity(providerAlias);
-    if (matchingCiphers.length === 0) {
-      result.missing.push({ kind: "provider-alias-without-login", alias: aliasIdentity });
-      continue;
-    }
-
-    if (matchingCiphers.length > 1) {
-      result.duplicates.push({
-        alias: aliasIdentity,
-        ciphers: matchingCiphers.map(cipherReference).sort((left, right) =>
-          left.cipherId.localeCompare(right.cipherId),
-        ),
-      });
-      continue;
-    }
-
-    const cipher = matchingCiphers[0];
-    const match = { ...cipherReference(cipher), alias: aliasIdentity };
-    if (!cipher.id) {
-      conflictedCipherIds.add("");
-      result.conflicts.push({
-        ...cipherReference(cipher),
-        reason: "cipher-id-missing",
-        binding: cipher.aliasBinding,
-        providerAliases: [aliasIdentity],
-      });
-    } else if (!cipher.aliasBinding) {
-      result.unbound.push(match);
-    } else if (
-      cipher.aliasBinding.id === aliasIdentity.id &&
-      normalizeEmailAliasAddress(cipher.aliasBinding.address) === address
-    ) {
-      result.exactMatches.push(match);
-    } else {
-      conflictedCipherIds.add(cipher.id);
-      result.conflicts.push({
-        ...cipherReference(cipher),
-        reason: "binding-does-not-match-provider",
-        binding: cipher.aliasBinding,
-        providerAliases: [aliasIdentity],
-      });
-    }
-  }
-
-  for (const cipher of loginCiphers) {
-    const binding = cipher.aliasBinding;
-    if (!binding) {
-      continue;
-    }
-
-    const address = normalizeEmailAliasAddress(cipher.login?.username);
-    const providerAliases = aliasesByAddress.get(address) ?? [];
-    const providerAliasById = aliasesById.get(binding.id);
-    if (
-      providerAliasById &&
-      normalizeEmailAliasAddress(providerAliasById.address) !== address &&
-      !conflictedCipherIds.has(cipher.id ?? "")
-    ) {
-      conflictedCipherIds.add(cipher.id ?? "");
-      result.conflicts.push({
-        ...cipherReference(cipher),
-        reason: "binding-does-not-match-provider",
-        binding,
-        providerAliases: [identity(providerAliasById)],
-      });
-      continue;
-    }
-
-    if (providerAliasById || providerAliases.length > 0) {
-      continue;
-    }
-
-    result.missing.push({
-      ...cipherReference(cipher),
-      kind: "bound-login-without-provider-alias",
-      binding,
-    });
-  }
-
-  result.exactMatches.sort(sortMatches);
-  result.duplicates.sort((left, right) => sortByAddressAndId(left.alias, right.alias));
-  result.conflicts.sort((left, right) =>
-    left.username.localeCompare(right.username) || left.cipherId.localeCompare(right.cipherId),
-  );
-  result.missing.sort((left, right) => {
-    const leftAddress =
-      left.kind === "provider-alias-without-login" ? left.alias.address : left.username;
-    const rightAddress =
-      right.kind === "provider-alias-without-login" ? right.alias.address : right.username;
-    return leftAddress.localeCompare(rightAddress);
-  });
-  result.unbound.sort(sortMatches);
-
-  return result;
 }
 
 type Wait = (milliseconds: number) => Promise<void>;
@@ -287,9 +128,13 @@ async function listAliasPageWithRetry(
 ) {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await aliasService.list(page);
+      return await aliasService.listCanonical(page);
     } catch (error) {
-      if (!(error instanceof SimpleLoginAliasError) || error.code !== "rate-limited" || attempt >= 2) {
+      if (
+        !(error instanceof SimpleLoginAliasError) ||
+        error.code !== "rate-limited" ||
+        attempt >= 2
+      ) {
         throw error;
       }
       const retryAfterSeconds = Math.min(300, Math.max(1, error.retryAfterSeconds ?? 60));
@@ -301,22 +146,154 @@ async function listAliasPageWithRetry(
 async function listAllAliases(
   aliasService: SimpleLoginAliasService,
   waitForRetry: Wait,
-): Promise<SimpleLoginAlias[]> {
-  const aliases: SimpleLoginAlias[] = [];
+): Promise<Alias[]> {
+  const aliases: Alias[] = [];
   let page = 0;
   const seenPages = new Set<number>();
 
   while (!seenPages.has(page)) {
     seenPages.add(page);
     const result = await listAliasPageWithRetry(aliasService, page, waitForRetry);
-    aliases.push(...result.items);
-    if (result.nextPage === undefined) {
+    aliases.push(...result.aliases);
+    if (result.aliases.length < 20) {
       break;
     }
-    page = result.nextPage;
+    page += 1;
   }
 
   return aliases;
+}
+
+function canonicalIdentity(
+  provider: AliasProviderIdentity,
+  alias: Alias,
+): AliasReconciliationIdentity {
+  const reference = parse_alias_reference(create_alias_reference(provider, alias));
+  return {
+    version: 2,
+    provider: reference.provider,
+    providerInstance: reference.providerInstance,
+    connectionId: reference.connectionId,
+    aliasId: reference.aliasId.toString(),
+    address: reference.address as string,
+  };
+}
+
+function cipherIdString(cipherId: CipherId): string {
+  return cipherId as unknown as string;
+}
+
+function analysisFromSdkPlan(
+  plan: AliasReconciliationPlan,
+  aliases: Alias[],
+  ciphers: CipherView[],
+): AliasReconciliationAnalysis {
+  const aliasesById = new Map(
+    aliases.map((alias) => [alias.id.toString(), canonicalIdentity(plan.provider, alias)]),
+  );
+  const ciphersById = new Map(ciphers.map((cipher) => [cipher.id ?? "", cipher]));
+  const result: AliasReconciliationAnalysis = {
+    exactMatches: [],
+    duplicates: [],
+    conflicts: [],
+    missing: [],
+    unbound: [],
+  };
+
+  const match = (aliasId: bigint, cipherId: CipherId): AliasReconciliationMatch | undefined => {
+    const alias = aliasesById.get(aliasId.toString());
+    const cipher = ciphersById.get(cipherIdString(cipherId));
+    return alias && cipher ? { ...cipherReference(cipher), alias } : undefined;
+  };
+
+  for (const outcome of plan.outcomes as AliasReconciliationOutcome[]) {
+    switch (outcome.status) {
+      case "matched": {
+        const matched = match(outcome.alias_id, outcome.cipher_id);
+        if (matched) {
+          result.exactMatches.push(matched);
+        }
+        break;
+      }
+      case "matchedByAddress": {
+        const matched = match(outcome.alias_id, outcome.cipher_id);
+        if (matched) {
+          result.unbound.push(matched);
+        }
+        break;
+      }
+      case "staleBinding": {
+        const matched = match(outcome.alias_id, outcome.cipher_id);
+        const cipher = ciphersById.get(cipherIdString(outcome.cipher_id));
+        if (matched && cipher) {
+          result.conflicts.push({
+            ...cipherReference(cipher),
+            reason: "binding-does-not-match-provider",
+            binding: cipher.aliasBinding,
+            providerAliases: [matched.alias],
+          });
+        }
+        break;
+      }
+      case "duplicateBinding": {
+        const alias = aliasesById.get(outcome.alias_id.toString());
+        if (alias) {
+          result.duplicates.push({
+            alias,
+            ciphers: outcome.cipher_ids
+              .map((id) => ciphersById.get(cipherIdString(id)))
+              .filter((cipher): cipher is CipherView => cipher !== undefined)
+              .map(cipherReference),
+          });
+        }
+        break;
+      }
+      case "missingAlias": {
+        const cipher = ciphersById.get(cipherIdString(outcome.cipher_id));
+        if (cipher?.aliasBinding) {
+          result.missing.push({
+            ...cipherReference(cipher),
+            kind: "bound-login-without-provider-alias",
+            binding: cipher.aliasBinding,
+          });
+        }
+        break;
+      }
+      case "unboundAlias": {
+        const alias = aliasesById.get(outcome.alias_id.toString());
+        if (alias) {
+          result.missing.push({ kind: "provider-alias-without-login", alias });
+        }
+        break;
+      }
+      case "skippedCipher": {
+        const cipher = outcome.cipher_id
+          ? ciphersById.get(cipherIdString(outcome.cipher_id))
+          : undefined;
+        result.conflicts.push({
+          cipherId: cipher?.id ?? "",
+          username: cipher?.login?.username ?? "",
+          reason: "sdk-skipped-cipher",
+          binding: cipher?.aliasBinding,
+          providerAliases: [],
+        });
+        break;
+      }
+    }
+  }
+
+  result.exactMatches.sort(sortMatches);
+  result.unbound.sort(sortMatches);
+  result.duplicates.sort((left, right) => sortByAddressAndId(left.alias, right.alias));
+  result.conflicts.sort((left, right) => left.cipherId.localeCompare(right.cipherId));
+  result.missing.sort((left, right) => {
+    const leftAddress =
+      left.kind === "provider-alias-without-login" ? left.alias.address : left.username;
+    const rightAddress =
+      right.kind === "provider-alias-without-login" ? right.alias.address : right.username;
+    return leftAddress.localeCompare(rightAddress);
+  });
+  return result;
 }
 
 export class AliasReconciliationService {
@@ -330,35 +307,90 @@ export class AliasReconciliationService {
     const aliases = await listAllAliases(this.aliasService, this.waitForRetry);
     const ciphers = await this.cipherService.getAllDecrypted(userId);
     const loginCiphers = ciphers.filter((cipher) => cipher.type === CipherType.Login);
-    const before = analyzeAliasReconciliation(aliases, ciphers);
+    const provider = this.aliasService.providerIdentity();
+    const originalSdkCiphers = ciphers.map((cipher) => cipher.toSdkCipherView());
+    const plannedSdkCiphers = originalSdkCiphers.map((cipher) => {
+      try {
+        return migrate_cipher_alias_reference(cipher, [provider]).cipher;
+      } catch {
+        return cipher;
+      }
+    });
+    const migrationChangedIds = new Set<string>();
+    for (let index = 0; index < plannedSdkCiphers.length; index++) {
+      const planned = plannedSdkCiphers[index];
+      const original = originalSdkCiphers[index];
+      if (planned.id && JSON.stringify(planned.fields) !== JSON.stringify(original.fields)) {
+        migrationChangedIds.add(cipherIdString(planned.id));
+      }
+    }
+    const beforePlan = plan_alias_reconciliation(provider, aliases, plannedSdkCiphers);
+    const plannedChangeIds = new Set([
+      ...migrationChangedIds,
+      ...beforePlan.actions.map((action) => cipherIdString(action.cipher_id)),
+    ]);
+    let finalPlan = beforePlan;
     const changes: AliasReconciliationChange[] = [];
 
     if (apply) {
-      const ciphersById = new Map(ciphers.map((cipher) => [cipher.id ?? "", cipher]));
-      for (const planned of before.unbound) {
-        const cipher = ciphersById.get(planned.cipherId);
-        if (
-          !cipher ||
-          cipher.aliasBinding ||
-          normalizeEmailAliasAddress(cipher.login?.username) !==
-            normalizeEmailAliasAddress(planned.alias.address)
-        ) {
-          changes.push({ ...planned, status: "failed", reason: "vault-update-failed" });
-          continue;
-        }
+      const output = apply_alias_reconciliation(beforePlan, aliases, plannedSdkCiphers);
+      const originalById = new Map(
+        originalSdkCiphers
+          .filter((cipher) => cipher.id !== undefined)
+          .map((cipher) => [cipherIdString(cipher.id!), cipher]),
+      );
+      const finalSdkCiphers = [...output.ciphers];
+      const updatedById = new Map(
+        output.ciphers
+          .filter((cipher) => cipher.id !== undefined)
+          .map((cipher) => [cipherIdString(cipher.id!), cipher]),
+      );
+      const actionByCipherId = new Map(
+        beforePlan.actions.map((action) => [cipherIdString(action.cipher_id), action]),
+      );
+      const changedIds = new Set([
+        ...migrationChangedIds,
+        ...output.result.changedCipherIds.map(cipherIdString),
+      ]);
 
-        cipher.aliasBinding = planned.alias;
+      for (const cipherId of changedIds) {
+        const sdkCipher = updatedById.get(cipherId);
+        const view = sdkCipher ? CipherView.fromSdkCipherView(sdkCipher) : undefined;
+        const action = actionByCipherId.get(cipherId);
+        const aliasId =
+          action?.alias_id ?? (view?.aliasBinding ? BigInt(view.aliasBinding.aliasId) : undefined);
+        const alias = aliases.find((candidate) => candidate.id === aliasId);
+        const changeIdentity = alias ? canonicalIdentity(provider, alias) : view?.aliasBinding;
+        const change =
+          changeIdentity && view
+            ? {
+                ...cipherReference(view),
+                alias: changeIdentity,
+              }
+            : undefined;
         try {
-          await this.cipherService.updateWithServer(cipher, userId);
-          changes.push({ ...planned, status: "applied" });
+          if (!view) {
+            throw new Error("SDK reconciliation did not return an updated cipher");
+          }
+          await this.cipherService.updateWithServer(view, userId);
+          if (change) {
+            changes.push({ ...change, status: "applied" });
+          }
         } catch {
-          delete cipher.aliasBinding;
-          changes.push({ ...planned, status: "failed", reason: "vault-update-failed" });
+          const original = originalById.get(cipherId);
+          const outputIndex = finalSdkCiphers.findIndex((cipher) => cipher.id === sdkCipher?.id);
+          if (original && outputIndex >= 0) {
+            finalSdkCiphers[outputIndex] = original;
+          }
+          if (change) {
+            changes.push({ ...change, status: "failed", reason: "vault-update-failed" });
+          }
         }
       }
+      finalPlan = plan_alias_reconciliation(provider, aliases, finalSdkCiphers);
     }
 
-    const analysis = apply ? analyzeAliasReconciliation(aliases, ciphers) : before;
+    const analysis = analysisFromSdkPlan(finalPlan, aliases, ciphers);
     const appliedChanges = changes.filter((change) => change.status === "applied").length;
     const failedChanges = changes.length - appliedChanges;
     return {
@@ -374,7 +406,7 @@ export class AliasReconciliationService {
         conflicts: analysis.conflicts.length,
         missing: analysis.missing.length,
         unbound: analysis.unbound.length,
-        plannedChanges: before.unbound.length,
+        plannedChanges: plannedChangeIds.size,
         appliedChanges,
         failedChanges,
       },

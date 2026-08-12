@@ -1,11 +1,15 @@
 import { firstValueFrom } from "rxjs";
 
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
-import { createSimpleLoginAliasService, integration } from "@bitwarden/generator-core";
+import {
+  createSimpleLoginAliasService,
+  createSimpleLoginConnectionId,
+  integration,
+  isSimpleLoginConnectionId,
+} from "@bitwarden/generator-core";
 import { StateProvider } from "@bitwarden/state";
 
 import { Response } from "../../models/response";
@@ -17,7 +21,6 @@ export class AliasReconciliationCommand {
     private readonly cipherService: CipherService,
     private readonly accountService: AccountService,
     private readonly stateProvider: StateProvider,
-    private readonly apiService: ApiService,
     private readonly syncService: SyncService,
   ) {}
 
@@ -36,12 +39,26 @@ export class AliasReconciliationCommand {
       );
     }
 
+    let connectionId = settings.connectionId;
+    if (connectionId !== undefined && !isSimpleLoginConnectionId(connectionId)) {
+      return Response.badRequest("The stored SimpleLogin connection identity is invalid.");
+    }
+    if (!connectionId) {
+      connectionId = createSimpleLoginConnectionId();
+      await this.stateProvider.setUserState(
+        integration.SimpleLogin.forwarder.settings,
+        { ...settings, connectionId },
+        userId,
+      );
+    }
+
     try {
       await this.syncService.fullSync(true, true);
       const service = new AliasReconciliationService(
-        createSimpleLoginAliasService(this.apiService, {
+        createSimpleLoginAliasService({
           token: settings.token,
           baseUrl: settings.baseUrl,
+          connectionId,
         }),
         this.cipherService,
       );

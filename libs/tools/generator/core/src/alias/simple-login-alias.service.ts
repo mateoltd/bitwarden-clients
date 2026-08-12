@@ -1,7 +1,19 @@
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { normalizeEmailAliasAddress } from "@bitwarden/common/tools/alias";
+import {
+  Alias,
+  AliasClient,
+  AliasClientSettings,
+  AliasFilter,
+  AliasPage,
+  AliasProviderIdentity,
+  AliasUpdateRequest,
+  OptionalSensitiveStringUpdate,
+  ReverseAlias,
+  SensitiveString,
+  parse_alias_reference,
+} from "@bitwarden/sdk-internal";
 
-import { SimpleLoginAliasTransport } from "./simple-login-alias.transport";
+import { SimpleLoginAliasError, normalizeSimpleLoginAliasError } from "./simple-login-alias.error";
 import {
   CreateSimpleLoginAliasRequest,
   SimpleLoginAlias,
@@ -15,76 +27,31 @@ import {
   UpdateSimpleLoginAliasRequest,
 } from "./simple-login-alias.types";
 
+const DEFAULT_SIMPLELOGIN_BASE_URL = "https://app.simplelogin.io";
 const SIMPLELOGIN_PAGE_SIZE = 20;
 
-function requiredNumber(value: unknown, field: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error(`SimpleLogin response is missing ${field}`);
+const sensitive = (value: string): SensitiveString => value as SensitiveString;
+
+function safeNumber(value: bigint, field: string): number {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number)) {
+    throw new SimpleLoginAliasError(`SimpleLogin returned an invalid ${field}`, "invalid-response");
+  }
+  return number;
+}
+
+function positiveId(value: number, field: string): bigint {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new SimpleLoginAliasError(`SimpleLogin ${field} is invalid`, "invalid-response");
+  }
+  return BigInt(value);
+}
+
+function pageNumber(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new SimpleLoginAliasError("SimpleLogin page is invalid", "invalid-response");
   }
   return value;
-}
-
-function requiredString(value: unknown, field: string): string {
-  if (typeof value !== "string" || value === "") {
-    throw new Error(`SimpleLogin response is missing ${field}`);
-  }
-  return value;
-}
-
-function optionalString(value: unknown): string | null {
-  return typeof value === "string" ? value : null;
-}
-
-export function simpleLoginAliasFromJson(json: any): SimpleLoginAlias {
-  const mailboxes = Array.isArray(json?.mailboxes)
-    ? json.mailboxes.map((mailbox: any) => ({
-        id: requiredNumber(mailbox?.id, "mailbox id"),
-        email: requiredString(mailbox?.email, "mailbox email"),
-      }))
-    : [];
-
-  const latest = json?.latest_activity;
-  return {
-    id: requiredNumber(json?.id, "alias id"),
-    address: requiredString(json?.email ?? json?.alias, "alias address"),
-    name: optionalString(json?.name),
-    note: optionalString(json?.note),
-    enabled: json?.enabled === true,
-    pinned: json?.pinned === true,
-    createdAt: requiredNumber(json?.creation_timestamp, "creation timestamp"),
-    blockedCount: Number(json?.nb_block ?? 0),
-    forwardedCount: Number(json?.nb_forward ?? 0),
-    repliedCount: Number(json?.nb_reply ?? 0),
-    supportsPgp: json?.support_pgp === true,
-    pgpDisabled: json?.disable_pgp === true,
-    mailboxes,
-    latestActivity:
-      latest && latest.contact
-        ? {
-            action: latest.action,
-            timestamp: requiredNumber(latest.timestamp, "activity timestamp"),
-            contact: {
-              email: requiredString(latest.contact.email, "activity contact"),
-              name: optionalString(latest.contact.name),
-              reverseAlias: requiredString(latest.contact.reverse_alias, "activity reverse alias"),
-            },
-          }
-        : null,
-  };
-}
-
-function simpleLoginContactFromJson(json: any): SimpleLoginContact {
-  return {
-    id: requiredNumber(json?.id, "contact id"),
-    address: requiredString(json?.contact, "contact address"),
-    reverseAlias: requiredString(json?.reverse_alias, "reverse alias"),
-    reverseAliasAddress: requiredString(json?.reverse_alias_address, "reverse alias address"),
-    createdAt: requiredNumber(json?.creation_timestamp, "contact creation timestamp"),
-    lastEmailSentAt:
-      typeof json?.last_email_sent_timestamp === "number" ? json.last_email_sent_timestamp : null,
-    blocked: json?.block_forward === true,
-    existed: json?.existed === true,
-  };
 }
 
 function normalizedHostname(value: string | undefined): string | undefined {
@@ -99,68 +66,160 @@ function normalizedHostname(value: string | undefined): string | undefined {
   }
 }
 
-/** Stable Angular-independent lifecycle service backed by the real SimpleLogin API. */
-export class SimpleLoginAliasService {
-  private readonly settings: SimpleLoginAliasSettings;
+function filterValue(filter: SimpleLoginAliasFilter): AliasFilter | undefined {
+  switch (filter) {
+    case "enabled":
+      return "Enabled";
+    case "disabled":
+      return "Disabled";
+    case "pinned":
+      return "Pinned";
+    default:
+      return undefined;
+  }
+}
 
-  constructor(
-    private readonly transport: SimpleLoginAliasTransport,
-    settings: SimpleLoginAliasSettings,
-  ) {
-    this.settings = { token: settings.token, baseUrl: settings.baseUrl };
+function optionalTextUpdate(
+  value: string | null | undefined,
+): OptionalSensitiveStringUpdate | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return value === null ? { type: "clear" } : { type: "set", value: sensitive(value) };
+}
+
+/** UI model mapping from the canonical SDK lifecycle model. */
+function simpleLoginAliasFromSdk(client: AliasClient, alias: Alias): SimpleLoginAlias {
+  const reference = parse_alias_reference(client.create_alias_reference(alias));
+  const latest = alias.latest_activity;
+  return {
+    id: safeNumber(alias.id, "alias id"),
+    address: alias.email as string,
+    name: (alias.name as string | undefined) ?? null,
+    note: (alias.note as string | undefined) ?? null,
+    enabled: alias.enabled,
+    pinned: alias.pinned === true,
+    createdAt: safeNumber(alias.creation_timestamp, "creation timestamp"),
+    blockedCount: safeNumber(alias.nb_block, "blocked count"),
+    forwardedCount: safeNumber(alias.nb_forward, "forwarded count"),
+    repliedCount: safeNumber(alias.nb_reply, "reply count"),
+    supportsPgp: alias.support_pgp,
+    pgpDisabled: alias.disable_pgp,
+    mailboxes: alias.mailboxes.map((mailbox) => ({
+      id: safeNumber(mailbox.id, "mailbox id"),
+      email: mailbox.email as string,
+    })),
+    latestActivity: latest
+      ? {
+          action: latest.action as "forward" | "reply" | "block" | "bounced",
+          timestamp: safeNumber(latest.timestamp, "activity timestamp"),
+          contact: {
+            email: latest.contact.email as string,
+            name: (latest.contact.name as string | undefined) ?? null,
+            reverseAlias: latest.contact.reverse_alias as string,
+          },
+        }
+      : null,
+    identity: {
+      version: 2,
+      provider: reference.provider,
+      providerInstance: reference.providerInstance,
+      connectionId: reference.connectionId,
+      aliasId: reference.aliasId.toString(),
+      address: reference.address as string,
+    },
+  };
+}
+
+function simpleLoginContactFromSdk(contact: ReverseAlias): SimpleLoginContact {
+  return {
+    id: safeNumber(contact.id, "contact id"),
+    address: contact.contact as string,
+    reverseAlias: contact.reverse_alias as string,
+    reverseAliasAddress: contact.reverse_alias_address as string,
+    createdAt: safeNumber(contact.creation_timestamp, "contact creation timestamp"),
+    lastEmailSentAt:
+      contact.last_email_sent_timestamp === undefined
+        ? null
+        : safeNumber(contact.last_email_sent_timestamp, "last email timestamp"),
+    blocked: contact.block_forward,
+    existed: contact.existed === true,
+  };
+}
+
+/** Angular-independent application service backed exclusively by the canonical alias SDK. */
+export class SimpleLoginAliasService {
+  constructor(private readonly settings: AliasClientSettings) {}
+
+  providerIdentity(): AliasProviderIdentity {
+    const client = new AliasClient(this.settings);
+    try {
+      return client.provider_identity();
+    } finally {
+      client.free();
+    }
   }
 
   async recommend(website: string): Promise<SimpleLoginAliasRecommendation> {
-    const hostname = normalizedHostname(website) ?? "";
-    const json = await this.transport.request<any>(this.settings, "api/v5/alias/options", {
-      query: { hostname: hostname || undefined },
+    return this.safe(async (client) => {
+      const hostname = normalizedHostname(website) ?? "";
+      const options = await client.get_alias_options(hostname || undefined);
+      let alias: SimpleLoginAlias | undefined;
+      if (options.recommendation) {
+        alias = await this.findByAddress(options.recommendation.alias as string);
+      }
+      return {
+        hostname,
+        canCreate: options.can_create,
+        prefixSuggestion: options.prefix_suggestion,
+        suffixes: options.suffixes.map((suffix) => ({
+          suffix: suffix.suffix as string,
+          signedSuffix: suffix.signed_suffix as string,
+          isCustom: suffix.is_custom,
+          isPremium: suffix.is_premium,
+        })),
+        alias,
+      };
     });
-
-    let alias: SimpleLoginAlias | undefined;
-    const recommendedAddress = json?.recommendation?.alias;
-    if (typeof recommendedAddress === "string") {
-      alias = await this.findByAddress(recommendedAddress);
-    }
-
-    return {
-      hostname,
-      canCreate: json?.can_create === true,
-      prefixSuggestion: typeof json?.prefix_suggestion === "string" ? json.prefix_suggestion : "",
-      suffixes: Array.isArray(json?.suffixes)
-        ? json.suffixes.map((suffix: any) => ({
-            suffix: requiredString(suffix?.suffix, "alias suffix"),
-            signedSuffix: requiredString(suffix?.signed_suffix, "signed alias suffix"),
-            isCustom: suffix?.is_custom === true,
-            isPremium: suffix?.is_premium === true,
-          }))
-        : [],
-      alias,
-    };
   }
 
   async create(request: CreateSimpleLoginAliasRequest = {}): Promise<SimpleLoginAlias> {
-    const hostname = normalizedHostname(request.hostname);
-    if (request.kind === "custom") {
-      const json = await this.transport.request<any>(this.settings, "api/v3/alias/custom/new", {
-        method: "POST",
-        query: { hostname },
-        body: {
-          alias_prefix: request.aliasPrefix,
-          signed_suffix: request.signedSuffix,
-          mailbox_ids: request.mailboxIds,
-          note: request.note,
-          name: request.name,
-        },
-      });
-      return simpleLoginAliasFromJson(json);
-    }
-
-    const json = await this.transport.request<any>(this.settings, "api/alias/random/new", {
-      method: "POST",
-      query: { hostname, mode: request.mode },
-      body: request.note === undefined ? {} : { note: request.note },
+    return this.safe(async (client) => {
+      const hostname = normalizedHostname(request.hostname);
+      const alias =
+        request.kind === "custom"
+          ? await client.create_custom_alias({
+              alias_prefix: request.aliasPrefix,
+              signed_suffix: sensitive(request.signedSuffix),
+              mailbox_ids: request.mailboxIds.map((id) => positiveId(id, "mailbox id")),
+              hostname: hostname ? sensitive(hostname) : undefined,
+              note: request.note === undefined ? undefined : sensitive(request.note),
+              name: request.name === undefined ? undefined : sensitive(request.name),
+            })
+          : await client.create_random_alias({
+              hostname: hostname ? sensitive(hostname) : undefined,
+              mode: request.mode === "uuid" ? "Uuid" : request.mode === "word" ? "Word" : undefined,
+              note: request.note === undefined ? undefined : sensitive(request.note),
+            });
+      return simpleLoginAliasFromSdk(client, alias);
     });
-    return simpleLoginAliasFromJson(json);
+  }
+
+  async listCanonical(
+    page = 0,
+    query?: string,
+    filter: SimpleLoginAliasFilter = "all",
+  ): Promise<AliasPage> {
+    return this.safe((client) => {
+      const validPage = pageNumber(page);
+      return query
+        ? client.search_aliases({
+            query: sensitive(query),
+            page: validPage,
+            filter: filterValue(filter),
+          })
+        : client.list_aliases(validPage, filterValue(filter));
+    });
   }
 
   async list(
@@ -168,99 +227,88 @@ export class SimpleLoginAliasService {
     query?: string,
     filter: SimpleLoginAliasFilter = "all",
   ): Promise<SimpleLoginAliasPage> {
-    const json = await this.transport.request<any>(this.settings, "api/v2/aliases", {
-      method: query ? "POST" : "GET",
-      query: {
-        page_id: page,
-        [filter]: filter === "all" ? undefined : true,
-      },
-      body: query ? { query } : undefined,
-    });
-    const items = Array.isArray(json?.aliases) ? json.aliases.map(simpleLoginAliasFromJson) : [];
+    const result = await this.listCanonical(page, query, filter);
+    const items = await this.safe(async (client) =>
+      result.aliases.map((alias) => simpleLoginAliasFromSdk(client, alias)),
+    );
     return { items, page, nextPage: items.length === SIMPLELOGIN_PAGE_SIZE ? page + 1 : undefined };
   }
 
   async get(id: number): Promise<SimpleLoginAlias> {
-    const json = await this.transport.request<any>(this.settings, `api/aliases/${id}`);
-    return simpleLoginAliasFromJson(json);
+    return this.safe(async (client) =>
+      simpleLoginAliasFromSdk(client, await client.get_alias(positiveId(id, "alias id"))),
+    );
   }
 
   async update(id: number, update: UpdateSimpleLoginAliasRequest): Promise<SimpleLoginAlias> {
-    await this.transport.request(this.settings, `api/aliases/${id}`, {
-      method: "PATCH",
-      body: {
-        note: update.note,
-        name: update.name,
-        mailbox_ids: update.mailboxIds,
+    return this.safe(async (client) => {
+      const request: AliasUpdateRequest = {
+        note: optionalTextUpdate(update.note),
+        name: optionalTextUpdate(update.name),
+        mailbox_ids: update.mailboxIds?.map((mailboxId) => positiveId(mailboxId, "mailbox id")),
         disable_pgp: update.pgpDisabled,
         pinned: update.pinned,
-      },
+      };
+      return simpleLoginAliasFromSdk(
+        client,
+        await client.update_alias(positiveId(id, "alias id"), request),
+      );
     });
-    return this.get(id);
   }
 
   async setEnabled(id: number, enabled: boolean): Promise<SimpleLoginAlias> {
-    const alias = await this.get(id);
-    if (alias.enabled === enabled) {
-      return alias;
-    }
-
-    const result = await this.transport.request<{ enabled?: boolean }>(
-      this.settings,
-      `api/aliases/${id}/toggle`,
-      { method: "POST" },
-    );
-    return { ...alias, enabled: result.enabled === true };
+    return this.safe(async (client) => {
+      const aliasId = positiveId(id, "alias id");
+      await client.set_alias_enabled(aliasId, enabled);
+      return simpleLoginAliasFromSdk(client, await client.get_alias(aliasId));
+    });
   }
 
   async delete(id: number): Promise<void> {
-    await this.transport.request(this.settings, `api/aliases/${id}`, { method: "DELETE" });
+    await this.safe((client) => client.delete_alias(positiveId(id, "alias id")));
   }
 
   async domains(): Promise<SimpleLoginAliasDomain[]> {
-    const json = await this.transport.request<any[]>(this.settings, "api/v2/setting/domains");
-    return Array.isArray(json)
-      ? json.map((domain) => ({
-          domain: requiredString(domain?.domain, "alias domain"),
-          isCustom: domain?.is_custom === true,
-        }))
-      : [];
+    return this.safe(async (client) =>
+      (await client.list_domains()).map((domain) => ({
+        domain: domain.domain as string,
+        isCustom: domain.is_custom,
+      })),
+    );
   }
 
   async contacts(aliasId: number, page = 0): Promise<SimpleLoginContactPage> {
-    const json = await this.transport.request<any>(
-      this.settings,
-      `api/aliases/${aliasId}/contacts`,
-      { query: { page_id: page } },
-    );
-    const items = Array.isArray(json?.contacts)
-      ? json.contacts.map(simpleLoginContactFromJson)
-      : [];
-    return { items, page, nextPage: items.length === SIMPLELOGIN_PAGE_SIZE ? page + 1 : undefined };
+    return this.safe(async (client) => {
+      const result = await client.list_reverse_aliases(
+        positiveId(aliasId, "alias id"),
+        pageNumber(page),
+      );
+      const items = result.contacts.map(simpleLoginContactFromSdk);
+      return {
+        items,
+        page,
+        nextPage: items.length === SIMPLELOGIN_PAGE_SIZE ? page + 1 : undefined,
+      };
+    });
   }
 
   async createReverseAlias(aliasId: number, contact: string): Promise<SimpleLoginContact> {
-    const json = await this.transport.request<any>(
-      this.settings,
-      `api/aliases/${aliasId}/contacts`,
-      { method: "POST", body: { contact } },
+    return this.safe(async (client) =>
+      simpleLoginContactFromSdk(
+        await client.create_reverse_alias(positiveId(aliasId, "alias id"), contact),
+      ),
     );
-    return simpleLoginContactFromJson(json);
   }
 
   async toggleContactBlocked(contactId: number): Promise<boolean> {
-    const json = await this.transport.request<{ block_forward?: boolean }>(
-      this.settings,
-      `api/contacts/${contactId}/toggle`,
-      { method: "POST" },
+    return this.safe(
+      async (client) =>
+        (await client.toggle_contact_blocked(positiveId(contactId, "contact id"))).block_forward,
     );
-    return json.block_forward === true;
   }
 
   async deleteContact(contactId: number): Promise<void> {
-    await this.transport.request(this.settings, `api/contacts/${contactId}`, {
-      method: "DELETE",
-    });
+    await this.safe((client) => client.delete_contact(positiveId(contactId, "contact id")));
   }
 
   private async findByAddress(address: string): Promise<SimpleLoginAlias | undefined> {
@@ -268,11 +316,37 @@ export class SimpleLoginAliasService {
     const normalized = normalizeEmailAliasAddress(address);
     return result.items.find((alias) => normalizeEmailAliasAddress(alias.address) === normalized);
   }
+
+  private async safe<Result>(operation: (client: AliasClient) => Promise<Result>): Promise<Result> {
+    let client: AliasClient;
+    try {
+      client = new AliasClient(this.settings);
+    } catch (error) {
+      throw normalizeSimpleLoginAliasError(error);
+    }
+    try {
+      return await operation(client);
+    } catch (error) {
+      throw normalizeSimpleLoginAliasError(error);
+    } finally {
+      client.free();
+    }
+  }
 }
 
 export function createSimpleLoginAliasService(
-  api: ApiService,
   settings: SimpleLoginAliasSettings,
 ): SimpleLoginAliasService {
-  return new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), settings);
+  try {
+    const sdkSettings: AliasClientSettings = {
+      base_url: settings.baseUrl?.trim() || DEFAULT_SIMPLELOGIN_BASE_URL,
+      api_token: sensitive(settings.token.trim()),
+      connection_id: settings.connectionId,
+    };
+    const client = new AliasClient(sdkSettings);
+    client.free();
+    return new SimpleLoginAliasService(sdkSettings);
+  } catch (error) {
+    throw normalizeSimpleLoginAliasError(error);
+  }
 }

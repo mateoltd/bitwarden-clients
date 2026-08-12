@@ -65,6 +65,9 @@ export class Forwarder implements CredentialGenerator<ApiSettings> {
     configuration: ForwarderConfiguration<Settings>,
     settings: Settings,
   ) {
+    if (!configuration.forwarder.createForwardingEmail) {
+      throw new Error(`Forwarder ${configuration.name} requires a dedicated generator engine`);
+    }
     const context = this.createContext(configuration, settings);
     const rpc = new CreateForwardingAddressRpc<Settings>(configuration, context);
     return rpc;

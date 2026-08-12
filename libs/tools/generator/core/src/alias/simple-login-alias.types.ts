@@ -1,12 +1,10 @@
-import {
-  EMAIL_ALIAS_IDENTITY_VERSION,
-  EmailAliasCredentialMetadata,
-  EmailAliasIdentity,
-} from "@bitwarden/common/tools/alias";
+import { EmailAliasCredentialMetadata, EmailAliasIdentity } from "@bitwarden/common/tools/alias";
 
 export type SimpleLoginAliasSettings = {
   token: string;
   baseUrl?: string;
+  /** Stable UUID v4 persisted with the encrypted account-scoped provider settings. */
+  connectionId: string;
 };
 
 export type SimpleLoginMailbox = {
@@ -39,6 +37,8 @@ export type SimpleLoginAlias = {
   pgpDisabled: boolean;
   mailboxes: SimpleLoginMailbox[];
   latestActivity: SimpleLoginAliasActivity | null;
+  /** Canonical connection-scoped reference used by generator-to-vault binding. */
+  identity: EmailAliasIdentity;
 };
 
 export type SimpleLoginAliasFilter = "all" | "enabled" | "disabled" | "pinned";
@@ -112,12 +112,7 @@ export type SimpleLoginContactPage = {
 };
 
 export function toSimpleLoginAliasIdentity(alias: SimpleLoginAlias): EmailAliasIdentity {
-  return {
-    version: EMAIL_ALIAS_IDENTITY_VERSION,
-    provider: "simplelogin",
-    id: alias.id.toString(),
-    address: alias.address,
-  };
+  return alias.identity;
 }
 
 export function toSimpleLoginCredentialMetadata(

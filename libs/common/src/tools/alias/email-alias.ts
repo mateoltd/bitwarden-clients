@@ -1,5 +1,11 @@
-/** Current version of the alias identity exchanged between generators and vault ciphers. */
-export const EMAIL_ALIAS_IDENTITY_VERSION = 1 as const;
+import {
+  AliasReference,
+  SensitiveString,
+  serialize_alias_reference,
+} from "@bitwarden/sdk-internal";
+
+/** Current canonical SDK alias-reference version exchanged by generators and vault ciphers. */
+export const EMAIL_ALIAS_IDENTITY_VERSION = 2 as const;
 
 /** Providers whose aliases can be bound to a login cipher. */
 export type EmailAliasProvider = "simplelogin";
@@ -13,7 +19,9 @@ export type EmailAliasProvider = "simplelogin";
 export type EmailAliasIdentity = {
   version: typeof EMAIL_ALIAS_IDENTITY_VERSION;
   provider: EmailAliasProvider;
-  id: string;
+  providerInstance: string;
+  connectionId: string;
+  aliasId: string;
   address: string;
 };
 
@@ -40,20 +48,37 @@ export function parseEmailAliasIdentity(value: unknown): EmailAliasIdentity | un
   if (
     candidate.version !== EMAIL_ALIAS_IDENTITY_VERSION ||
     candidate.provider !== "simplelogin" ||
-    typeof candidate.id !== "string" ||
-    candidate.id.trim() === "" ||
+    typeof candidate.providerInstance !== "string" ||
+    typeof candidate.connectionId !== "string" ||
+    typeof candidate.aliasId !== "string" ||
+    !/^[1-9]\d*$/.test(candidate.aliasId) ||
     typeof candidate.address !== "string" ||
     normalizeEmailAliasAddress(candidate.address) === ""
   ) {
     return undefined;
   }
 
-  return {
-    version: EMAIL_ALIAS_IDENTITY_VERSION,
-    provider: candidate.provider,
-    id: candidate.id,
-    address: candidate.address.trim(),
-  };
+  try {
+    const reference: AliasReference = {
+      version: EMAIL_ALIAS_IDENTITY_VERSION,
+      provider: candidate.provider,
+      providerInstance: candidate.providerInstance,
+      connectionId: candidate.connectionId,
+      aliasId: BigInt(candidate.aliasId),
+      address: candidate.address.trim() as SensitiveString,
+    };
+    serialize_alias_reference(reference);
+    return {
+      version: EMAIL_ALIAS_IDENTITY_VERSION,
+      provider: reference.provider,
+      providerInstance: reference.providerInstance,
+      connectionId: reference.connectionId,
+      aliasId: reference.aliasId.toString(),
+      address: reference.address as string,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 /** Parse generated-credential metadata without accepting provider-specific secrets. */

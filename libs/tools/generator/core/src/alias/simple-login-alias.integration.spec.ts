@@ -1,13 +1,14 @@
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
-import { ApiSettings, RestClient } from "@bitwarden/common/tools/integration/rpc";
 
-import { Forwarder } from "../engine/forwarder";
+import { SimpleLoginForwarder } from "../engine/simple-login-forwarder";
 import { SimpleLogin } from "../integration/simple-login";
 import { GeneratedCredential } from "../types";
 
-import { SimpleLoginAliasService } from "./simple-login-alias.service";
-import { SimpleLoginAliasError, SimpleLoginAliasTransport } from "./simple-login-alias.transport";
+import { SimpleLoginAliasError } from "./simple-login-alias.error";
+import {
+  createSimpleLoginAliasService,
+  SimpleLoginAliasService,
+} from "./simple-login-alias.service";
 
 const integrationEnabled = process.env["SIMPLELOGIN_INTEGRATION"] === "1";
 const describeIntegration = integrationEnabled ? describe : describe.skip;
@@ -16,9 +17,7 @@ describeIntegration("SimpleLogin real API integration", () => {
   const baseUrl = process.env["SIMPLELOGIN_BASE_URL"] ?? "http://127.0.0.1:7777";
   const email = process.env["SIMPLELOGIN_EMAIL"] ?? "john@wick.com";
   const password = process.env["SIMPLELOGIN_PASSWORD"] ?? "password";
-  const api = {
-    nativeFetch: (request: Request) => fetch(request),
-  } as ApiService;
+  const connectionId = "11111111-1111-4111-8111-111111111111";
   const i18n = {
     t: (key: string, ...values: string[]) => `${key} ${values.join(" ")}`.trim(),
   } as I18nService;
@@ -42,7 +41,7 @@ describeIntegration("SimpleLogin real API integration", () => {
     }
 
     token = body.api_key;
-    service = new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), { token, baseUrl });
+    service = createSimpleLoginAliasService({ token, baseUrl, connectionId });
   });
 
   afterAll(async () => {
@@ -57,7 +56,7 @@ describeIntegration("SimpleLogin real API integration", () => {
   it("retains generator identity and completes lifecycle operations", async () => {
     const marker = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
     const hostname = `alias-${marker}.integration.test`;
-    const forwarder = new Forwarder(SimpleLogin, new RestClient(api, i18n), i18n);
+    const forwarder = new SimpleLoginForwarder(SimpleLogin, i18n, Date.now);
 
     const generated = await forwarder.generate(
       {
@@ -65,9 +64,9 @@ describeIntegration("SimpleLogin real API integration", () => {
         website: hostname,
         source: "integration test",
       },
-      { token, baseUrl } as ApiSettings,
+      { token, baseUrl, connectionId },
     );
-    const aliasId = Number(generated.metadata?.alias.id);
+    const aliasId = Number(generated.metadata?.alias.aliasId);
     aliasesToDelete.add(aliasId);
     lifecycleAlias = { id: aliasId, address: generated.credential, hostname };
 
@@ -76,7 +75,11 @@ describeIntegration("SimpleLogin real API integration", () => {
       website: hostname,
       metadata: {
         kind: "email-alias",
-        alias: { provider: "simplelogin", id: expect.any(String) },
+        alias: {
+          provider: "simplelogin",
+          connectionId,
+          aliasId: expect.any(String),
+        },
       },
     });
     expect(generated.metadata?.alias.address).toBe(generated.credential);
@@ -117,9 +120,10 @@ describeIntegration("SimpleLogin real API integration", () => {
 
   it("handles concurrent clients, expired credentials, partial failures, and offline state", async () => {
     expect(lifecycleAlias).toBeDefined();
-    const secondClient = new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), {
+    const secondClient = createSimpleLoginAliasService({
       token,
       baseUrl,
+      connectionId,
     });
 
     const [firstDetail, secondDetail, recommendation] = await Promise.all([
@@ -136,19 +140,20 @@ describeIntegration("SimpleLogin real API integration", () => {
 
     let partialFailure: SimpleLoginAliasError | undefined;
     try {
-      await service.get(-1);
+      await service.get(999_999);
     } catch (error) {
       partialFailure = error as SimpleLoginAliasError;
     }
-    expect(["forbidden", "not-found"]).toContain(partialFailure?.code);
+    expect(partialFailure).toMatchObject({ code: "remote-error", status: 400 });
     await expect(service.get(lifecycleAlias!.id)).resolves.toMatchObject({
       id: lifecycleAlias!.id,
     });
 
     const expiredToken = `expired-${Date.now()}`;
-    const expired = new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), {
+    const expired = createSimpleLoginAliasService({
       token: expiredToken,
       baseUrl,
+      connectionId,
     });
     await expect(expired.list()).rejects.toMatchObject({
       code: "invalid-credentials",
@@ -156,13 +161,14 @@ describeIntegration("SimpleLogin real API integration", () => {
     });
     await expect(expired.list()).rejects.not.toThrow(expiredToken);
 
-    const offline = new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), {
+    const offline = createSimpleLoginAliasService({
       token,
       baseUrl: "http://127.0.0.1:1",
+      connectionId,
     });
     await expect(offline.list()).rejects.toMatchObject({
-      code: "remote-error",
-      message: "SimpleLogin could not be reached",
+      code: "invalid-response",
+      message: "invalid alias provider response: provider fetch failed",
     });
   });
 

@@ -43,9 +43,11 @@ describe("GeneratedCredential", () => {
       {
         kind: "email-alias",
         alias: {
-          version: 1,
+          version: 2,
           provider: "simplelogin",
-          id: "42",
+          providerInstance: "https://app.simplelogin.io/",
+          connectionId: "11111111-1111-4111-8111-111111111111",
+          aliasId: "42",
           address: "alias@sl.test",
         },
       },

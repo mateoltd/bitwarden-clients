@@ -9,11 +9,22 @@ import {
   SimpleChanges,
 } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
-import { map, ReplaySubject, skip, Subject, switchAll, takeUntil, withLatestFrom } from "rxjs";
+import {
+  concatMap,
+  firstValueFrom,
+  map,
+  ReplaySubject,
+  skip,
+  Subject,
+  switchAll,
+  takeUntil,
+  withLatestFrom,
+} from "rxjs";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { Account } from "@bitwarden/common/auth/abstractions/account.service";
 import { VendorId } from "@bitwarden/common/tools/extension";
+import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
 import {
   FormFieldModule,
   AriaDisableDirective,
@@ -23,6 +34,7 @@ import {
 } from "@bitwarden/components";
 import {
   CredentialGeneratorService,
+  createSimpleLoginConnectionId,
   ForwarderOptions,
   GeneratorMetadata,
 } from "@bitwarden/generator-core";
@@ -149,12 +161,28 @@ export class ForwarderSettingsComponent implements OnInit, OnChanges, OnDestroy 
 
     // now that outputs are set up, connect inputs
     this.saveSettings
-      .pipe(withLatestFrom(this.settings.valueChanges, settings$), takeUntil(this.destroyed$))
-      .subscribe(([, value, settings]) => {
-        // convert prefix boolean back to sentinel string for the settings store
-        const saveValues = { ...value, prefix: (value as any).prefix ? "website" : "" };
-        settings.next(saveValues as ForwarderOptions);
-      });
+      .pipe(
+        withLatestFrom(this.settings.valueChanges, settings$),
+        concatMap(async ([, value, settings]) => {
+          const current = await firstValueFrom(settings);
+          // convert prefix boolean back to sentinel string for the settings store
+          const saveValues: ForwarderOptions = {
+            ...current,
+            ...value,
+            prefix: (value as any).prefix ? "website" : "",
+          };
+          if (
+            this.forwarder === Vendor.simplelogin &&
+            saveValues.token?.trim() &&
+            !saveValues.connectionId
+          ) {
+            saveValues.connectionId = createSimpleLoginConnectionId();
+          }
+          return { saveValues, settings };
+        }),
+        takeUntil(this.destroyed$),
+      )
+      .subscribe(({ saveValues, settings }) => settings.next(saveValues));
   }
 
   private saveSettings = new Subject<string>();

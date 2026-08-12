@@ -12,7 +12,7 @@ import { chromium } from "playwright";
 const root = process.cwd();
 const extensionDirectory = path.resolve(
   root,
-  process.env.BROWSER_EXTENSION_DIRECTORY ?? "apps/browser/build",
+  process.env.BROWSER_EXTENSION_DIRECTORY ?? "dist/apps/browser/chrome-dev",
 );
 const registrationFixture = path.resolve(root, "apps/browser/test/alias-registration.html");
 const certificate = fs.readFileSync(path.resolve(root, "apps/web/dev-server.shared.pem"));
@@ -71,7 +71,9 @@ try {
   context.setDefaultTimeout(15_000);
   observeContext(context, apiProxy);
 
-  worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  worker =
+    context.serviceWorkers()[0] ??
+    (await context.waitForEvent("serviceworker", { timeout: 30_000 }));
   observeWorker(worker);
   extensionId = new URL(worker.url()).host;
   popup = await context.newPage();
@@ -304,7 +306,9 @@ try {
   context = await chromium.launchPersistentContext(profile, launchOptions);
   context.setDefaultTimeout(15_000);
   observeContext(context, apiProxy);
-  worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  worker =
+    context.serviceWorkers()[0] ??
+    (await context.waitForEvent("serviceworker", { timeout: 30_000 }));
   observeWorker(worker);
   assert.equal(new URL(worker.url()).host, extensionId);
   popup = await context.newPage();
@@ -317,6 +321,13 @@ try {
   await popup.waitForURL(/#\/tabs\//, { timeout: 30_000 });
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/vault`);
   await popup.getByText(marker, { exact: true }).waitFor({ timeout: 20_000 });
+  const restartedVaultItem = popup
+    .getByText(marker, { exact: true })
+    .locator("xpath=ancestor::bit-item");
+  await restartedVaultItem.getByRole("button", { name: "More options" }).click();
+  await popup.getByRole("menuitem", { name: "Manage bound alias", exact: true }).click();
+  await popup.waitForURL(new RegExp(`#\/email-aliases\/${alias.id}$`));
+  await popup.getByTestId("alias-address").filter({ hasText: aliasAddress }).waitFor();
 
   const restartedBrowserStorage = JSON.stringify(
     await worker.evaluate(() => new Promise((resolve) => chrome.storage.local.get(null, resolve))),
@@ -399,7 +410,11 @@ function recordDiagnostic(kind, message) {
 }
 
 function assertServiceLogsDoNotContain(secret) {
-  const logs = spawnSync("docker", ["logs", "alias-core-sl-app"], { encoding: "utf8" });
+  const logs = spawnSync(
+    "docker",
+    ["logs", process.env.SIMPLELOGIN_APP_CONTAINER ?? "alias-core-sl-app"],
+    { encoding: "utf8" },
+  );
   assert.equal(logs.status, 0, "SimpleLogin logs must be readable for leakage checks");
   assert.equal(`${logs.stdout}${logs.stderr}`.includes(secret), false);
 }

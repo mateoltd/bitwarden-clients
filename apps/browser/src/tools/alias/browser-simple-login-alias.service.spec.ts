@@ -3,7 +3,6 @@
 import { MockProxy, mock } from "jest-mock-extended";
 import { BehaviorSubject, firstValueFrom } from "rxjs";
 
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { FakeAccountService, mockAccountServiceWith } from "@bitwarden/common/spec";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CredentialGeneratorService, ForwarderOptions } from "@bitwarden/generator-core";
@@ -11,96 +10,57 @@ import { CredentialGeneratorService, ForwarderOptions } from "@bitwarden/generat
 import { BrowserSimpleLoginAliasService } from "./browser-simple-login-alias.service";
 
 describe("BrowserSimpleLoginAliasService", () => {
-  const userId = "browser-alias-user" as UserId;
-  const token = "provider-token-must-not-leak";
-  const baseUrl = "https://simplelogin.test";
+  const userId = "11111111-1111-4111-8111-111111111111" as UserId;
+  const baseUrl = "https://app.simplelogin.io";
 
-  let apiService: MockProxy<ApiService>;
   let generatorService: MockProxy<CredentialGeneratorService>;
   let accountService: FakeAccountService;
   let settings$: BehaviorSubject<ForwarderOptions>;
   let service: BrowserSimpleLoginAliasService;
 
   beforeEach(() => {
-    apiService = mock<ApiService>();
     generatorService = mock<CredentialGeneratorService>();
     accountService = mockAccountServiceWith(userId);
-    settings$ = new BehaviorSubject<ForwarderOptions>({ token, baseUrl });
+    settings$ = new BehaviorSubject<ForwarderOptions>({
+      token: "provider-token-must-not-leak",
+      baseUrl,
+    });
     generatorService.forwarder.mockReturnValue({} as any);
     generatorService.settings.mockReturnValue(settings$ as any);
-
-    service = new BrowserSimpleLoginAliasService(apiService, accountService, generatorService);
+    service = new BrowserSimpleLoginAliasService(accountService, generatorService);
   });
 
-  it("reuses the hostname recommendation and returns only public binding metadata", async () => {
-    const complete = jest.spyOn(settings$, "complete");
-    apiService.nativeFetch
-      .mockResolvedValueOnce(
-        jsonResponse({
-          can_create: true,
-          prefix_suggestion: "example",
-          suffixes: [],
-          recommendation: { alias: "existing@sl.test" },
-        }),
-      )
-      .mockResolvedValueOnce(jsonResponse({ aliases: [aliasJson(42, "existing@sl.test")] }));
+  it("persists one UUIDv4 connection identity in encrypted forwarder settings", async () => {
+    const client = await service["lifecycle"]();
+    const identity = client.providerIdentity();
 
-    const result = await service.recommendOrCreate("https://www.example.com/register");
-
-    expect(result.credential).toBe("existing@sl.test");
-    expect(result.website).toBe("https://www.example.com/register");
-    expect(result.metadata).toEqual({
-      kind: "email-alias",
-      alias: {
-        version: 1,
-        provider: "simplelogin",
-        id: "42",
-        address: "existing@sl.test",
-      },
+    expect(identity).toMatchObject({
+      provider: "simplelogin",
+      instance: "https://app.simplelogin.io/",
+      connectionId: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      ),
     });
-    expect(JSON.stringify(result.metadata)).not.toContain(token);
-    expect(apiService.nativeFetch).toHaveBeenCalledTimes(2);
-    expect(complete).toHaveBeenCalledTimes(1);
+    expect(settings$.value.connectionId).toBe(identity.connectionId);
+    expect(JSON.stringify(identity)).not.toContain(settings$.value.token);
   });
 
-  it("creates an alias with the registration hostname when no reusable alias exists", async () => {
-    apiService.nativeFetch
-      .mockResolvedValueOnce(
-        jsonResponse({
-          can_create: true,
-          prefix_suggestion: "signup",
-          suffixes: [],
-        }),
-      )
-      .mockResolvedValueOnce(jsonResponse(aliasJson(84, "created@sl.test"), 201));
-
-    const result = await service.recommendOrCreate("https://signup.example.net/new");
-
-    expect(result.metadata?.alias.id).toBe("84");
-    const createRequest = apiService.nativeFetch.mock.calls[1][0] as Request;
-    expect(createRequest.url).toContain("hostname=signup.example.net");
-    expect(await createRequest.clone().json()).toEqual({
-      note: "Bitwarden: signup.example.net",
-    });
-    expect(createRequest.headers.get("Authentication")).toBe(token);
-    expect(result.toJSON()).not.toHaveProperty("metadata");
-  });
-
-  it("reads fresh account-scoped settings after an account switch", async () => {
-    const secondUserId = "second-browser-alias-user" as UserId;
+  it("reads fresh encrypted settings after an account switch", async () => {
+    const secondUserId = "22222222-2222-4222-8222-222222222222" as UserId;
+    const firstId = "33333333-3333-4333-8333-333333333333";
+    const secondId = "44444444-4444-4444-8444-444444444444";
     const secondSettings$ = new BehaviorSubject<ForwarderOptions>({
       token: "second-provider-token",
       baseUrl,
+      connectionId: secondId,
     });
+    settings$.next({ ...settings$.value, connectionId: firstId });
     generatorService.settings
       .mockReset()
       .mockReturnValueOnce(settings$ as any)
       .mockReturnValueOnce(secondSettings$ as any);
-    apiService.nativeFetch
-      .mockResolvedValueOnce(jsonResponse(aliasJson(1, "first@sl.test"), 201))
-      .mockResolvedValueOnce(jsonResponse(aliasJson(2, "second@sl.test"), 201));
 
-    await service.create();
+    expect((await service["lifecycle"]()).providerIdentity().connectionId).toBe(firstId);
     accountService.activeAccountSubject.next({
       id: secondUserId,
       name: "Second user",
@@ -108,14 +68,7 @@ describe("BrowserSimpleLoginAliasService", () => {
       emailVerified: true,
       creationDate: undefined,
     });
-    await service.create();
-
-    expect((apiService.nativeFetch.mock.calls[0][0] as Request).headers.get("Authentication")).toBe(
-      token,
-    );
-    expect((apiService.nativeFetch.mock.calls[1][0] as Request).headers.get("Authentication")).toBe(
-      "second-provider-token",
-    );
+    expect((await service["lifecycle"]()).providerIdentity().connectionId).toBe(secondId);
     await expect(
       firstValueFrom(generatorService.settings.mock.calls[0][1]!.account$),
     ).resolves.toMatchObject({ id: userId });
@@ -123,30 +76,11 @@ describe("BrowserSimpleLoginAliasService", () => {
       firstValueFrom(generatorService.settings.mock.calls[1][1]!.account$),
     ).resolves.toMatchObject({ id: secondUserId });
   });
-});
 
-function jsonResponse(value: unknown, status = 200): Response {
-  return new Response(JSON.stringify(value), {
-    status,
-    headers: { "Content-Type": "application/json" },
+  it("rejects malformed persisted identities instead of silently reconnecting", async () => {
+    settings$.next({ ...settings$.value, connectionId: "invalid" });
+
+    await expect(service["lifecycle"]()).rejects.toMatchObject({ code: "invalid-response" });
+    expect(settings$.value.connectionId).toBe("invalid");
   });
-}
-
-function aliasJson(id: number, email: string): Record<string, unknown> {
-  return {
-    id,
-    email,
-    name: null,
-    note: null,
-    enabled: true,
-    pinned: false,
-    creation_timestamp: 1_700_000_000,
-    nb_block: 0,
-    nb_forward: 0,
-    nb_reply: 0,
-    support_pgp: false,
-    disable_pgp: false,
-    mailboxes: [],
-    latest_activity: null,
-  };
-}
+});

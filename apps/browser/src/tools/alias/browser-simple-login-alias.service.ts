@@ -1,14 +1,12 @@
-import { ReplaySubject, firstValueFrom } from "rxjs";
+import { firstValueFrom } from "rxjs";
 
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
-import { Account, AccountService } from "@bitwarden/common/auth/abstractions/account.service";
-import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import {
   CreateSimpleLoginAliasRequest,
   CredentialGeneratorService,
-  ForwarderOptions,
   GeneratedCredential,
   SimpleLoginAlias,
+  SimpleLoginAliasError,
   SimpleLoginAliasDomain,
   SimpleLoginAliasFilter,
   SimpleLoginAliasPage,
@@ -18,6 +16,7 @@ import {
   Type,
   UpdateSimpleLoginAliasRequest,
   createSimpleLoginAliasService,
+  readSimpleLoginAliasSettings,
   toSimpleLoginCredentialMetadata,
 } from "@bitwarden/generator-core";
 
@@ -30,7 +29,6 @@ import {
  */
 export class BrowserSimpleLoginAliasService {
   constructor(
-    private readonly apiService: ApiService,
     private readonly accountService: AccountService,
     private readonly generatorService: CredentialGeneratorService,
   ) {}
@@ -108,29 +106,11 @@ export class BrowserSimpleLoginAliasService {
   private async lifecycle(): Promise<SimpleLoginAliasService> {
     const account = await firstValueFrom(this.accountService.activeAccount$);
     if (!account) {
-      return createSimpleLoginAliasService(this.apiService, { token: "" });
+      throw new SimpleLoginAliasError("SimpleLogin credentials are missing", "invalid-credentials");
     }
-
-    // `UserStateSubject` loads asynchronously and completes with its account dependency. An `of`
-    // dependency completes before encrypted state can emit in production, so keep this scoped
-    // dependency alive until the first settings value has been read.
-    const account$ = new ReplaySubject<Account>(1);
-    account$.next(account);
-    const settings$ = this.generatorService.settings<ForwarderOptions>(
-      this.generatorService.forwarder(Vendor.simplelogin),
-      { account$ },
+    return createSimpleLoginAliasService(
+      await readSimpleLoginAliasSettings(this.generatorService, account),
     );
-    let settings: ForwarderOptions;
-    try {
-      settings = await firstValueFrom(settings$);
-    } finally {
-      account$.complete();
-      settings$.complete();
-    }
-    return createSimpleLoginAliasService(this.apiService, {
-      token: settings.token ?? "",
-      baseUrl: settings.baseUrl,
-    });
   }
 
   private toCredential(alias: SimpleLoginAlias, website?: string): GeneratedCredential {

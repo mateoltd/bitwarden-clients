@@ -290,7 +290,7 @@ export class ItemMoreOptionsComponent {
     if (!cipher.aliasBinding || cipher.aliasBinding.provider !== "simplelogin") {
       return;
     }
-    await this.router.navigate(["/email-aliases", cipher.aliasBinding.id]);
+    await this.router.navigate(["/email-aliases", cipher.aliasBinding.aliasId]);
   }
 
   /**

@@ -10,15 +10,14 @@ import nodeFetch, {
 } from "node-fetch";
 import { BehaviorSubject, of } from "rxjs";
 
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { DialogService } from "@bitwarden/components";
 import {
   CredentialGeneratorService,
+  createSimpleLoginAliasService,
   SimpleLoginAliasService,
-  SimpleLoginAliasTransport,
   SimpleLoginContact,
 } from "@bitwarden/generator-core";
 
@@ -52,6 +51,7 @@ describeIntegration("rendered web email alias experience against real services",
   let facade: WebSimpleLoginAliasService;
 
   beforeAll(async () => {
+    const connectionId = "11111111-1111-4111-8111-111111111111";
     Object.assign(globalThis, {
       fetch: nodeFetch,
       Headers: NodeHeaders,
@@ -76,19 +76,17 @@ describeIntegration("rendered web email alias experience against real services",
       throw new Error(`SimpleLogin test login failed (${login.status})`);
     }
 
-    const api = {
-      nativeFetch: (request: Request) => nodeFetch(request as NodeRequest),
-    } as ApiService;
-    lifecycle = new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), {
+    lifecycle = createSimpleLoginAliasService({
       token: body.api_key,
       baseUrl: simpleLoginBaseUrl,
+      connectionId,
     });
     facade = new WebSimpleLoginAliasService(
-      api,
       { activeAccount$: of({ id: "web-alias-integration" }) } as AccountService,
       {
         forwarder: () => ({ id: "simplelogin" }),
-        settings: () => new BehaviorSubject({ token: body.api_key, baseUrl: simpleLoginBaseUrl }),
+        settings: () =>
+          new BehaviorSubject({ token: body.api_key, baseUrl: simpleLoginBaseUrl, connectionId }),
       } as unknown as CredentialGeneratorService,
     );
   });

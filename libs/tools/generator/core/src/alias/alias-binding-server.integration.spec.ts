@@ -2,10 +2,8 @@
 
 import { randomUUID } from "crypto";
 
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { asUuid } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
-import { ApiSettings, RestClient } from "@bitwarden/common/tools/integration/rpc";
 import { UserId } from "@bitwarden/common/types/guid";
 import { bindGeneratedAlias } from "@bitwarden/common/vault/alias-binding";
 import { CipherType } from "@bitwarden/common/vault/enums";
@@ -16,12 +14,11 @@ import { CipherResponse } from "@bitwarden/common/vault/models/response/cipher.r
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { ClientSettings, PasswordManagerClient, TokenProvider } from "@bitwarden/sdk-internal";
 
-import { Forwarder } from "../engine/forwarder";
+import { SimpleLoginForwarder } from "../engine/simple-login-forwarder";
 import { SimpleLogin } from "../integration/simple-login";
 import { GeneratedCredential } from "../types";
 
-import { SimpleLoginAliasService } from "./simple-login-alias.service";
-import { SimpleLoginAliasTransport } from "./simple-login-alias.transport";
+import { createSimpleLoginAliasService } from "./simple-login-alias.service";
 
 const integrationEnabled =
   process.env["SIMPLELOGIN_INTEGRATION"] === "1" &&
@@ -134,7 +131,6 @@ describeIntegration("real SimpleLogin to Bitwarden encrypted alias binding", () 
   const simpleLoginPassword = process.env["SIMPLELOGIN_PASSWORD"] ?? "password";
   const bitwardenEmail = process.env["BITWARDEN_EMAIL"] ?? "alias.lab@individual.example";
   const bitwardenPassword = process.env["BITWARDEN_PASSWORD"] ?? "alias-lab-password";
-  const api = { nativeFetch: (request: Request) => fetch(request) } as ApiService;
   const i18n = {
     t: (key: string, ...values: string[]) => `${key} ${values.join(" ")}`.trim(),
   } as I18nService;
@@ -154,13 +150,15 @@ describeIntegration("real SimpleLogin to Bitwarden encrypted alias binding", () 
       throw new Error(`SimpleLogin test login failed (${simpleLoginLogin.status})`);
     }
     const providerToken = simpleLoginLoginBody.api_key;
-    const aliasService = new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), {
+    const connectionId = randomUUID();
+    const aliasService = createSimpleLoginAliasService({
       token: providerToken,
       baseUrl: simpleLoginBaseUrl,
+      connectionId,
     });
     const marker = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
     const hostname = `bound-${marker}.integration.test`;
-    const forwarder = new Forwarder(SimpleLogin, new RestClient(api, i18n), i18n);
+    const forwarder = new SimpleLoginForwarder(SimpleLogin, i18n, Date.now);
     let aliasId: number | undefined;
     let cipherId: string | undefined;
     let firstClient: AuthenticatedClient | undefined;
@@ -173,9 +171,9 @@ describeIntegration("real SimpleLogin to Bitwarden encrypted alias binding", () 
           website: hostname,
           source: "registration form",
         },
-        { token: providerToken, baseUrl: simpleLoginBaseUrl } as ApiSettings,
+        { token: providerToken, baseUrl: simpleLoginBaseUrl, connectionId },
       );
-      aliasId = Number(generated.metadata?.alias.id);
+      aliasId = Number(generated.metadata?.alias.aliasId);
       expect(Number.isSafeInteger(aliasId)).toBe(true);
 
       const loginCipher = new CipherView();
@@ -200,7 +198,7 @@ describeIntegration("real SimpleLogin to Bitwarden encrypted alias binding", () 
 
       expect(serializedCreateRequest).not.toContain(generated.credential);
       expect(serializedCreateRequest).not.toContain(JSON.stringify(generated.metadata?.alias));
-      expect(serializedCreateRequest).not.toContain("bitwarden.internal.alias-binding");
+      expect(serializedCreateRequest).not.toContain("bitwarden.alias.reference");
       expect(serializedCreateRequest).not.toContain(providerToken);
 
       const created = await vaultRequest(firstClient.accessToken, "/ciphers", {

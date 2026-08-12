@@ -5,7 +5,6 @@ import { randomUUID } from "crypto";
 import { existsSync } from "fs";
 import { resolve } from "path";
 
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { asUuid } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherType } from "@bitwarden/common/vault/enums";
@@ -14,10 +13,7 @@ import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
 import { CipherRequest } from "@bitwarden/common/vault/models/request/cipher.request";
 import { CipherResponse } from "@bitwarden/common/vault/models/response/cipher.response";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
-import {
-  SimpleLoginAliasService,
-  SimpleLoginAliasTransport,
-} from "@bitwarden/generator-core";
+import { createSimpleLoginAliasService } from "@bitwarden/generator-core";
 import { ClientSettings, PasswordManagerClient, TokenProvider } from "@bitwarden/sdk-internal";
 
 import { AliasReconciliationService } from "./alias-reconciliation.service";
@@ -38,7 +34,10 @@ const bitwardenSettings: ClientSettings = {
 };
 
 const bitwardenDatabaseCandidates = [
-  resolve(process.cwd(), "../.integration-labs/first-class-aliases/bitwarden-server/dev/db/bitwarden.db"),
+  resolve(
+    process.cwd(),
+    "../.integration-labs/first-class-aliases/bitwarden-server/dev/db/bitwarden.db",
+  ),
   resolve(
     process.cwd(),
     "../../../.integration-labs/first-class-aliases/bitwarden-server/dev/db/bitwarden.db",
@@ -139,7 +138,7 @@ function simpleLoginSql(sql: string): string {
     "docker",
     [
       "exec",
-      "alias-core-sl-db",
+      process.env["SIMPLELOGIN_DB_CONTAINER"] ?? "alias-core-sl-db",
       "psql",
       "-v",
       "ON_ERROR_STOP=1",
@@ -187,7 +186,7 @@ describeIntegration("real 1,000+ alias migration", () => {
   it("dry-runs, applies and idempotently verifies 1,001 persisted aliases and logins", async () => {
     const marker = `bwmig${Date.now()}${Math.floor(Math.random() * 1_000_000)}`;
     const addressPrefix = `${marker}-`;
-    const api = { nativeFetch: (request: Request) => fetch(request) } as ApiService;
+    const connectionId = randomUUID();
     let providerToken = "";
     let firstClient: AuthenticatedClient | undefined;
     let secondClient: AuthenticatedClient | undefined;
@@ -205,9 +204,7 @@ describeIntegration("real 1,000+ alias migration", () => {
       `);
       expect(
         Number(
-          simpleLoginSql(
-            `SELECT COUNT(*) FROM alias WHERE email LIKE '${addressPrefix}%@sl.lan';`,
-          ),
+          simpleLoginSql(`SELECT COUNT(*) FROM alias WHERE email LIKE '${addressPrefix}%@sl.lan';`),
         ),
       ).toBe(fixtureSize);
 
@@ -225,9 +222,10 @@ describeIntegration("real 1,000+ alias migration", () => {
         throw new Error(`SimpleLogin test login failed (${simpleLoginLogin.status})`);
       }
       providerToken = loginBody.api_key;
-      const aliasService = new SimpleLoginAliasService(new SimpleLoginAliasTransport(api), {
+      const aliasService = createSimpleLoginAliasService({
         token: providerToken,
         baseUrl: simpleLoginBaseUrl,
+        connectionId,
       });
 
       firstClient = await authenticateBitwardenClient(bitwardenEmail, bitwardenPassword);
@@ -238,7 +236,10 @@ describeIntegration("real 1,000+ alias migration", () => {
         view.name = `${marker} login ${index}`;
         view.login.username = `${addressPrefix}${index}@sl.lan`;
         view.login.password = "migration-fixture-password";
-        const encrypted = await firstClient.client.vault().ciphers().encrypt(view.toSdkCipherView());
+        const encrypted = await firstClient.client
+          .vault()
+          .ciphers()
+          .encrypt(view.toSdkCipherView());
         importCiphers.push(
           new CipherRequest({
             cipher: Cipher.fromSdkCipher(encrypted.cipher)!,
@@ -278,7 +279,16 @@ describeIntegration("real 1,000+ alias migration", () => {
       );
 
       const realVaultAdapter = {
-        getAllDecrypted: async () => fixtureCiphers,
+        getAllDecrypted: async () => {
+          const sync = await vaultRequest(firstClient!.accessToken, "/sync?excludeDomains=true");
+          if (sync.response.status !== 200) {
+            throw new Error(`Bitwarden sync failed (${sync.response.status})`);
+          }
+          const raw = (sync.json?.Ciphers ?? sync.json?.ciphers) as unknown[];
+          return (await decryptCiphers(firstClient!, raw)).filter((cipher) =>
+            cipher.login?.username?.startsWith(addressPrefix),
+          );
+        },
         updateWithServer: async (view: CipherView) => {
           const encrypted = await firstClient!.client
             .vault()
@@ -343,9 +353,9 @@ describeIntegration("real 1,000+ alias migration", () => {
         cipher.login?.username?.startsWith(addressPrefix),
       );
       expect(finalViews).toHaveLength(fixtureSize);
-      expect(finalViews.every((cipher) => cipher.aliasBinding?.address === cipher.login.username)).toBe(
-        true,
-      );
+      expect(
+        finalViews.every((cipher) => cipher.aliasBinding?.address === cipher.login.username),
+      ).toBe(true);
       expect(finalViews.every((cipher) => (cipher.fields ?? []).length === 0)).toBe(true);
 
       const persistedVaultData = sqlite(
@@ -353,9 +363,11 @@ describeIntegration("real 1,000+ alias migration", () => {
       );
       expect(persistedVaultData).not.toContain(addressPrefix);
       expect(persistedVaultData).not.toContain(providerToken);
-      const simpleLoginLogResult = spawnSync("docker", ["logs", "alias-core-sl-app"], {
-        encoding: "utf8",
-      });
+      const simpleLoginLogResult = spawnSync(
+        "docker",
+        ["logs", process.env["SIMPLELOGIN_APP_CONTAINER"] ?? "alias-core-sl-app"],
+        { encoding: "utf8" },
+      );
       expect(simpleLoginLogResult.status).toBe(0);
       const simpleLoginLogs = `${simpleLoginLogResult.stdout}${simpleLoginLogResult.stderr}`;
       expect(simpleLoginLogs).not.toContain(providerToken);

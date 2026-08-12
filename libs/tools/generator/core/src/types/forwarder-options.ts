@@ -51,6 +51,9 @@ export type ForwarderOptions = Partial<
      */
     baseUrl: string;
 
+    /** Stable non-secret UUID v4 identifying one configured provider connection. */
+    connectionId: string;
+
     /** The domain part of the generated email address.
      *  @remarks The domain should be authorized by the forwarder before
      *           submitting a request through bitwarden.

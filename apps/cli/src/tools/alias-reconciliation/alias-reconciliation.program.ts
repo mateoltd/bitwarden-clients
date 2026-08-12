@@ -25,7 +25,9 @@ export class AliasReconciliationProgram extends BaseProgram {
       .on("--help", () => {
         writeLn("\n  Notes:");
         writeLn("");
-        writeLn("    Output is a versioned JSON report. Without --apply, the vault is not modified.");
+        writeLn(
+          "    Output is a versioned JSON report. Without --apply, the vault is not modified.",
+        );
         writeLn("    --apply binds only one unbound login to one exact live alias address.");
         writeLn("");
         writeLn("  Examples:");
@@ -40,7 +42,6 @@ export class AliasReconciliationProgram extends BaseProgram {
           this.serviceContainer.cipherService,
           this.serviceContainer.accountService,
           this.serviceContainer.stateProvider,
-          this.serviceContainer.apiService,
           this.serviceContainer.syncService,
         );
         this.processResponse(await command.run(options.apply === true));

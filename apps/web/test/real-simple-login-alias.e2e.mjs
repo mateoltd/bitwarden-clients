@@ -307,7 +307,11 @@ function assertProfileDoesNotContain(secret) {
 }
 
 function assertServiceLogsDoNotContain(secret) {
-  const logs = spawnSync("docker", ["logs", "alias-core-sl-app"], { encoding: "utf8" });
+  const logs = spawnSync(
+    "docker",
+    ["logs", process.env.SIMPLELOGIN_APP_CONTAINER ?? "alias-core-sl-app"],
+    { encoding: "utf8" },
+  );
   assert.equal(logs.status, 0, "SimpleLogin logs must be readable for leakage checks");
   assert.equal(`${logs.stdout}${logs.stderr}`.includes(secret), false);
 }

@@ -1864,9 +1864,11 @@ describe("OverlayBackground", () => {
             {
               kind: "email-alias",
               alias: {
-                version: 1,
+                version: 2,
                 provider: "simplelogin",
-                id: "741",
+                providerInstance: "https://app.simplelogin.io/",
+                connectionId: "11111111-1111-4111-8111-111111111111",
+                aliasId: "741",
                 address: aliasAddress,
               },
             },
@@ -1891,9 +1893,11 @@ describe("OverlayBackground", () => {
 
         const savedCipher = cipherService.setAddEditCipherInfo.mock.calls[0][0].cipher;
         expect(savedCipher.aliasBinding).toEqual({
-          version: 1,
+          version: 2,
           provider: "simplelogin",
-          id: "741",
+          providerInstance: "https://app.simplelogin.io/",
+          connectionId: "11111111-1111-4111-8111-111111111111",
+          aliasId: "741",
           address: aliasAddress,
         });
         expect(JSON.stringify(savedCipher)).not.toContain("provider-token");

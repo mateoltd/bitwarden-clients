@@ -114,7 +114,7 @@ try {
   await page.getByRole("button", { name: "Enable", exact: true }).click();
   await waitForAlias(createdAliasId, (alias) => alias.enabled === true);
 
-  const contactAddress = `desktop-${marker}@example.net`;
+  const contactAddress = `desktop-${marker}@contact.lan`;
   await page.locator('input[name="newContact"]').fill(contactAddress);
   await page.getByRole("button", { name: "Create reverse alias", exact: true }).click();
   const contactRow = page.locator("li").filter({ hasText: contactAddress });
@@ -127,6 +127,28 @@ try {
 
   await contactRow.getByRole("button", { name: "Block", exact: true }).click();
   await waitForContact(createdAliasId, createdContactId, (candidate) => candidate.block_forward);
+  await contactRow.getByRole("button", { name: "Unblock", exact: true }).click();
+  await waitForContact(createdAliasId, createdContactId, (candidate) => !candidate.block_forward);
+
+  const mailLifecycle = spawnSync(
+    "python3",
+    [
+      path.resolve(root, "apps/desktop/test/real-simple-login-mail.py"),
+      aliasAddress,
+      simpleLoginEmail,
+      contactAddress,
+      contact.reverse_alias_address,
+    ],
+    { encoding: "utf8", env: process.env },
+  );
+  assert.equal(
+    mailLifecycle.status,
+    0,
+    `real SimpleLogin SMTP lifecycle failed: ${mailLifecycle.stderr}`,
+  );
+  assert.match(mailLifecycle.stdout, /REAL_SIMPLELOGIN_INBOUND_FORWARDED/);
+  assert.match(mailLifecycle.stdout, /REAL_SIMPLELOGIN_REVERSE_ALIAS_REPLY/);
+
   await contactRow.getByRole("button", { name: "Delete", exact: true }).click();
   const deleteContactDialog = page.getByRole("dialog");
   await deleteContactDialog.getByRole("button", { name: "Delete", exact: true }).click();
@@ -179,6 +201,7 @@ try {
 
   console.log("REAL_DESKTOP_LOGIN_AND_ALIAS_ROUTE");
   console.log("REAL_DESKTOP_ALIAS_LIFECYCLE");
+  console.log("REAL_DESKTOP_INBOUND_AND_REVERSE_REPLY");
   console.log("REAL_DESKTOP_LOCK_RESTART_UNLOCK");
   console.log("REAL_DESKTOP_TOKEN_ABSENT_FROM_STORAGE_AND_LOGS");
   console.log("REAL_DESKTOP_STATE_CLEANED");
@@ -323,7 +346,11 @@ function assertProfileDoesNotContain(secret) {
 }
 
 function assertServiceLogsDoNotContain(secret) {
-  const logs = spawnSync("docker", ["logs", "alias-core-sl-app"], { encoding: "utf8" });
+  const logs = spawnSync(
+    "docker",
+    ["logs", process.env.SIMPLELOGIN_APP_CONTAINER ?? "alias-core-sl-app"],
+    { encoding: "utf8" },
+  );
   assert.equal(logs.status, 0, "SimpleLogin logs must be readable for leakage checks");
   assert.equal(`${logs.stdout}${logs.stderr}`.includes(secret), false);
 }

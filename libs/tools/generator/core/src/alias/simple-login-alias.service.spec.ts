@@ -1,110 +1,67 @@
-import { mock } from "jest-mock-extended";
+import { createSimpleLoginAliasService } from "./simple-login-alias.service";
 
-import { SimpleLoginAliasService } from "./simple-login-alias.service";
-import { SimpleLoginAliasTransport } from "./simple-login-alias.transport";
-
-const aliasJson = (id = 7, email = "shop@sl.test"): any => ({
-  id,
-  email,
-  name: "Shop",
-  note: "generated",
-  enabled: true,
-  pinned: false,
-  creation_timestamp: 123,
-  nb_block: 1,
-  nb_forward: 2,
-  nb_reply: 3,
-  support_pgp: false,
-  disable_pgp: false,
-  mailboxes: [{ id: 5, email: "owner@example.test" }],
-  latest_activity: null,
-});
+const connectionId = "11111111-1111-4111-8111-111111111111";
 
 describe("SimpleLoginAliasService", () => {
-  const transport = mock<SimpleLoginAliasTransport>();
-  const service = new SimpleLoginAliasService(transport, {
-    token: "secret",
-    baseUrl: "https://sl.test",
+  it.each([
+    "http://simplelogin.example",
+    "ftp://simplelogin.example",
+    "https://user:password@simplelogin.example",
+    "https://simplelogin.example?destination=untrusted",
+  ])("lets the SDK reject an unsafe provider URL before any request: %s", (baseUrl) => {
+    expect(() =>
+      createSimpleLoginAliasService({ token: "provider-secret", baseUrl, connectionId }),
+    ).toThrow(expect.objectContaining({ code: "invalid-response" }));
   });
 
-  afterEach(() => jest.resetAllMocks());
+  it("allows the SDK's loopback-only HTTP integration exception", () => {
+    const service = createSimpleLoginAliasService({
+      token: "provider-secret",
+      baseUrl: "http://127.0.0.1:32769",
+      connectionId,
+    });
 
-  it("creates an alias with stable id and address", async () => {
-    transport.request.mockResolvedValue(aliasJson());
+    expect(service.providerIdentity()).toEqual({
+      provider: "simplelogin",
+      instance: "http://127.0.0.1:32769/",
+      connectionId,
+    });
+  });
 
-    const result = await service.create({ hostname: "https://shop.example/path", mode: "word" });
-
-    expect(result).toMatchObject({ id: 7, address: "shop@sl.test" });
-    expect(transport.request).toHaveBeenCalledWith(
-      expect.anything(),
-      "api/alias/random/new",
-      expect.objectContaining({
-        method: "POST",
-        query: { hostname: "shop.example", mode: "word" },
+  it("rejects malformed connection identities instead of silently replacing them", () => {
+    expect(() =>
+      createSimpleLoginAliasService({
+        token: "provider-secret",
+        baseUrl: "https://app.simplelogin.io",
+        connectionId: "not-a-uuid",
       }),
-    );
+    ).toThrow(expect.objectContaining({ code: "invalid-response" }));
   });
 
-  it("resolves a hostname recommendation to stable alias identity", async () => {
-    transport.request
-      .mockResolvedValueOnce({
-        can_create: true,
-        prefix_suggestion: "shop",
-        suffixes: [],
-        recommendation: { alias: "shop@sl.test", hostname: "shop.example" },
-      })
-      .mockResolvedValueOnce({ aliases: [aliasJson()] });
-
-    const result = await service.recommend("https://shop.example/register");
-
-    expect(result.alias).toMatchObject({ id: 7, address: "shop@sl.test" });
+  it("never copies an invalid provider token into the translated error", () => {
+    const token = "private-token\nnot-a-header";
+    try {
+      createSimpleLoginAliasService({ token, connectionId });
+      throw new Error("expected SDK validation to fail");
+    } catch (error) {
+      expect(error).toMatchObject({ code: "invalid-response" });
+      expect((error as Error).message).not.toContain(token);
+    }
   });
 
-  it("supports search pagination, detail, update, state, delete, domains and reverse aliases", async () => {
-    transport.request.mockResolvedValueOnce({ aliases: [aliasJson()] });
-    await expect(service.list(0, "shop", "enabled")).resolves.toMatchObject({
-      items: [{ id: 7 }],
-      page: 0,
+  it("rejects invalid numeric identifiers before crossing the WASM boundary", async () => {
+    const service = createSimpleLoginAliasService({
+      token: "provider-secret",
+      connectionId,
     });
 
-    transport.request.mockResolvedValueOnce(aliasJson());
-    await expect(service.get(7)).resolves.toMatchObject({ id: 7 });
-
-    transport.request.mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce(aliasJson());
-    await expect(service.update(7, { name: "Updated" })).resolves.toMatchObject({ id: 7 });
-
-    transport.request.mockResolvedValueOnce(aliasJson());
-    await expect(service.setEnabled(7, true)).resolves.toMatchObject({ enabled: true });
-
-    transport.request.mockResolvedValueOnce({ deleted: true });
-    await expect(service.delete(7)).resolves.toBeUndefined();
-
-    transport.request.mockResolvedValueOnce([{ domain: "sl.test", is_custom: false }]);
-    await expect(service.domains()).resolves.toEqual([{ domain: "sl.test", isCustom: false }]);
-
-    const contact: any = {
-      id: 8,
-      contact: "merchant@example.test",
-      reverse_alias: "merchant <reply@sl.test>",
-      reverse_alias_address: "reply@sl.test",
-      creation_timestamp: 456,
-      last_email_sent_timestamp: null,
-      block_forward: false,
-      existed: false,
-    };
-    transport.request.mockResolvedValueOnce(contact);
-    await expect(service.createReverseAlias(7, contact.contact)).resolves.toMatchObject({
-      id: 8,
-      reverseAliasAddress: "reply@sl.test",
+    await expect(service.get(-1)).rejects.toMatchObject({
+      code: "invalid-response",
+      message: "SimpleLogin alias id is invalid",
     });
-
-    transport.request.mockResolvedValueOnce({ contacts: [contact] });
-    await expect(service.contacts(7)).resolves.toMatchObject({ items: [{ id: 8 }] });
-
-    transport.request.mockResolvedValueOnce({ block_forward: true });
-    await expect(service.toggleContactBlocked(8)).resolves.toBe(true);
-
-    transport.request.mockResolvedValueOnce({ deleted: true });
-    await expect(service.deleteContact(8)).resolves.toBeUndefined();
+    await expect(service.contacts(1, -1)).rejects.toMatchObject({
+      code: "invalid-response",
+      message: "SimpleLogin page is invalid",
+    });
   });
 });

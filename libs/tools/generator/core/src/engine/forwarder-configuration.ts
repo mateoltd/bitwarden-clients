@@ -80,7 +80,7 @@ export type ForwarderConfiguration<
     };
 
     /** createForwardingEmail RPC definition */
-    createForwardingEmail: CreateForwardingEmailRpcDef<Settings, Request>;
+    createForwardingEmail?: CreateForwardingEmailRpcDef<Settings, Request>;
 
     /** getAccountId RPC definition; the response updates `accountId` which has a
      *  structural mixin type `RequestAccount`.

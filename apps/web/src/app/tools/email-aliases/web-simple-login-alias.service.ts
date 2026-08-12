@@ -1,15 +1,14 @@
 import { Injectable } from "@angular/core";
-import { ReplaySubject, firstValueFrom } from "rxjs";
+import { firstValueFrom } from "rxjs";
 
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
-import { Account, AccountService } from "@bitwarden/common/auth/abstractions/account.service";
-import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import {
   CreateSimpleLoginAliasRequest,
   CredentialGeneratorService,
-  ForwarderOptions,
   createSimpleLoginAliasService,
+  readSimpleLoginAliasSettings,
   SimpleLoginAlias,
+  SimpleLoginAliasError,
   SimpleLoginAliasDomain,
   SimpleLoginAliasFilter,
   SimpleLoginAliasPage,
@@ -22,14 +21,14 @@ import {
 @Injectable({ providedIn: "root" })
 export class WebSimpleLoginAliasService {
   constructor(
-    private readonly apiService: ApiService,
     private readonly accountService: AccountService,
     private readonly generatorService: CredentialGeneratorService,
   ) {}
 
   async isConfigured(): Promise<boolean> {
     try {
-      return Boolean((await this.settings()).token?.trim());
+      await this.service();
+      return true;
     } catch {
       return false;
     }
@@ -88,31 +87,12 @@ export class WebSimpleLoginAliasService {
   }
 
   private async service() {
-    const settings = await this.settings();
-    return createSimpleLoginAliasService(this.apiService, {
-      token: settings.token ?? "",
-      baseUrl: settings.baseUrl || undefined,
-    });
-  }
-
-  /** Read account-scoped encrypted settings for one request, then release the decrypted buffer. */
-  private async settings(): Promise<ForwarderOptions> {
     const account = await firstValueFrom(this.accountService.activeAccount$);
     if (!account) {
-      return {};
+      throw new SimpleLoginAliasError("SimpleLogin credentials are missing", "invalid-credentials");
     }
-
-    const account$ = new ReplaySubject<Account>(1);
-    account$.next(account);
-    const settings$ = this.generatorService.settings<ForwarderOptions>(
-      this.generatorService.forwarder(Vendor.simplelogin),
-      { account$ },
+    return createSimpleLoginAliasService(
+      await readSimpleLoginAliasSettings(this.generatorService, account),
     );
-    try {
-      return await firstValueFrom(settings$);
-    } finally {
-      account$.complete();
-      settings$.complete();
-    }
   }
 }

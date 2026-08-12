@@ -2298,11 +2298,7 @@ export default class MainBackground {
       this.accountService,
       this.generatorHistoryService,
       this.credentialGeneratorService,
-      new BrowserSimpleLoginAliasService(
-        this.apiService,
-        this.accountService,
-        this.credentialGeneratorService,
-      ),
+      new BrowserSimpleLoginAliasService(this.accountService, this.credentialGeneratorService),
     );
 
     this.autofillBadgeUpdaterService = new AutofillBadgeUpdaterService(

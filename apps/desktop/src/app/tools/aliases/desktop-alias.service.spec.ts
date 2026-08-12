@@ -2,7 +2,6 @@ import { TestBed } from "@angular/core/testing";
 import { mock, MockProxy } from "jest-mock-extended";
 import { BehaviorSubject } from "rxjs";
 
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { Account, AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
 import { UserId } from "@bitwarden/common/types/guid";
@@ -16,18 +15,7 @@ import {
 
 import { DesktopAliasService } from "./desktop-alias.service";
 
-class MockRequest {
-  readonly url: string;
-  readonly headers: Headers;
-
-  constructor(input: URL, init?: RequestInit) {
-    this.url = input.toString();
-    this.headers = init?.headers as Headers;
-  }
-}
-
 describe("DesktopAliasService", () => {
-  let apiService: MockProxy<ApiService>;
   let accountService: MockProxy<AccountService>;
   let cipherService: MockProxy<CipherService>;
   let generatorService: MockProxy<CredentialGeneratorService>;
@@ -47,18 +35,7 @@ describe("DesktopAliasService", () => {
     address: "alias@example.com",
   } as SimpleLoginAlias;
 
-  const originalRequest = global.Request;
-
-  beforeAll(() => {
-    global.Request = MockRequest as any;
-  });
-
-  afterAll(() => {
-    global.Request = originalRequest;
-  });
-
   beforeEach(() => {
-    apiService = mock<ApiService>();
     accountService = mock<AccountService>();
     Object.defineProperty(accountService, "activeAccount$", {
       value: new BehaviorSubject(account),
@@ -68,6 +45,7 @@ describe("DesktopAliasService", () => {
     settings = new BehaviorSubject<ForwarderOptions>({
       token: "encrypted-setting-token",
       baseUrl: "https://simplelogin.example",
+      connectionId: "11111111-1111-4111-8111-111111111111",
       domain: "",
       prefix: "",
     });
@@ -77,7 +55,6 @@ describe("DesktopAliasService", () => {
     TestBed.configureTestingModule({
       providers: [
         DesktopAliasService,
-        { provide: ApiService, useValue: apiService },
         { provide: AccountService, useValue: accountService },
         { provide: CipherService, useValue: cipherService },
         { provide: CredentialGeneratorService, useValue: generatorService },
@@ -89,16 +66,13 @@ describe("DesktopAliasService", () => {
 
   it("uses the existing SimpleLogin forwarder settings", async () => {
     const client = await service.client();
-    const response = mock<Response>({ status: 200, headers: new Headers() });
-    response.text.mockResolvedValue(JSON.stringify([]));
-    apiService.nativeFetch.mockResolvedValue(response);
-
-    await client.domains();
 
     expect(generatorService.forwarder).toHaveBeenCalledWith(Vendor.simplelogin);
-    const request = apiService.nativeFetch.mock.calls[0][0];
-    expect(request.url).toBe("https://simplelogin.example/api/v2/setting/domains");
-    expect(request.headers.get("Authentication")).toBe("encrypted-setting-token");
+    expect(client.providerIdentity()).toEqual({
+      provider: "simplelogin",
+      instance: "https://simplelogin.example/",
+      connectionId: "11111111-1111-4111-8111-111111111111",
+    });
   });
 
   it("returns only logins with an exact stable alias binding", async () => {
@@ -107,9 +81,11 @@ describe("DesktopAliasService", () => {
     bound.name = "Bound login";
     bound.login = { username: "Alias@Example.com" } as any;
     bound.aliasBinding = {
-      version: 1,
+      version: 2,
       provider: "simplelogin",
-      id: "42",
+      providerInstance: "https://app.simplelogin.io/",
+      connectionId: "11111111-1111-4111-8111-111111111111",
+      aliasId: "42",
       address: "alias@example.com",
     };
 
