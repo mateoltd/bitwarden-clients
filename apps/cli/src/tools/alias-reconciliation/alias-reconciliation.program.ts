@@ -20,7 +20,7 @@ export class AliasReconciliationProgram extends BaseProgram {
       )
       .option(
         "--apply",
-        "Apply only safe one-to-one bindings. Duplicate, conflicting, and missing records are never changed.",
+        "Refresh current first-class alias bindings. Duplicate and missing records are never changed.",
       )
       .on("--help", () => {
         writeLn("\n  Notes:");
@@ -28,7 +28,7 @@ export class AliasReconciliationProgram extends BaseProgram {
         writeLn(
           "    Output is a versioned JSON report. Without --apply, the vault is not modified.",
         );
-        writeLn("    --apply binds only one unbound login to one exact live alias address.");
+        writeLn("    --apply refreshes only existing canonical alias bindings from the provider.");
         writeLn("");
         writeLn("  Examples:");
         writeLn("");

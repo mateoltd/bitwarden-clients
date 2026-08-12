@@ -12,7 +12,6 @@ import {
   CipherId,
   apply_alias_reconciliation,
   create_alias_reference,
-  migrate_cipher_alias_reference,
   parse_alias_reference,
   plan_alias_reconciliation,
 } from "@bitwarden/sdk-internal";
@@ -69,7 +68,6 @@ export type AliasReconciliationAnalysis = {
   duplicates: AliasReconciliationDuplicate[];
   conflicts: AliasReconciliationConflict[];
   missing: AliasReconciliationMissing[];
-  unbound: AliasReconciliationMatch[];
 };
 
 export type AliasReconciliationReport = AliasReconciliationAnalysis & {
@@ -84,7 +82,6 @@ export type AliasReconciliationReport = AliasReconciliationAnalysis & {
     duplicates: number;
     conflicts: number;
     missing: number;
-    unbound: number;
     plannedChanges: number;
     appliedChanges: number;
     failedChanges: number;
@@ -126,9 +123,16 @@ async function listAliasPageWithRetry(
   page: number,
   waitForRetry: Wait,
 ) {
+  return withRateLimitRetry(() => aliasService.listCanonical(page), waitForRetry);
+}
+
+async function withRateLimitRetry<Result>(
+  operation: () => Promise<Result>,
+  waitForRetry: Wait,
+): Promise<Result> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await aliasService.listCanonical(page);
+      return await operation();
     } catch (error) {
       if (
         !(error instanceof SimpleLoginAliasError) ||
@@ -147,21 +151,90 @@ async function listAllAliases(
   aliasService: SimpleLoginAliasService,
   waitForRetry: Wait,
 ): Promise<Alias[]> {
-  const aliases: Alias[] = [];
+  const aliases = new Map<string, Alias>();
   let page = 0;
   const seenPages = new Set<number>();
 
   while (!seenPages.has(page)) {
     seenPages.add(page);
     const result = await listAliasPageWithRetry(aliasService, page, waitForRetry);
-    aliases.push(...result.aliases);
+    for (const alias of result.aliases) {
+      const id = alias.id.toString();
+      const existing = aliases.get(id);
+      // SimpleLogin uses live offset pagination, so a record can overlap at a page boundary.
+      if (existing && existing.email !== alias.email) {
+        throw new SimpleLoginAliasError(
+          `SimpleLogin returned conflicting records for alias ${id}`,
+          "invalid-response",
+        );
+      }
+      aliases.set(id, alias);
+    }
     if (result.aliases.length < 20) {
       break;
     }
     page += 1;
   }
 
-  return aliases;
+  return [...aliases.values()];
+}
+
+function isConfiguredProviderBinding(
+  binding: EmailAliasIdentity,
+  provider: AliasProviderIdentity,
+): boolean {
+  return (
+    binding.provider === provider.provider &&
+    binding.providerInstance === provider.instance &&
+    binding.connectionId === provider.connectionId
+  );
+}
+
+async function recoverOmittedBoundAliases(
+  aliasService: SimpleLoginAliasService,
+  aliases: Alias[],
+  ciphers: CipherView[],
+  provider: AliasProviderIdentity,
+  waitForRetry: Wait,
+): Promise<Alias[]> {
+  const aliasesById = new Map(aliases.map((alias) => [alias.id.toString(), alias]));
+  const boundIds = new Set(
+    ciphers
+      .map((cipher) => cipher.aliasBinding)
+      .filter(
+        (binding): binding is EmailAliasIdentity =>
+          binding !== undefined && isConfiguredProviderBinding(binding, provider),
+      )
+      .map((binding) => binding.aliasId),
+  );
+
+  for (const boundId of boundIds) {
+    if (aliasesById.has(boundId)) {
+      continue;
+    }
+
+    let alias: Alias;
+    try {
+      alias = await withRateLimitRetry(
+        () => aliasService.getCanonical(BigInt(boundId)),
+        waitForRetry,
+      );
+    } catch (error) {
+      if (error instanceof SimpleLoginAliasError && error.code === "not-found") {
+        continue;
+      }
+      throw error;
+    }
+    if (alias.id.toString() !== boundId) {
+      throw new SimpleLoginAliasError(
+        `SimpleLogin returned an unexpected record for alias ${boundId}`,
+        "invalid-response",
+      );
+    }
+    aliasesById.set(boundId, alias);
+  }
+
+  return [...aliasesById.values()];
 }
 
 function canonicalIdentity(
@@ -197,7 +270,6 @@ function analysisFromSdkPlan(
     duplicates: [],
     conflicts: [],
     missing: [],
-    unbound: [],
   };
 
   const match = (aliasId: bigint, cipherId: CipherId): AliasReconciliationMatch | undefined => {
@@ -212,13 +284,6 @@ function analysisFromSdkPlan(
         const matched = match(outcome.alias_id, outcome.cipher_id);
         if (matched) {
           result.exactMatches.push(matched);
-        }
-        break;
-      }
-      case "matchedByAddress": {
-        const matched = match(outcome.alias_id, outcome.cipher_id);
-        if (matched) {
-          result.unbound.push(matched);
         }
         break;
       }
@@ -283,7 +348,6 @@ function analysisFromSdkPlan(
   }
 
   result.exactMatches.sort(sortMatches);
-  result.unbound.sort(sortMatches);
   result.duplicates.sort((left, right) => sortByAddressAndId(left.alias, right.alias));
   result.conflicts.sort((left, right) => left.cipherId.localeCompare(right.cipherId));
   result.missing.sort((left, right) => {
@@ -304,38 +368,31 @@ export class AliasReconciliationService {
   ) {}
 
   async reconcile(userId: UserId, apply: boolean): Promise<AliasReconciliationReport> {
-    const aliases = await listAllAliases(this.aliasService, this.waitForRetry);
     const ciphers = await this.cipherService.getAllDecrypted(userId);
     const loginCiphers = ciphers.filter((cipher) => cipher.type === CipherType.Login);
     const provider = this.aliasService.providerIdentity();
-    const originalSdkCiphers = ciphers.map((cipher) => cipher.toSdkCipherView());
-    const plannedSdkCiphers = originalSdkCiphers.map((cipher) => {
-      try {
-        return migrate_cipher_alias_reference(cipher, [provider]).cipher;
-      } catch {
-        return cipher;
-      }
-    });
-    const migrationChangedIds = new Set<string>();
-    for (let index = 0; index < plannedSdkCiphers.length; index++) {
-      const planned = plannedSdkCiphers[index];
-      const original = originalSdkCiphers[index];
-      if (planned.id && JSON.stringify(planned.fields) !== JSON.stringify(original.fields)) {
-        migrationChangedIds.add(cipherIdString(planned.id));
-      }
-    }
-    const beforePlan = plan_alias_reconciliation(provider, aliases, plannedSdkCiphers);
-    const plannedChangeIds = new Set([
-      ...migrationChangedIds,
-      ...beforePlan.actions.map((action) => cipherIdString(action.cipher_id)),
-    ]);
+    const listedAliases = await listAllAliases(this.aliasService, this.waitForRetry);
+    const aliases = await recoverOmittedBoundAliases(
+      this.aliasService,
+      listedAliases,
+      loginCiphers,
+      provider,
+      this.waitForRetry,
+    );
+    const sdkCiphers = loginCiphers
+      .filter((cipher) => cipher.aliasBinding !== undefined)
+      .map((cipher) => cipher.toSdkCipherView());
+    const beforePlan = plan_alias_reconciliation(provider, aliases, sdkCiphers);
+    const plannedChangeIds = new Set(
+      beforePlan.actions.map((action) => cipherIdString(action.cipher_id)),
+    );
     let finalPlan = beforePlan;
     const changes: AliasReconciliationChange[] = [];
 
     if (apply) {
-      const output = apply_alias_reconciliation(beforePlan, aliases, plannedSdkCiphers);
+      const output = apply_alias_reconciliation(beforePlan, aliases, sdkCiphers);
       const originalById = new Map(
-        originalSdkCiphers
+        sdkCiphers
           .filter((cipher) => cipher.id !== undefined)
           .map((cipher) => [cipherIdString(cipher.id!), cipher]),
       );
@@ -348,10 +405,7 @@ export class AliasReconciliationService {
       const actionByCipherId = new Map(
         beforePlan.actions.map((action) => [cipherIdString(action.cipher_id), action]),
       );
-      const changedIds = new Set([
-        ...migrationChangedIds,
-        ...output.result.changedCipherIds.map(cipherIdString),
-      ]);
+      const changedIds = new Set(output.result.changedCipherIds.map(cipherIdString));
 
       for (const cipherId of changedIds) {
         const sdkCipher = updatedById.get(cipherId);
@@ -405,7 +459,6 @@ export class AliasReconciliationService {
         duplicates: analysis.duplicates.length,
         conflicts: analysis.conflicts.length,
         missing: analysis.missing.length,
-        unbound: analysis.unbound.length,
         plannedChanges: plannedChangeIds.size,
         appliedChanges,
         failedChanges,

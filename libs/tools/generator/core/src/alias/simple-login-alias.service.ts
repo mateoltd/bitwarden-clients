@@ -47,6 +47,13 @@ function positiveId(value: number, field: string): bigint {
   return BigInt(value);
 }
 
+function positiveBigInt(value: bigint, field: string): bigint {
+  if (value <= 0) {
+    throw new SimpleLoginAliasError(`SimpleLogin ${field} is invalid`, "invalid-response");
+  }
+  return value;
+}
+
 function pageNumber(value: number): number {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new SimpleLoginAliasError("SimpleLogin page is invalid", "invalid-response");
@@ -232,6 +239,10 @@ export class SimpleLoginAliasService {
       result.aliases.map((alias) => simpleLoginAliasFromSdk(client, alias)),
     );
     return { items, page, nextPage: items.length === SIMPLELOGIN_PAGE_SIZE ? page + 1 : undefined };
+  }
+
+  async getCanonical(id: bigint): Promise<Alias> {
+    return this.safe((client) => client.get_alias(positiveBigInt(id, "alias id")));
   }
 
   async get(id: number): Promise<SimpleLoginAlias> {

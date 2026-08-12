@@ -33,7 +33,7 @@ describe("alias binding", () => {
     const cipher = login();
     const userField = new FieldView();
     userField.name = "account";
-    userField.value = "personal";
+    userField.value = "visible";
     cipher.fields = [userField];
     cipher.aliasBinding = firstAlias;
 
@@ -94,42 +94,16 @@ describe("alias binding", () => {
     expect(JSON.stringify(cipher)).not.toContain("must-not-survive");
   });
 
-  it("keeps a sanitized pre-SDK field hidden until reconciliation replaces it", () => {
-    const field = new FieldView();
-    field.name = "bitwarden.internal.alias-binding";
-    field.type = FieldType.Hidden;
-    field.value = JSON.stringify({
-      version: 1,
-      provider: "simplelogin",
-      id: "41",
-      address: firstAlias.address,
-      token: "must-not-survive",
-    });
-    const cipher = login();
-    cipher.fields = [field];
-
-    hydrateAliasBinding(cipher);
-
-    expect(cipher.fields).toEqual([]);
-    expect(cipher.aliasBinding).toBeUndefined();
-    const retained = fieldsWithoutAliasReferences(cipher);
-    expect(retained).toHaveLength(1);
-    expect(retained[0]).toMatchObject({
-      name: "bitwarden.internal.alias-binding",
-      type: FieldType.Hidden,
-    });
-    expect(retained[0].value).not.toContain("must-not-survive");
-  });
-
-  it("retains an SDK v1 field for explicit connection-scoped migration", () => {
+  it("drops a malformed current payload from the reserved field", () => {
     const field = new FieldView();
     field.name = ALIAS_BINDING_FIELD_NAME;
     field.type = FieldType.Hidden;
     field.value = JSON.stringify({
-      version: 1,
+      version: 2,
       provider: "simplelogin",
       providerInstance: firstAlias.providerInstance,
-      aliasId: 41,
+      connectionId: "invalid",
+      aliasId: firstAlias.aliasId,
       address: firstAlias.address,
     });
     const cipher = login();
@@ -139,13 +113,7 @@ describe("alias binding", () => {
 
     expect(cipher.fields).toEqual([]);
     expect(cipher.aliasBinding).toBeUndefined();
-    expect(fieldsWithoutAliasReferences(cipher)).toEqual([
-      expect.objectContaining({
-        name: ALIAS_BINDING_FIELD_NAME,
-        type: FieldType.Hidden,
-        value: field.value,
-      }),
-    ]);
+    expect(fieldsWithoutAliasReferences(cipher)).toEqual([]);
   });
 
   it("property: canonical references round-trip for generated IDs, cases and addresses", () => {

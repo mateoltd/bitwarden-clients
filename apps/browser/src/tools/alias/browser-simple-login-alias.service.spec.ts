@@ -24,24 +24,24 @@ describe("BrowserSimpleLoginAliasService", () => {
     settings$ = new BehaviorSubject<ForwarderOptions>({
       token: "provider-token-must-not-leak",
       baseUrl,
+      connectionId: "33333333-3333-4333-8333-333333333333",
     });
     generatorService.forwarder.mockReturnValue({} as any);
     generatorService.settings.mockReturnValue(settings$ as any);
     service = new BrowserSimpleLoginAliasService(accountService, generatorService);
   });
 
-  it("persists one UUIDv4 connection identity in encrypted forwarder settings", async () => {
+  it("reads the persisted connection identity without rewriting settings", async () => {
+    const next = jest.spyOn(settings$, "next");
     const client = await service["lifecycle"]();
     const identity = client.providerIdentity();
 
     expect(identity).toMatchObject({
       provider: "simplelogin",
       instance: "https://app.simplelogin.io/",
-      connectionId: expect.stringMatching(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-      ),
+      connectionId: settings$.value.connectionId,
     });
-    expect(settings$.value.connectionId).toBe(identity.connectionId);
+    expect(next).not.toHaveBeenCalled();
     expect(JSON.stringify(identity)).not.toContain(settings$.value.token);
   });
 

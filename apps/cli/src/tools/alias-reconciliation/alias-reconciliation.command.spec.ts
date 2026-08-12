@@ -48,7 +48,19 @@ describe("AliasReconciliationCommand", () => {
     const response = await command.run(false);
 
     expect(response.success).toBe(false);
-    expect(response.message).toContain("connection identity is invalid");
+    expect(response.message).toContain("valid persisted connection identity");
+    expect(stateProvider.setUserState).not.toHaveBeenCalled();
+    expect(syncService.fullSync).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing connection identity without writing settings", async () => {
+    stateProvider.getUserState$.mockReturnValue(of({ token, baseUrl: "https://simplelogin.test" }));
+
+    const response = await command.run(false);
+
+    expect(response.success).toBe(false);
+    expect(response.message).toContain("valid persisted connection identity");
+    expect(stateProvider.setUserState).not.toHaveBeenCalled();
     expect(syncService.fullSync).not.toHaveBeenCalled();
   });
 });
