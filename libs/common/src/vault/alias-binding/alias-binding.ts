@@ -68,15 +68,15 @@ function aliasReference(binding: AliasBinding): AliasReference {
   };
 }
 
-function aliasBindingFromReference(reference: AliasReference): AliasBinding {
-  return {
-    version: 2,
+function aliasBindingFromReference(reference: AliasReference): AliasBinding | undefined {
+  return parseEmailAliasIdentity({
+    version: reference.version,
     provider: reference.provider,
     providerInstance: reference.providerInstance,
     connectionId: reference.connectionId,
     aliasId: reference.aliasId.toString(),
     address: reference.address as string,
-  };
+  });
 }
 
 /**

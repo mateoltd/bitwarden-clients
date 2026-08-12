@@ -6,10 +6,12 @@ import {
   AliasSyncEventInput,
   AliasSyncProjection,
   AliasSyncStore,
+  EmailAliasIdentity,
   aliasConnectionKey,
   appendAliasSyncEvent,
   emailAliasKey,
   normalizeEmailAliasAddress,
+  parseEmailAliasIdentity,
   projectAliasSync,
 } from "@bitwarden/common/tools/alias";
 import {
@@ -19,6 +21,7 @@ import {
   AliasFilter,
   AliasPage,
   AliasProviderIdentity,
+  AliasReference,
   AliasUpdateRequest,
   OptionalSensitiveStringUpdate,
   ReverseAlias,
@@ -44,6 +47,24 @@ const DEFAULT_SIMPLELOGIN_BASE_URL = "https://app.simplelogin.io";
 const SIMPLELOGIN_PAGE_SIZE = 20;
 
 const sensitive = (value: string): SensitiveString => value as SensitiveString;
+
+function emailAliasIdentityFromReference(reference: AliasReference): EmailAliasIdentity {
+  const identity = parseEmailAliasIdentity({
+    version: reference.version,
+    provider: reference.provider,
+    providerInstance: reference.providerInstance,
+    connectionId: reference.connectionId,
+    aliasId: reference.aliasId.toString(),
+    address: reference.address as string,
+  });
+  if (!identity) {
+    throw new SimpleLoginAliasError(
+      "The alias SDK returned an unsupported reference schema",
+      "invalid-response",
+    );
+  }
+  return identity;
+}
 
 function safeNumber(value: bigint, field: string): number {
   const number = Number(value);
@@ -140,14 +161,7 @@ function simpleLoginAliasFromSdk(client: AliasClient, alias: Alias): SimpleLogin
           },
         }
       : null,
-    identity: {
-      version: 2,
-      provider: reference.provider,
-      providerInstance: reference.providerInstance,
-      connectionId: reference.connectionId,
-      aliasId: reference.aliasId.toString(),
-      address: reference.address as string,
-    },
+    identity: emailAliasIdentityFromReference(reference),
   };
 }
 

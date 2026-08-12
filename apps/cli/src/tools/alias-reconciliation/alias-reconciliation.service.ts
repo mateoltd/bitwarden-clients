@@ -1,4 +1,4 @@
-import { EmailAliasIdentity } from "@bitwarden/common/tools/alias";
+import { EmailAliasIdentity, parseEmailAliasIdentity } from "@bitwarden/common/tools/alias";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
@@ -242,14 +242,21 @@ function canonicalIdentity(
   alias: Alias,
 ): AliasReconciliationIdentity {
   const reference = parse_alias_reference(create_alias_reference(provider, alias));
-  return {
-    version: 2,
+  const identity = parseEmailAliasIdentity({
+    version: reference.version,
     provider: reference.provider,
     providerInstance: reference.providerInstance,
     connectionId: reference.connectionId,
     aliasId: reference.aliasId.toString(),
     address: reference.address as string,
-  };
+  });
+  if (!identity) {
+    throw new SimpleLoginAliasError(
+      "The alias SDK returned an unsupported reference schema",
+      "invalid-response",
+    );
+  }
+  return identity;
 }
 
 function cipherIdString(cipherId: CipherId): string {

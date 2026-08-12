@@ -192,7 +192,7 @@ function createGeneratorSyncStore(
   };
 }
 
-/** Read current-schema settings without ever creating or persisting connection identity. */
+/** Read schema-v1 settings without ever creating or persisting connection identity. */
 export async function readSimpleLoginAliasSettings(
   generatorService: CredentialGeneratorService,
   account: Account,

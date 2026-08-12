@@ -50,7 +50,7 @@ function login(index: number, username: string, aliasId?: number): CipherView {
   cipher.login.username = username;
   if (aliasId !== undefined) {
     cipher.aliasBinding = {
-      version: 2,
+      version: 1,
       provider: "simplelogin",
       providerInstance: provider.instance,
       connectionId,

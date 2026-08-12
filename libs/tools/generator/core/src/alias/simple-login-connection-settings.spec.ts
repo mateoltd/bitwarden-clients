@@ -16,7 +16,7 @@ import {
   readSimpleLoginAliasSettings,
 } from "./simple-login-connection-settings";
 
-describe("SimpleLogin current-schema connection identity", () => {
+describe("SimpleLogin schema-v1 connection identity", () => {
   function reader(settings: ForwarderOptions) {
     const generatorService = mock<CredentialGeneratorService>();
     const subject = new BehaviorSubject(settings);
@@ -68,7 +68,7 @@ describe("SimpleLogin current-schema connection identity", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it("recovers an encrypted current-schema carrier for the session without mutating settings", async () => {
+  it("recovers an encrypted schema-v1 carrier for the session without mutating settings", async () => {
     const userId = "11111111-1111-4111-8111-111111111111" as UserId;
     const account = { id: userId } as Account;
     const connection = {
