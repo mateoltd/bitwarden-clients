@@ -2,7 +2,7 @@ name: Alias upstream drift report
 
 on:
   push:
-    branches: [build/alias-client-release]
+    branches: [integration/public-alias-clients]
     paths:
       - release/**
       - scripts/release/**

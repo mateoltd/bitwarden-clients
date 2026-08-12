@@ -1,11 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/mateoltd/bitwarden-clients/blob/build/alias-client-release/release/alias-client-release.schema.json",
+  "$id": "https://github.com/mateoltd/bitwarden-clients/blob/integration/public-alias-clients/release/alias-client-release.schema.json",
   "title": "Alias client release manifest",
   "type": "object",
   "required": [
     "schemaVersion",
     "releaseLane",
+    "cleanHistoryInputs",
     "canonicalSdk",
     "testInfrastructure",
     "toolchains",
@@ -22,6 +23,17 @@
         "cleanupCommit",
         "sourceRepository",
         "upstreamRepository"
+      ]
+    },
+    "cleanHistoryInputs": {
+      "type": "object",
+      "required": [
+        "requestedClientSnapshotRef",
+        "publishedClientSnapshotRef",
+        "clientSnapshotCommit",
+        "releaseCheckpointRef",
+        "releaseCheckpointCommit",
+        "stateOnly"
       ]
     },
     "canonicalSdk": {

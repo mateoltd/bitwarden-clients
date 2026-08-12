@@ -2,7 +2,7 @@ name: Alias headed provider E2E
 
 on:
   push:
-    branches: [build/alias-client-release]
+    branches: [integration/public-alias-clients]
   workflow_dispatch:
 
 permissions:
