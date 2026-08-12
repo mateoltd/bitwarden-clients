@@ -1,0 +1,11 @@
+{
+  "hash": "fixture-build",
+  "assets": [{ "name": "iframe.bundle.js", "size": 128 }],
+  "modules": [
+    {
+      "id": "./button.stories.ts",
+      "name": "./button.stories.ts",
+      "reasons": []
+    }
+  ]
+}

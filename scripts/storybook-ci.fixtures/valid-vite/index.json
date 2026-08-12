@@ -1,0 +1,11 @@
+{
+  "v": 5,
+  "entries": {
+    "button--primary": {
+      "id": "button--primary",
+      "title": "Button",
+      "name": "Primary",
+      "importPath": "./button.stories.ts"
+    }
+  }
+}
