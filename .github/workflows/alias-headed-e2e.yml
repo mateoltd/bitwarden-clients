@@ -56,7 +56,9 @@ jobs:
           HUSKY=0 npm ci
           npx playwright install --with-deps chromium
           sudo apt-get update
-          sudo apt-get install --yes pkg-config libxss-dev libasound2 xvfb
+          audio_package=libasound2
+          if apt-cache show libasound2t64 >/dev/null 2>&1; then audio_package=libasound2t64; fi
+          sudo apt-get install --yes pkg-config libxss-dev "$audio_package" xvfb
       - name: Start pinned real provider
         run: |
           provider/ops/owned-provider/bin/owned-provider init
