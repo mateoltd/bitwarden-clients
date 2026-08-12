@@ -36,6 +36,11 @@ async function run(context) {
   }
 
   if (["darwin", "mas"].includes(context.electronPlatformName)) {
+    if (process.env.RELEASE_CANDIDATE_UNSIGNED === "1") {
+      console.log("Unsigned release candidate: skipping unavailable proxy signing credentials");
+      return;
+    }
+
     const is_mas = context.electronPlatformName === "mas";
 
     let id;

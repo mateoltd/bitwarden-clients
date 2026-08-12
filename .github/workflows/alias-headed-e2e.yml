@@ -1,0 +1,137 @@
+name: Alias headed provider E2E
+
+on:
+  push:
+    branches: [build/alias-client-release]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alias-headed-e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 24.17.0
+  NPM_VERSION: 11.18.0
+  PYTHON_VERSION: 3.14.2
+  PROVIDER_OPERATIONS_COMMIT: e157b6804f7b1b60e149207cebe2d414f6e4a73f
+  PROVIDER_UPSTREAM_COMMIT: dbc45fcce4e8e6b4fa615cc729ca95a67bf75266
+  VAULT_IMAGE: docker.io/vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8
+
+jobs:
+  browser-and-desktop:
+    name: Browser autofill and desktop lifecycle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out clients
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out pinned real provider
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: mateoltd/simplelogin-owned-provider
+          ref: e157b6804f7b1b60e149207cebe2d414f6e4a73f
+          path: provider
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with: { python-version: 3.14.2 }
+      - run: npm install --global "npm@${NPM_VERSION}"
+      - name: Verify pinned provider ancestry
+        run: |
+          test "$(git -C provider rev-parse HEAD)" = "$PROVIDER_OPERATIONS_COMMIT"
+          test "$(tr -d '[:space:]' < provider/ops/owned-provider/UPSTREAM_COMMIT)" = "$PROVIDER_UPSTREAM_COMMIT"
+      - name: Prepare OSS client source
+        run: |
+          scripts/release/export-oss-source.sh "$RUNNER_TEMP/source"
+          cd "$RUNNER_TEMP/source"
+          HUSKY=0 npm ci
+          npx playwright install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install --yes pkg-config libxss-dev libasound2 xvfb
+      - name: Start pinned real provider
+        run: |
+          provider/ops/owned-provider/bin/owned-provider init
+          provider/ops/owned-provider/bin/owned-provider up
+          provider_password="$(tr -d '\r\n' < provider/.owned-provider/secrets/admin_password)"
+          echo "::add-mask::$provider_password"
+          echo "SIMPLELOGIN_PASSWORD=$provider_password" >> "$GITHUB_ENV"
+      - name: Start pinned ephemeral vault
+        run: |
+          mkdir -p "$RUNNER_TEMP/vault-data"
+          chmod 777 "$RUNNER_TEMP/vault-data"
+          docker run --detach --name alias-client-release-vault \
+            --volume "$RUNNER_TEMP/vault-data:/data" \
+            --publish 127.0.0.1:18080:80 \
+            --env DOMAIN=https://localhost:18443 \
+            --env SIGNUPS_ALLOWED=true \
+            --env SIGNUPS_VERIFY=false \
+            "$VAULT_IMAGE"
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:18080/alive >/dev/null; then break; fi
+            if [[ "$attempt" == 60 ]]; then docker logs alias-client-release-vault; exit 1; fi
+            sleep 1
+          done
+          cd "$RUNNER_TEMP/source"
+          node scripts/release/vault-tls-proxy.mjs > "$RUNNER_TEMP/vault-tls-proxy.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --insecure --silent --fail https://localhost:18443/alive >/dev/null; then break; fi
+            if [[ "$attempt" == 30 ]]; then cat "$RUNNER_TEMP/vault-tls-proxy.log"; exit 1; fi
+            sleep 1
+          done
+          vault_password="$(openssl rand -base64 30 | tr -d '\r\n')"
+          echo "::add-mask::$vault_password"
+          {
+            echo "BITWARDEN_PASSWORD=$vault_password"
+            echo "BITWARDEN_EMAIL=alias-release-${GITHUB_RUN_ID}@mailbox.lan"
+            echo "BITWARDEN_DB_PATH=$RUNNER_TEMP/vault-data/db.sqlite3"
+          } >> "$GITHUB_ENV"
+      - name: Bootstrap client-generated vault keys
+        env:
+          BITWARDEN_WEB_URL: https://localhost:18443
+        run: |
+          cd "$RUNNER_TEMP/source"
+          node scripts/release/bootstrap-test-vault.mjs
+      - name: Build headed test clients
+        run: |
+          cd "$RUNNER_TEMP/source"
+          npx nx run browser:build --configuration=chrome-dev
+          node apps/desktop/desktop_native/build.js --target=x86_64-unknown-linux-gnu --release
+          npm run build --workspace apps/desktop
+      - name: Browser create, autofill, lock, restart, and unlock
+        env: &alias-e2e-environment
+          BITWARDEN_API_URL: http://127.0.0.1:18080
+          BITWARDEN_IDENTITY_URL: http://127.0.0.1:18080
+          BITWARDEN_DB_DIALECT: vaultwarden
+          SIMPLELOGIN_URL: http://127.0.0.1:17777
+          SIMPLELOGIN_EMAIL: admin@mailbox.lan
+          SIMPLELOGIN_APP_CONTAINER: simplelogin-owned-provider-app-1
+        run: |
+          cd "$RUNNER_TEMP/source"
+          xvfb-run -a node apps/browser/test/real-simple-login-alias.e2e.mjs
+      - name: Desktop create, lock, restart, and unlock
+        env: *alias-e2e-environment
+        run: |
+          cd "$RUNNER_TEMP/source"
+          xvfb-run -a node apps/desktop/test/real-simple-login-alias.e2e.mjs
+      - name: Capture diagnostics
+        if: always()
+        run: |
+          mkdir -p diagnostics
+          docker logs alias-client-release-vault > diagnostics/vault.log 2>&1 || true
+          docker logs simplelogin-owned-provider-app-1 > diagnostics/provider.log 2>&1 || true
+          find /tmp -maxdepth 1 -name 'alias-*.png' -exec cp {} diagnostics/ \; || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: alias-headed-e2e-diagnostics
+          path: diagnostics
+          if-no-files-found: warn

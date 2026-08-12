@@ -1,0 +1,27 @@
+title = "Bitwarden alias client release secret policy"
+minVersion = "v8.30.1"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Existing development certificates and explicit importer or cryptography test vectors"
+paths = [
+  '''(?:^|/)apps/web/dev-server\.shared\.pem$''',
+  '''(?:^|/)libs/importer/src/importers/spec-data/''',
+  '''(?:^|/)libs/importer/src/importers/.*\.spec\.ts$''',
+  '''(?:^|/)apps/desktop/desktop_native/(core/src/ssh_agent|ssh_agent|win_webauthn)/.*\.rs$''',
+  '''(?:^|/)(apps|libs)/.*\.(spec|test)\.ts$'''
+]
+
+[[allowlists]]
+description = "Reviewed public identifiers and cryptographic constants in production source"
+paths = [
+  '''(?:^|/)apps/desktop/native-messaging-test-runner/src/variables\.ts$''',
+  '''(?:^|/)apps/web/config/(base|cloud|euprd)\.json$''',
+  '''(?:^|/)apps/web/src/app-id\.json$''',
+  '''(?:^|/)apps/web/src/app/billing/shared/offboarding-survey\.component\.ts$''',
+  '''(?:^|/)libs/common/src/billing/services/subscription-pricing\.service\.ts$''',
+  '''(?:^|/)libs/common/src/enums/feature-flag\.enum\.ts$''',
+  '''(?:^|/)libs/common/src/platform/models/domain/symmetric-crypto-key\.ts$'''
+]

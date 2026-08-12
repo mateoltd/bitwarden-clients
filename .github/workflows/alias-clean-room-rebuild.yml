@@ -1,0 +1,66 @@
+name: Alias client clean-room rebuilds
+
+on:
+  push:
+    branches: [build/alias-client-release]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alias-clean-room-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    name: Rebuild ${{ matrix.id }} twice
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: browser-chrome, runner: ubuntu-24.04, node: 24.17.0, family: browser }
+          - { id: browser-edge, runner: ubuntu-24.04, node: 24.17.0, family: browser }
+          - { id: browser-firefox-mv2, runner: ubuntu-24.04, node: 24.17.0, family: browser }
+          - { id: browser-firefox-mv3, runner: ubuntu-24.04, node: 24.17.0, family: browser }
+          - { id: browser-opera, runner: ubuntu-24.04, node: 24.17.0, family: browser }
+          - { id: browser-safari-mv2, runner: macos-15, node: 24.17.0, family: browser }
+          - { id: browser-safari-mv3, runner: macos-15, node: 24.17.0, family: browser }
+          - { id: desktop-linux-x64, runner: ubuntu-22.04, node: 24.17.0, family: desktop }
+          - { id: desktop-linux-arm64, runner: ubuntu-24.04-arm, node: 24.17.0, family: desktop }
+          - { id: desktop-macos-x64, runner: macos-15-intel, node: 24.17.0, family: desktop }
+          - { id: desktop-macos-arm64, runner: macos-15, node: 24.17.0, family: desktop }
+          - { id: desktop-windows-x64, runner: windows-2022, node: 24.17.0, family: desktop }
+          - { id: desktop-windows-arm64, runner: windows-11-arm, node: 24.17.0, family: desktop }
+          - { id: desktop-windows-ia32, runner: windows-2022, node: 24.17.0, family: desktop }
+          - { id: web-selfhost, runner: ubuntu-24.04, node: 24.17.0, family: web }
+          - { id: cli-linux-x64, runner: ubuntu-22.04, node: 22.22.0, family: cli }
+          - { id: cli-linux-arm64, runner: ubuntu-24.04-arm, node: 22.22.0, family: cli }
+          - { id: cli-macos-x64, runner: macos-15-intel, node: 22.22.0, family: cli }
+          - { id: cli-macos-arm64, runner: macos-15, node: 22.22.0, family: cli }
+          - { id: cli-windows-x64, runner: windows-2022, node: 22.22.0, family: cli }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with: { python-version: 3.14.2 }
+      - run: npm install --global npm@11.18.0
+      - name: Install desktop build dependencies
+        if: matrix.family == 'desktop' && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes pkg-config libxss-dev libasound2
+      - name: Compare isolated rebuilds
+        run: scripts/release/clean-room-rebuild.sh ${{ matrix.id }} | tee reproducibility-${{ matrix.id }}.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reproducibility-${{ matrix.id }}
+          path: reproducibility-${{ matrix.id }}.txt
+          if-no-files-found: error

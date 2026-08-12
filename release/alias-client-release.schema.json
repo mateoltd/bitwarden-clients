@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mateoltd/bitwarden-clients/blob/build/alias-client-release/release/alias-client-release.schema.json",
+  "title": "Alias client release manifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "releaseLane",
+    "canonicalSdk",
+    "testInfrastructure",
+    "toolchains",
+    "targets",
+    "handoff"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "releaseLane": {
+      "type": "object",
+      "required": [
+        "branch",
+        "baseCommit",
+        "cleanupCommit",
+        "sourceRepository",
+        "upstreamRepository"
+      ]
+    },
+    "canonicalSdk": {
+      "type": "object",
+      "required": [
+        "package",
+        "version",
+        "artifact",
+        "provenance",
+        "provenanceSha256",
+        "candidateChecksums",
+        "candidateChecksumsSha256",
+        "buildEnvironment",
+        "sha256",
+        "integrity",
+        "sourceCommit",
+        "functionalCleanupCommit"
+      ]
+    },
+    "testInfrastructure": { "type": "object" },
+    "toolchains": { "type": "object" },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "family", "runner", "artifactFormat", "smoke"]
+      }
+    },
+    "handoff": { "type": "object" }
+  }
+}

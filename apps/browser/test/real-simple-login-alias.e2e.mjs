@@ -16,12 +16,7 @@ const extensionDirectory = path.resolve(
 );
 const registrationFixture = path.resolve(root, "apps/browser/test/alias-registration.html");
 const certificate = fs.readFileSync(path.resolve(root, "apps/web/dev-server.shared.pem"));
-const browserExecutable =
-  process.env.CHROMIUM_PATH ??
-  path.join(
-    os.homedir(),
-    "Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
-  );
+const browserExecutable = process.env.CHROMIUM_PATH ?? chromium.executablePath();
 
 const bitwardenEmail = requiredEnvironment("BITWARDEN_EMAIL");
 const bitwardenPassword = requiredEnvironment("BITWARDEN_PASSWORD");
@@ -254,9 +249,7 @@ try {
   );
 
   const database = new DatabaseSync(bitwardenDbPath, { readOnly: true });
-  const persistedCipher = database
-    .prepare('SELECT "Data" FROM "Cipher" WHERE lower("Id") = lower(?)')
-    .get(cipherId);
+  const persistedCipher = readCipher(database, cipherId, false);
   database.close();
   assert.ok(persistedCipher);
   assert.equal(persistedCipher.Data.includes(simpleLoginToken), false);
@@ -498,9 +491,7 @@ async function waitForCipherDatabaseState(cipherId, predicate) {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     const database = new DatabaseSync(bitwardenDbPath, { readOnly: true });
-    const row = database
-      .prepare('SELECT "Data", "DeletedDate" FROM "Cipher" WHERE lower("Id") = lower(?)')
-      .get(cipherId);
+    const row = readCipher(database, cipherId, true);
     database.close();
     if (predicate(row)) {
       return;
@@ -508,6 +499,21 @@ async function waitForCipherDatabaseState(cipherId, predicate) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error(`Cipher database state did not settle for ${cipherId}`);
+}
+
+function readCipher(database, cipherId, includeDeletedDate) {
+  if (process.env.BITWARDEN_DB_DIALECT === "vaultwarden") {
+    const columns = includeDeletedDate
+      ? 'data AS "Data", deleted_at AS "DeletedDate"'
+      : 'data AS "Data"';
+    return database
+      .prepare(`SELECT ${columns} FROM ciphers WHERE lower(uuid) = lower(?)`)
+      .get(cipherId);
+  }
+  const columns = includeDeletedDate ? '"Data", "DeletedDate"' : '"Data"';
+  return database
+    .prepare(`SELECT ${columns} FROM "Cipher" WHERE lower("Id") = lower(?)`)
+    .get(cipherId);
 }
 
 async function startHttpsProxy(target) {

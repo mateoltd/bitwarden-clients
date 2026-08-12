@@ -12,6 +12,8 @@ async function run(context) {
   console.log("## After sign");
   // console.log(context);
 
+  const unsignedReleaseCandidate = process.env.RELEASE_CANDIDATE_UNSIGNED === "1";
+
   const appName = context.packager.appInfo.productFilename;
   const appPath = `${context.appOutDir}/${appName}.app`;
   const macBuild = context.electronPlatformName === "darwin";
@@ -54,7 +56,7 @@ async function run(context) {
     }
   }
 
-  if (shouldResign) {
+  if (shouldResign && !unsignedReleaseCandidate) {
     // Resign to sign safari extension
     if (context.electronPlatformName === "mas") {
       const masBuildOptions = deepAssign(
@@ -75,7 +77,7 @@ async function run(context) {
     }
   }
 
-  if (macBuild) {
+  if (macBuild && !unsignedReleaseCandidate) {
     console.log("### Notarizing " + appPath);
     if (process.env.APP_STORE_CONNECT_TEAM_ISSUER) {
       const appleApiIssuer = process.env.APP_STORE_CONNECT_TEAM_ISSUER;
@@ -99,5 +101,7 @@ async function run(context) {
         appleIdPassword: appleIdPassword,
       });
     }
+  } else if (macBuild) {
+    console.log("Unsigned release candidate: skipping unavailable signing and notarization");
   }
 }
