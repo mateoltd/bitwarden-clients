@@ -70,12 +70,16 @@ npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --so
 
 The clean-room workflow exports only tracked OSS source, excludes `bitwarden_license`, removes the
 commercial SDK from the exported package manifest and lock before dependency installation, builds
-the requested target twice in separate directories, and compares candidate SHA-256 values. Run the
-same path locally with:
+the requested target twice in independently allocated clean roots, compares the logical archive
+content, and then compares the final candidate SHA-256 values. Run the same path locally with:
 
 ```sh
 scripts/release/clean-room-rebuild.sh browser-chrome
 ```
+
+The OSS Linux ARM64 CLI packages JavaScript source instead of V8 cached bytecode because V8's
+cached-data blobs are process-dependent on that target. The input remains the verified OSS clean
+room, and both its logical content digest and normalized archive checksum remain enforced.
 
 ## Upstream maintenance
 

@@ -44,7 +44,7 @@
     "package:oss:mac": "pkg . --targets macos-x64 --output ./dist/oss/macos/bw",
     "package:oss:mac-arm64": "pkg . --targets macos-arm64 --output ./dist/oss/macos-arm64/bw",
     "package:oss:lin": "pkg . --targets linux-x64 --output ./dist/oss/linux/bw",
-    "package:oss:lin-arm64": "pkg . --targets linux-arm64 --output ./dist/oss/linux-arm64/bw",
+    "package:oss:lin-arm64": "pkg . --targets linux-arm64 --no-bytecode --public --public-packages \"*\" --output ./dist/oss/linux-arm64/bw",
     "package:bit:win": "pkg . --targets win-x64 --output ./dist/bit/windows/bw.exe",
     "package:bit:mac": "pkg . --targets macos-x64 --output ./dist/bit/macos/bw",
     "package:bit:mac-arm64": "pkg . --targets macos-arm64 --output ./dist/bit/macos-arm64/bw",

@@ -3,15 +3,20 @@ set -euo pipefail
 
 target="${1:?usage: $0 TARGET_ID}"
 repository_root="$(git rev-parse --show-toplevel)"
-temporary_root="$(mktemp -d "/tmp/alias-clean-room.XXXXXX")"
-trap 'rm -rf -- "$temporary_root"' EXIT
+first_root="$(mktemp -d "/tmp/alias-clean-room-first.XXXXXX")"
+second_root="$(mktemp -d "/tmp/alias-clean-room-second.XXXXXX")"
+
+cleanup() {
+  rm -rf -- "$first_root" "$second_root"
+}
+trap cleanup EXIT
 
 build_once() {
   local label="$1"
-  local source="$temporary_root/$label/source"
-  local output="$temporary_root/$label/output"
-  local log="$temporary_root/$label/build.log"
-  mkdir -p "$temporary_root/$label"
+  local clean_root="$2"
+  local source="$clean_root/source"
+  local output="$clean_root/output"
+  local log="$clean_root/build.log"
   "$repository_root/scripts/release/export-oss-source.sh" "$source" >"$log" 2>&1 || {
     tail -n 200 "$log" >&2
     return 1
@@ -28,12 +33,20 @@ build_once() {
   find "$output" -maxdepth 1 -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print -quit
 }
 
-first="$(build_once first)"
-second="$(build_once second)"
+first="$(build_once first "$first_root")"
+second="$(build_once second "$second_root")"
+
+python_command="${PYTHON:-python3}"
+if ! command -v "$python_command" >/dev/null 2>&1; then
+  python_command="python"
+fi
+content_hash="$("$python_command" "$repository_root/scripts/release/compare-archive-contents.py" "$first" "$second")"
+
 first_hash="$(node -e 'const c=require("node:crypto"),f=require("node:fs"); console.log(c.createHash("sha256").update(f.readFileSync(process.argv[1])).digest("hex"))' "$first")"
 second_hash="$(node -e 'const c=require("node:crypto"),f=require("node:fs"); console.log(c.createHash("sha256").update(f.readFileSync(process.argv[1])).digest("hex"))' "$second")"
 if [[ "$first_hash" != "$second_hash" ]]; then
   echo "clean-room rebuild mismatch: $first_hash != $second_hash" >&2
   exit 1
 fi
+echo "$target reproducible content SHA-256 $content_hash"
 echo "$target reproducible SHA-256 $first_hash"
