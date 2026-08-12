@@ -174,8 +174,16 @@ export type OverlayPortCommand =
   | "blurred"
   | "updateColorScheme"
   | "unlockVault"
+  | "fillEmailAlias"
+  | "refreshEmailAliasRecommendation"
   | "refreshGeneratedPassword"
   | "fillGeneratedPassword";
+
+export type InlineMenuEmailAliasRecommendation = {
+  hostname: string;
+  canCreate: boolean;
+  address?: string;
+};
 
 export type OverlayPortMessage = {
   command: OverlayPortCommand;
@@ -188,6 +196,7 @@ export type OverlayPortMessage = {
   viewsCipherData?: InlineMenuCipherData;
   loginUrl?: string;
   fillGeneratedPassword?: boolean;
+  emailAliasRecommendation?: InlineMenuEmailAliasRecommendation;
 };
 
 export type InlineMenuCipherData = {
@@ -317,6 +326,8 @@ export type InlineMenuListPortMessageHandlers = {
   updateAutofillInlineMenuListHeight: ({ message, port }: PortOnMessageHandlerParams) => void;
   refreshGeneratedPassword: () => Promise<void>;
   fillGeneratedPassword: ({ port }: PortConnectionParam) => Promise<void>;
+  fillEmailAlias: ({ port }: PortConnectionParam) => Promise<void>;
+  refreshEmailAliasRecommendation: ({ port }: PortConnectionParam) => Promise<void>;
   refreshOverlayCiphers: () => Promise<void>;
 };
 

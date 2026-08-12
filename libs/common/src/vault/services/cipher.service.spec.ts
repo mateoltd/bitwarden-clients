@@ -1,5 +1,5 @@
 import { mock } from "jest-mock-extended";
-import { BehaviorSubject, Observable, filter, firstValueFrom, map, of, throwError } from "rxjs";
+import { BehaviorSubject, Observable, filter, firstValueFrom, of, throwError } from "rxjs";
 
 // This import has been flagged as unallowed for this class. It may be involved in a circular dependency loop.
 // eslint-disable-next-line no-restricted-imports
@@ -29,12 +29,14 @@ import { LogService } from "../../platform/abstractions/log.service";
 import { FileUploadType } from "../../platform/enums";
 import { Utils } from "../../platform/misc/utils";
 import { ContainerService } from "../../platform/services/container.service";
+import { createAliasSyncDocument } from "../../tools/alias";
 import { CipherId, UserId, OrganizationId, CollectionId } from "../../types/guid";
 import { OrgKey, UserKey } from "../../types/key";
 import { CipherEncryptionService } from "../abstractions/cipher-encryption.service";
 import { CipherSdkService } from "../abstractions/cipher-sdk.service";
 import { EncryptionContext } from "../abstractions/cipher.service";
 import { CipherFileUploadService } from "../abstractions/file-upload/cipher-file-upload.service";
+import { createAliasConnectionCipher } from "../alias-connection";
 import { FieldType } from "../enums";
 import { CipherRepromptType } from "../enums/cipher-reprompt-type";
 import { CipherType } from "../enums/cipher-type";
@@ -605,10 +607,8 @@ describe("Cipher Service", () => {
 
       decryptedCiphers = new BehaviorSubject({ [cipher1.id]: cipher1, [cipher2.id]: cipher2 });
       jest
-        .spyOn(cipherService, "cipherViews$")
-        .mockImplementation((userId: UserId) =>
-          decryptedCiphers.pipe(map((ciphers) => Object.values(ciphers))),
-        );
+        .spyOn(cipherService, "getAllDecryptedIncludingInternal")
+        .mockImplementation(async () => Object.values(decryptedCiphers.value));
 
       failedCiphers = new BehaviorSubject<CipherView[]>([]);
       jest
@@ -678,9 +678,31 @@ describe("Cipher Service", () => {
       );
     });
 
-    it("sends overlay update when cipherViews$ emits", async () => {
-      (cipherService.cipherViews$ as jest.Mock)?.mockRestore();
+    it("rotates the hidden encrypted alias connection carrier", async () => {
+      const connection = {
+        provider: "simplelogin" as const,
+        providerInstance: "https://app.simplelogin.io/",
+        connectionId: "11111111-1111-4111-8111-111111111111",
+      };
+      const carrier = createAliasConnectionCipher({
+        version: 1,
+        connection,
+        credential: { token: "encrypted-provider-token", baseUrl: connection.providerInstance },
+        sync: createAliasSyncDocument("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+      });
+      carrier.id = "Alias Carrier" as CipherId;
+      decryptedCiphers.next({ ...decryptedCiphers.value, [carrier.id]: carrier });
 
+      await cipherService.getRotatedData(originalUserKey, newUserKey, mockUserId);
+
+      expect(cipherEncryptionService.encryptCipherForRotation).toHaveBeenCalledWith(
+        carrier,
+        mockUserId,
+        newUserKey,
+      );
+    });
+
+    it("sends overlay update when cipherViews$ emits", async () => {
       const decryptedView = new CipherView(encryptionContext.cipher);
       jest.spyOn(cipherService, "getAllDecrypted").mockResolvedValue([decryptedView]);
 
@@ -1681,6 +1703,28 @@ describe("Cipher Service", () => {
       expect(result).toHaveLength(2);
       expect(result[0]).toBeInstanceOf(CipherView);
       expect(result[1]).toBeInstanceOf(CipherView);
+    });
+
+    it("hides only marked alias carriers from normal decrypted consumers", async () => {
+      const connection = {
+        provider: "simplelogin" as const,
+        providerInstance: "https://app.simplelogin.io/",
+        connectionId: "11111111-1111-4111-8111-111111111111",
+      };
+      const carrier = createAliasConnectionCipher({
+        version: 1,
+        connection,
+        credential: { token: "encrypted-provider-token", baseUrl: connection.providerInstance },
+        sync: createAliasSyncDocument("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+      });
+      const ordinary = new CipherView();
+      ordinary.type = CipherType.SecureNote;
+      ordinary.name = carrier.name;
+      jest
+        .spyOn(cipherService, "getAllDecryptedIncludingInternal")
+        .mockResolvedValue([ordinary, carrier]);
+
+      await expect(cipherService.getAllDecrypted(mockUserId)).resolves.toEqual([ordinary]);
     });
 
     it("should serve the decrypted cache without calling the SDK when the cache is populated (flag enabled)", async () => {

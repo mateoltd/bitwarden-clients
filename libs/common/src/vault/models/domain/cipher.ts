@@ -9,6 +9,7 @@ import { asUuid, uuidAsString } from "../../../platform/abstractions/sdk/sdk.ser
 import { Utils } from "../../../platform/misc/utils";
 import Domain from "../../../platform/models/domain/domain-base";
 import { InitializerKey } from "../../../platform/services/cryptography/initializer-key";
+import { hydrateAliasBinding } from "../../alias-binding";
 import {
   CipherRepromptType,
   normalizeCipherRepromptTypeForSdk,
@@ -252,6 +253,8 @@ export class Cipher extends Domain implements Decryptable<CipherView> {
       }
       model.fields = fields;
     }
+
+    hydrateAliasBinding(model);
 
     if (this.passwordHistory != null && this.passwordHistory.length > 0) {
       const passwordHistory: PasswordHistoryView[] = [];

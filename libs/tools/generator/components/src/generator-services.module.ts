@@ -12,6 +12,7 @@ import { LogService } from "@bitwarden/common/platform/abstractions/log.service"
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { SdkService } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
 import { StateProvider } from "@bitwarden/common/platform/state";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { KeyServiceLegacyEncryptorProvider } from "@bitwarden/common/tools/cryptography/key-service-legacy-encryptor-provider";
 import { LegacyEncryptorProvider } from "@bitwarden/common/tools/cryptography/legacy-encryptor-provider";
 import { Site } from "@bitwarden/common/tools/extension";
@@ -28,6 +29,7 @@ import {
 } from "@bitwarden/common/tools/log";
 import { SystemServiceProvider } from "@bitwarden/common/tools/providers";
 import { UserStateSubjectDependencyProvider } from "@bitwarden/common/tools/state/user-state-subject-dependency-provider";
+import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import {
   BuiltIn,
   createRandomizer,
@@ -135,6 +137,8 @@ export const SYSTEM_SERVICE_PROVIDER = new SafeInjectionToken<SystemServiceProvi
         i18n: I18nService,
         api: ApiService,
         sdkService: SdkService,
+        cipherService: CipherService,
+        syncService: SyncService,
       ) => {
         const userStateDeps = {
           encryptor,
@@ -186,6 +190,7 @@ export const SYSTEM_SERVICE_PROVIDER = new SafeInjectionToken<SystemServiceProvi
           generator,
           profile,
           metadata,
+          aliasSync: { cipherService, syncService },
         } satisfies providers.CredentialGeneratorProviders;
       },
       deps: [
@@ -196,6 +201,8 @@ export const SYSTEM_SERVICE_PROVIDER = new SafeInjectionToken<SystemServiceProvi
         I18nService,
         ApiService,
         SdkService,
+        CipherService,
+        SyncService,
       ],
     }),
     safeProvider({

@@ -2,6 +2,7 @@ import {
   BehaviorSubject,
   concatMap,
   debounceTime,
+  distinctUntilChanged,
   filter,
   firstValueFrom,
   map,
@@ -48,6 +49,7 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
+import { bindGeneratedAlias } from "@bitwarden/common/vault/alias-binding";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { buildCipherIcon } from "@bitwarden/common/vault/icon/build-cipher-icon";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
@@ -57,13 +59,20 @@ import { IdentityView } from "@bitwarden/common/vault/models/view/identity.view"
 import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import { SshKeyView } from "@bitwarden/common/vault/models/view/ssh-key.view";
-import { CredentialGeneratorService, GenerateRequest, Type } from "@bitwarden/generator-core";
+import {
+  CredentialGeneratorService,
+  GeneratedCredential,
+  GenerateRequest,
+  SimpleLoginAliasError,
+  Type,
+} from "@bitwarden/generator-core";
 import { GeneratorHistoryService } from "@bitwarden/generator-history";
 
 // FIXME (PM-22628): Popup imports are forbidden in background
 // eslint-disable-next-line no-restricted-imports
 import { openUnlockPopout } from "../../auth/popup/utils/auth-popout-window";
 import { BrowserApi } from "../../platform/browser/browser-api";
+import { BrowserSimpleLoginAliasService } from "../../tools/alias/browser-simple-login-alias.service";
 // FIXME (PM-22628): Popup imports are forbidden in background
 // eslint-disable-next-line no-restricted-imports
 import {
@@ -146,6 +155,10 @@ export class OverlayBackground implements OverlayBackgroundInterface {
   private readonly requestGeneratedPassword$ = new Subject<GenerateRequest>();
   private readonly clearGeneratedPassword$ = new Subject<void>();
   private credential$ = new BehaviorSubject<string>("");
+  private generatedEmailAliases = new Map<number, GeneratedCredential>();
+  private emailAliasFillInFlight = new Map<number, symbol>();
+  private emailAliasRecommendationInFlight = new Map<number, symbol>();
+  private emailAliasStateGeneration = 0;
   private credentialPipelineSubscription: Subscription | undefined;
   private pageDetailsForTab: PageDetailsForTab = {};
   private subFrameOffsetsForTab: SubFrameOffsetsForTab = {};
@@ -253,6 +266,8 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     updateAutofillInlineMenuListHeight: ({ message }) => this.updateInlineMenuListHeight(message),
     refreshGeneratedPassword: () => this.updateGeneratedPassword(true),
     fillGeneratedPassword: ({ port }) => this.fillGeneratedPassword(port),
+    fillEmailAlias: ({ port }) => this.fillEmailAlias(port),
+    refreshEmailAliasRecommendation: ({ port }) => this.refreshEmailAliasRecommendation(port),
     refreshOverlayCiphers: () => this.updateOverlayCiphers(false),
   };
 
@@ -274,6 +289,7 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     private accountService: AccountService,
     private generatorHistoryService: GeneratorHistoryService,
     private generatorService: CredentialGeneratorService,
+    private emailAliasService: BrowserSimpleLoginAliasService,
     private configService: ConfigService,
   ) {
     this.initOverlayEventObservables();
@@ -361,6 +377,20 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       )
       .subscribe();
 
+    // Generated aliases are decrypted account data. Never retain them across a lock, logout, or
+    // account switch, including when an account changes while a provider request is in flight.
+    this.authService.activeAccountStatus$.pipe(distinctUntilChanged()).subscribe((status) => {
+      if (status !== AuthenticationStatus.Unlocked) {
+        this.clearGeneratedEmailAliasState();
+      }
+    });
+    this.accountService.activeAccount$
+      .pipe(
+        map((account) => account?.id),
+        distinctUntilChanged(),
+      )
+      .subscribe(() => this.clearGeneratedEmailAliasState());
+
     // Delayed close of the inline menu
     merge(
       this.startInlineMenuDelayedClose$.pipe(debounceTime(100)),
@@ -414,6 +444,9 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     if (this.portKeyForTab[tabId]) {
       delete this.portKeyForTab[tabId];
     }
+    this.generatedEmailAliases.delete(tabId);
+    this.emailAliasFillInFlight.delete(tabId);
+    this.emailAliasRecommendationInFlight.delete(tabId);
 
     this.clearGeneratedPassword$.next();
     this.focusedFieldData = null;
@@ -441,6 +474,13 @@ export class OverlayBackground implements OverlayBackgroundInterface {
         delete this.pageDetailsForTab[tabId];
       }
     }
+  }
+
+  private clearGeneratedEmailAliasState(): void {
+    this.emailAliasStateGeneration++;
+    this.generatedEmailAliases.clear();
+    this.emailAliasFillInFlight.clear();
+    this.emailAliasRecommendationInFlight.clear();
   }
 
   /**
@@ -2335,6 +2375,253 @@ export class OverlayBackground implements OverlayBackgroundInterface {
   }
 
   /**
+   * Creates or reuses a hostname-aware SimpleLogin alias, then fills only the focused registration
+   * email field. The full generated credential stays in background memory until the login-save
+   * handoff so its stable public identity can be bound to the cipher.
+   */
+  private async fillEmailAlias(port: chrome.runtime.Port) {
+    if (
+      !port.sender ||
+      !this.senderHasValidTab(port.sender) ||
+      !this.shouldShowEmailAliasAction()
+    ) {
+      return;
+    }
+
+    const tab = port.sender.tab;
+    const tabId = tab.id;
+    if (this.emailAliasFillInFlight.has(tabId)) {
+      return;
+    }
+    const pageDetailsForTab = this.pageDetailsForTab[tabId];
+    const focusedFieldOpid = this.focusedFieldData?.focusedFieldOpid;
+    if (!pageDetailsForTab?.size || !focusedFieldOpid) {
+      return;
+    }
+
+    const operationId = Symbol();
+    this.emailAliasFillInFlight.set(tabId, operationId);
+    const stateGeneration = this.emailAliasStateGeneration;
+    try {
+      const startingAccountId = (await firstValueFrom(this.accountService.activeAccount$))?.id;
+      const startingAuthStatus = await firstValueFrom(this.authService.activeAccountStatus$);
+      if (!startingAccountId || startingAuthStatus !== AuthenticationStatus.Unlocked) {
+        return;
+      }
+      const generated = await this.emailAliasService.recommendOrCreate(tab.url ?? "");
+      const currentAccountId = (await firstValueFrom(this.accountService.activeAccount$))?.id;
+      const currentAuthStatus = await firstValueFrom(this.authService.activeAccountStatus$);
+      if (
+        !this.isCurrentEmailAliasFill(
+          tabId,
+          operationId,
+          stateGeneration,
+          startingAccountId,
+          currentAccountId,
+          currentAuthStatus,
+          pageDetailsForTab,
+          focusedFieldOpid,
+        )
+      ) {
+        return;
+      }
+      const pageDetails = Array.from(pageDetailsForTab.values()).map((pageDetail) => {
+        const copy = structuredClone(pageDetail);
+        copy.details.fields = copy.details.fields.filter(
+          (field) =>
+            field.opid === focusedFieldOpid &&
+            this.inlineMenuFieldQualificationService.isFieldForIdentityEmail(field),
+        );
+        return copy;
+      });
+      const cipher = this.buildLoginCipherView({
+        uri: tab.url,
+        hostname: this.hostname(tab.url),
+        username: generated.credential,
+        password: "",
+      });
+      const result = await this.autofillService.doAutoFill({
+        tab,
+        cipher,
+        pageDetails,
+        onlyEmptyFields: false,
+        fillNewPassword: false,
+        allowTotpAutofill: false,
+        focusedFieldForm: this.focusedFieldData?.focusedFieldForm,
+        focusedFieldOpid,
+        inlineMenuFillType: InlineMenuFillTypes.AccountCreationUsername,
+      });
+
+      const finalAccountId = (await firstValueFrom(this.accountService.activeAccount$))?.id;
+      const finalAuthStatus = await firstValueFrom(this.authService.activeAccountStatus$);
+      if (
+        !result.didAutofill ||
+        !this.isCurrentEmailAliasFill(
+          tabId,
+          operationId,
+          stateGeneration,
+          startingAccountId,
+          finalAccountId,
+          finalAuthStatus,
+          pageDetailsForTab,
+          focusedFieldOpid,
+        )
+      ) {
+        return;
+      }
+
+      this.generatedEmailAliases.set(tabId, generated);
+      this.postMessageToPort(port, {
+        command: "updateAutofillInlineMenuEmailAliasRecommendation",
+        emailAliasRecommendation: {
+          hostname: this.hostname(tab.url),
+          canCreate: true,
+          address: generated.credential,
+        },
+      });
+    } catch (error) {
+      this.logAliasOperationFailure("Email alias fill failed", error);
+      this.postMessageToPort(port, {
+        command: "updateAutofillInlineMenuEmailAliasRecommendation",
+      });
+    } finally {
+      if (this.emailAliasFillInFlight.get(tabId) === operationId) {
+        this.emailAliasFillInFlight.delete(tabId);
+      }
+    }
+  }
+
+  private isCurrentEmailAliasFill(
+    tabId: number,
+    operationId: symbol,
+    stateGeneration: number,
+    startingAccountId: string,
+    currentAccountId: string | undefined,
+    authStatus: AuthenticationStatus,
+    pageDetailsForTab: Map<number, PageDetail>,
+    focusedFieldOpid: string,
+  ): boolean {
+    return (
+      this.emailAliasFillInFlight.get(tabId) === operationId &&
+      currentAccountId === startingAccountId &&
+      authStatus === AuthenticationStatus.Unlocked &&
+      stateGeneration === this.emailAliasStateGeneration &&
+      this.pageDetailsForTab[tabId] === pageDetailsForTab &&
+      this.focusedFieldData?.tabId === tabId &&
+      this.focusedFieldData?.focusedFieldOpid === focusedFieldOpid
+    );
+  }
+
+  private async refreshEmailAliasRecommendation(port: chrome.runtime.Port) {
+    if (port.sender && this.senderHasValidTab(port.sender)) {
+      await this.postEmailAliasRecommendation(port, port.sender.tab);
+    }
+  }
+
+  private async postEmailAliasRecommendation(port: chrome.runtime.Port, tab: chrome.tabs.Tab) {
+    const tabId = tab.id;
+    if (tabId === undefined || !this.shouldShowEmailAliasAction()) {
+      return;
+    }
+
+    const operationId = Symbol();
+    this.emailAliasRecommendationInFlight.set(tabId, operationId);
+    const stateGeneration = this.emailAliasStateGeneration;
+    try {
+      const startingAccountId = (await firstValueFrom(this.accountService.activeAccount$))?.id;
+      const startingAuthStatus = await firstValueFrom(this.authService.activeAccountStatus$);
+      if (!startingAccountId || startingAuthStatus !== AuthenticationStatus.Unlocked) {
+        return;
+      }
+      const recommendation = await this.emailAliasService.recommend(tab.url ?? "");
+      const currentAccountId = (await firstValueFrom(this.accountService.activeAccount$))?.id;
+      const currentAuthStatus = await firstValueFrom(this.authService.activeAccountStatus$);
+      if (
+        this.emailAliasRecommendationInFlight.get(tabId) !== operationId ||
+        stateGeneration !== this.emailAliasStateGeneration ||
+        currentAccountId !== startingAccountId ||
+        currentAuthStatus !== AuthenticationStatus.Unlocked ||
+        this.focusedFieldData?.tabId !== tabId ||
+        !this.shouldShowEmailAliasAction()
+      ) {
+        return;
+      }
+      this.postMessageToPort(port, {
+        command: "updateAutofillInlineMenuEmailAliasRecommendation",
+        emailAliasRecommendation: {
+          hostname: recommendation.hostname,
+          canCreate: recommendation.canCreate,
+          address: recommendation.alias?.address,
+        },
+      });
+    } catch (error) {
+      this.logAliasOperationFailure("Email alias recommendation failed", error);
+      if (
+        this.emailAliasRecommendationInFlight.get(tabId) === operationId &&
+        stateGeneration === this.emailAliasStateGeneration
+      ) {
+        this.postMessageToPort(port, {
+          command: "updateAutofillInlineMenuEmailAliasRecommendation",
+        });
+      }
+    } finally {
+      if (this.emailAliasRecommendationInFlight.get(tabId) === operationId) {
+        this.emailAliasRecommendationInFlight.delete(tabId);
+      }
+    }
+  }
+
+  private logAliasOperationFailure(context: string, error: unknown): void {
+    if (error instanceof SimpleLoginAliasError) {
+      this.logService.error(`${context}: ${error.code}${error.status ? ` (${error.status})` : ""}`);
+      return;
+    }
+    this.logService.error(`${context}: unexpected error`);
+  }
+
+  private shouldShowEmailAliasAction(): boolean {
+    return this.shouldShowInlineMenuAccountCreation() && this.focusedFieldIsEmail();
+  }
+
+  /**
+   * Email aliases remain available when identity autofill is disabled. In that configuration the
+   * account-creation classifier deliberately omits `accountCreationFieldType`, so fall back to the
+   * captured field data instead of coupling aliases to the unrelated identity setting.
+   */
+  private focusedFieldIsEmail(): boolean {
+    if (this.focusedFieldMatchesAccountCreationType(InlineMenuAccountCreationFieldType.Email)) {
+      return true;
+    }
+
+    const focusedFieldOpid = this.focusedFieldData?.focusedFieldOpid;
+    const focusedTabId = this.focusedFieldData?.tabId;
+    if (!focusedFieldOpid || focusedTabId === null || focusedTabId === undefined) {
+      return false;
+    }
+
+    const pageDetails = this.pageDetailsForTab[focusedTabId];
+    for (const pageDetail of pageDetails?.values() ?? []) {
+      const field = pageDetail.details.fields.find((field) => field.opid === focusedFieldOpid);
+      if (field && this.inlineMenuFieldQualificationService.isFieldForIdentityEmail(field)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private hostname(url: string | undefined): string {
+    if (!url) {
+      return "";
+    }
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return "";
+    }
+  }
+
+  /**
    * Verifies whether the save login inline menu view should be shown. This requires that
    * the login data on the page contains either a current or new password.
    *
@@ -2653,6 +2940,7 @@ export class OverlayBackground implements OverlayBackgroundInterface {
         "addNewVaultItem",
         "authenticating",
         "cardNumberEndsWith",
+        "createEmailAlias",
         "fillCredentialsFor",
         "fillGeneratedPassword",
         "fillVerificationCode",
@@ -2678,6 +2966,7 @@ export class OverlayBackground implements OverlayBackgroundInterface {
         "unlockAccountAria",
         "unlockYourAccountToViewAutofillSuggestions",
         "uppercaseAriaLabel",
+        "useEmailAlias",
         "username",
         "view",
         ...Object.values(specialCharacterToKeyMap),
@@ -2951,6 +3240,16 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     if (!cipherView) {
       this.currentAddNewItemData = null;
       return;
+    }
+
+    if (cipherView.type === CipherType.Login && sender.tab?.id !== undefined) {
+      const generatedAlias = this.generatedEmailAliases.get(sender.tab.id);
+      const generatedHostname = this.hostname(generatedAlias?.website);
+      const loginHostname = this.hostname(login?.uri) || login?.hostname;
+      if (generatedAlias && generatedHostname && generatedHostname === loginHostname) {
+        bindGeneratedAlias(cipherView, generatedAlias);
+      }
+      this.generatedEmailAliases.delete(sender.tab.id);
     }
 
     try {
@@ -3530,6 +3829,13 @@ export class OverlayBackground implements OverlayBackgroundInterface {
         ? await firstValueFrom(this.useLitInlineMenuComponents$)
         : undefined,
     });
+    if (
+      isInlineMenuListPort &&
+      authStatus === AuthenticationStatus.Unlocked &&
+      this.shouldShowEmailAliasAction()
+    ) {
+      void this.postEmailAliasRecommendation(port, port.sender.tab);
+    }
     if (port.sender) {
       this.updateInlineMenuPosition(
         port.sender,

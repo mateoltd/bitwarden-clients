@@ -1361,12 +1361,12 @@ export class AutofillOverlayContentService implements AutofillOverlayContentServ
       return;
     }
 
-    if (!this.showInlineMenuIdentities) {
+    if (this.inlineMenuFieldQualificationService.isEmailField(autofillFieldData)) {
+      autofillFieldData.accountCreationFieldType = InlineMenuAccountCreationFieldType.Email;
       return;
     }
 
-    if (this.inlineMenuFieldQualificationService.isEmailField(autofillFieldData)) {
-      autofillFieldData.accountCreationFieldType = InlineMenuAccountCreationFieldType.Email;
+    if (!this.showInlineMenuIdentities) {
       return;
     }
 

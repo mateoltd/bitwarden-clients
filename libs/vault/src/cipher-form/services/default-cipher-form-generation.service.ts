@@ -1,5 +1,6 @@
 import { Injectable } from "@angular/core";
 
+import { GeneratedCredential, Type } from "@bitwarden/generator-core";
 import {
   PasswordGenerationServiceAbstraction,
   UsernameGenerationServiceAbstraction,
@@ -14,13 +15,15 @@ export class DefaultCipherFormGenerationService implements CipherFormGenerationS
     private usernameGenerationService: UsernameGenerationServiceAbstraction,
   ) {}
 
-  async generatePassword(): Promise<string> {
+  async generatePassword(): Promise<GeneratedCredential> {
     const [options] = await this.passwordGenerationService.getOptions();
-    return await this.passwordGenerationService.generatePassword(options);
+    const value = await this.passwordGenerationService.generatePassword(options);
+    return new GeneratedCredential(value, Type.password, Date.now());
   }
 
-  async generateUsername(): Promise<string> {
+  async generateUsername(): Promise<GeneratedCredential> {
     const options = await this.usernameGenerationService.getOptions();
-    return await this.usernameGenerationService.generateUsername(options);
+    const value = await this.usernameGenerationService.generateUsername(options);
+    return new GeneratedCredential(value, Type.username, Date.now());
   }
 }

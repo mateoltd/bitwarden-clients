@@ -62,6 +62,32 @@ describe("AutofillInlineMenuList", () => {
   });
 
   describe("initAutofillInlineMenuList", () => {
+    it("preserves an alias recommendation that arrives before initialization finishes", async () => {
+      const initialization = autofillInlineMenuList["initAutofillInlineMenuList"](
+        createInitAutofillInlineMenuListMessageMock({
+          authStatus: AuthenticationStatus.Unlocked,
+          ciphers: [],
+          portKey,
+          showInlineMenuAccountCreation: true,
+        }),
+      );
+
+      autofillInlineMenuList["handleUpdateAutofillInlineMenuEmailAliasRecommendation"]({
+        command: "updateAutofillInlineMenuEmailAliasRecommendation",
+        emailAliasRecommendation: {
+          hostname: "registration.example",
+          canCreate: true,
+        },
+      });
+      await initialization;
+
+      expect(
+        autofillInlineMenuList["inlineMenuListContainer"].querySelector(
+          "[data-email-alias-action]",
+        ),
+      ).not.toBeNull();
+    });
+
     it("adds the no-animations class to the container when showAnimations is false", async () => {
       postWindowMessage(
         createInitAutofillInlineMenuListMessageMock({

@@ -52,6 +52,7 @@ import {
   EncryptionContext,
 } from "../abstractions/cipher.service";
 import { CipherFileUploadService } from "../abstractions/file-upload/cipher-file-upload.service";
+import { isAliasConnectionCipher, isAliasConnectionCipherListView } from "../alias-connection";
 import { FieldType } from "../enums";
 import { CipherType } from "../enums/cipher-type";
 import { CipherData } from "../models/data/cipher.data";
@@ -187,7 +188,9 @@ export class CipherService implements CipherServiceAbstraction {
               [["Items", decrypted.length]],
             );
           }),
-          map(([decrypted]) => decrypted),
+          map(([decrypted]) =>
+            decrypted.filter((cipher) => !isAliasConnectionCipherListView(cipher)),
+          ),
         );
       }),
     );
@@ -332,6 +335,12 @@ export class CipherService implements CipherServiceAbstraction {
    * @deprecated Use `cipherViews$` observable instead
    */
   async getAllDecrypted(userId: UserId): Promise<CipherView[]> {
+    return (await this.getAllDecryptedIncludingInternal(userId)).filter(
+      (cipher) => !isAliasConnectionCipher(cipher),
+    );
+  }
+
+  async getAllDecryptedIncludingInternal(userId: UserId): Promise<CipherView[]> {
     const useSdk = await firstValueFrom(this.sdkCipherCrudEnabled$);
     if (useSdk) {
       return this.getAllDecryptedUsingSdk(userId);
@@ -1753,11 +1762,10 @@ export class CipherService implements CipherServiceAbstraction {
 
     let encryptedCiphers: CipherWithIdRequest[] = [];
 
-    const ciphers = await firstValueFrom(this.cipherViews$(userId));
+    // Internal encrypted records are hidden from normal vault views but must rotate with the user
+    // key or account recovery would strand their credentials under the previous key.
+    const ciphers = await this.getAllDecryptedIncludingInternal(userId);
     const failedCiphers = await firstValueFrom(this.failedToDecryptCiphers$(userId));
-    if (!ciphers) {
-      return encryptedCiphers;
-    }
 
     if (failedCiphers.length > 0) {
       throw new Error("Cannot rotate ciphers when decryption failures are present");

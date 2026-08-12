@@ -1,6 +1,9 @@
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
 
-import { InlineMenuCipherData } from "../../../background/abstractions/overlay.background";
+import {
+  InlineMenuCipherData,
+  InlineMenuEmailAliasRecommendation,
+} from "../../../background/abstractions/overlay.background";
 import { InlineMenuFillType } from "../../../enums/autofill-overlay.enum";
 
 type AutofillInlineMenuListMessage = { command: string };
@@ -17,6 +20,10 @@ export type UpdateAutofillInlineMenuGeneratedPasswordMessage = AutofillInlineMen
   generatedPassword: string;
 };
 
+export type UpdateAutofillInlineMenuEmailAliasMessage = AutofillInlineMenuListMessage & {
+  emailAliasRecommendation?: InlineMenuEmailAliasRecommendation;
+};
+
 export type InitAutofillInlineMenuListMessage = AutofillInlineMenuListMessage & {
   authStatus: AuthenticationStatus;
   styleSheetUrl: string;
@@ -29,6 +36,7 @@ export type InitAutofillInlineMenuListMessage = AutofillInlineMenuListMessage & 
   portKey: string;
   token: string;
   generatedPassword?: string;
+  emailAliasRecommendation?: InlineMenuEmailAliasRecommendation;
   showSaveLoginMenu?: boolean;
   showAnimations?: boolean;
   useLitComponents?: boolean;
@@ -47,6 +55,11 @@ export type AutofillInlineMenuListWindowMessageHandlers = {
     message,
   }: {
     message: UpdateAutofillInlineMenuGeneratedPasswordMessage;
+  }) => void;
+  updateAutofillInlineMenuEmailAliasRecommendation: ({
+    message,
+  }: {
+    message: UpdateAutofillInlineMenuEmailAliasMessage;
   }) => void;
   focusAutofillInlineMenuList: () => void;
 };

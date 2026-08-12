@@ -803,6 +803,14 @@ const routes: Routes = [
             component: CredentialGeneratorComponent,
             data: { titleId: "generator" } satisfies RouteDataProperties,
           },
+          {
+            path: "aliases",
+            loadComponent: () =>
+              import("./tools/email-aliases/email-aliases.component").then(
+                (mod) => mod.EmailAliasesComponent,
+              ),
+            data: { titleId: "emailAliases" } satisfies RouteDataProperties,
+          },
         ],
       },
       {

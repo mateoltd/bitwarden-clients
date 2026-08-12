@@ -167,6 +167,22 @@ describe("VaultCipherRowComponent", () => {
 
       expect(overlayContent).not.toContain('appcopyfield="password"');
     });
+
+    it("renders a stable-ID management route for a bound email alias", () => {
+      loginCipher.aliasBinding = {
+        version: 2,
+        provider: "simplelogin",
+        providerInstance: "https://app.simplelogin.io/",
+        connectionId: "11111111-1111-4111-8111-111111111111",
+        aliasId: "42",
+        address: "bound@sl.example",
+      };
+
+      const overlayContent = openMenuAndGetContent();
+
+      expect(overlayContent).toContain("manageEmailAlias");
+      expect(overlayContent).toContain("/tools/aliases?aliasId=42");
+    });
   });
 
   describe("hasBankAccountOptions", () => {

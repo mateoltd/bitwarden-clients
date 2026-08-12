@@ -7739,5 +7739,33 @@
   },
   "youreAllSet": {
     "message": "You're all set!"
+  },
+  "createEmailAlias": {
+    "message": "Create email alias",
+    "description": "Button to create a SimpleLogin alias on a registration form"
+  },
+  "useEmailAlias": {
+    "message": "Use email alias",
+    "description": "Button to fill a recommended SimpleLogin alias on a registration form"
+  },
+  "emailAliases": {
+    "message": "Email aliases",
+    "description": "Title for SimpleLogin email alias management"
+  },
+  "manageEmailAliases": {
+    "message": "Manage email aliases",
+    "description": "Link to SimpleLogin email alias management"
+  },
+  "manageBoundAlias": {
+    "message": "Manage bound alias",
+    "description": "Action shown for a login bound to a SimpleLogin alias"
+  },
+  "deleteEmailAliasConfirmation": {
+    "message": "Delete this email alias? Mail sent to it will no longer be forwarded.",
+    "description": "Confirmation shown before deleting a SimpleLogin alias"
+  },
+  "deleteReverseAliasConfirmation": {
+    "message": "Delete this reverse alias? This cannot be undone.",
+    "description": "Confirmation shown before deleting a SimpleLogin reverse alias"
   }
 }
