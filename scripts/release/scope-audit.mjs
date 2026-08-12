@@ -63,7 +63,9 @@ function sourceFiles() {
         }
         const entryPath = path.join(directory, entry.name);
         if (entry.isDirectory()) pending.push(entryPath);
-        else if (entry.isFile()) files.push(path.relative(repositoryRoot, entryPath));
+        else if (entry.isFile()) {
+          files.push(path.relative(repositoryRoot, entryPath).split(path.sep).join("/"));
+        }
       }
     }
     return files;
