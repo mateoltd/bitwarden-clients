@@ -6,6 +6,7 @@ import { assert, git, readJson, readManifest, repositoryRoot, run } from "./lib.
 
 run(process.execPath, ["scripts/release/verify-sdk.mjs"]);
 run(process.execPath, ["scripts/release/scope-audit.mjs"]);
+run(process.execPath, ["scripts/release/verify-cli-packaging.mjs"]);
 
 const manifest = readManifest();
 const sourceCommitFile = path.join(repositoryRoot, ".release-source-commit");

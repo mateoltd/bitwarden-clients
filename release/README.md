@@ -78,6 +78,23 @@ same path locally with:
 scripts/release/clean-room-rebuild.sh browser-chrome
 ```
 
+### CLI reproducibility
+
+The pre-fix `cli-linux-arm64` rebuilds differed at
+`dc0f8e285c95b9a1384cd15e55e52c0979e9cd444367a48276770630685a5b47` and
+`5dd3b4d17efff98ad74d8d99d9ed68d3b6b7447806c87854604540c78f8ded59`. The
+archive wrapper was deterministic; the packaged executable was not. `@yao-pkg/pkg` 6.5.1 documents
+V8 bytecode generation as nondeterministic, so public CLI candidates disable bytecode and mark all
+GPL-distributed packages public. `npm run release:verify` enforces those arguments. The release gate
+must also prove the real target twice:
+
+```sh
+scripts/release/clean-room-rebuild.sh cli-linux-arm64
+```
+
+The comparator fails with per-file digests when payloads differ, so an equal outer archive cannot
+hide a target payload mismatch.
+
 ## Upstream maintenance
 
 The drift workflow fetches Bitwarden client main, the canonical SDK tracking ref, and the two
