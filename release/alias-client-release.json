@@ -2,9 +2,9 @@
   "$schema": "./alias-client-release.schema.json",
   "schemaVersion": 1,
   "releaseLane": {
-    "branch": "build/alias-client-release",
-    "baseRef": "origin/integration/canonical-alias-sdk",
-    "baseCommit": "79a59a7945cb1490104185e48f901348bcda2576",
+    "branch": "integration/public-alias-clients",
+    "baseRef": "origin/main",
+    "baseCommit": "1f881babc15eb7d3a88cad41730ce167d8e49a41",
     "sourceRepository": "https://github.com/mateoltd/bitwarden-clients.git",
     "upstreamRepository": "https://github.com/bitwarden/clients.git",
     "upstreamRef": "refs/heads/main",
@@ -12,6 +12,14 @@
     "cleanupCommit": "de5a4c6be71cdcb71038f1fab432bc484ffbc364",
     "sourceDateEpoch": 1786536436,
     "license": "GPL-3.0"
+  },
+  "cleanHistoryInputs": {
+    "requestedClientSnapshotRef": "origin/refactor/alias-schema-v1",
+    "publishedClientSnapshotRef": "origin/feat/alias-cross-device",
+    "clientSnapshotCommit": "113a59638afbe4379e259a2cec8fa38597445eb6",
+    "releaseCheckpointRef": "origin/build/alias-client-release",
+    "releaseCheckpointCommit": "95c5655065172c7505d7f82428b8bf7b46792b82",
+    "stateOnly": true
   },
   "canonicalSdk": {
     "package": "@bitwarden/sdk-internal",

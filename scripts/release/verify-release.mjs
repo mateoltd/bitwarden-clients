@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 import { assert, git, readJson, readManifest, repositoryRoot, run } from "./lib.mjs";
 
@@ -15,9 +16,24 @@ if (fs.existsSync(path.join(repositoryRoot, ".git"))) {
   branch =
     git(["branch", "--show-current"]) || process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME;
   git(["merge-base", "--is-ancestor", manifest.releaseLane.baseCommit, head], { capture: false });
-  git(["merge-base", "--is-ancestor", manifest.releaseLane.cleanupCommit, head], {
-    capture: false,
-  });
+  const cleanCommits = git(["rev-list", "--reverse", `${manifest.releaseLane.baseCommit}..${head}`])
+    .split("\n")
+    .filter(Boolean);
+  assert(cleanCommits.length > 0, "Clean release history has no commits after the pinned base");
+  assert(
+    git(["rev-parse", `${cleanCommits[0]}^`]) === manifest.releaseLane.baseCommit,
+    "First clean release commit is not parented directly by the pinned base",
+  );
+  for (const source of [
+    manifest.cleanHistoryInputs.clientSnapshotCommit,
+    manifest.cleanHistoryInputs.releaseCheckpointCommit,
+  ]) {
+    const ancestry = spawnSync("git", ["merge-base", "--is-ancestor", source, head], {
+      cwd: repositoryRoot,
+      stdio: "ignore",
+    });
+    assert(ancestry.status === 1, `Development ancestry entered the clean history: ${source}`);
+  }
   assert(
     branch === manifest.releaseLane.branch,
     `Expected branch ${manifest.releaseLane.branch}, got ${branch}`,
@@ -28,6 +44,8 @@ if (fs.existsSync(path.join(repositoryRoot, ".git"))) {
   branch = `${manifest.releaseLane.branch} (exported)`;
   assert(/^[0-9a-f]{40}$/.test(head), "Exported source commit is invalid");
 }
+
+assert(manifest.cleanHistoryInputs.stateOnly === true, "Clean history inputs must be state-only");
 
 const targetIds = manifest.targets.map(({ id }) => id);
 assert(new Set(targetIds).size === targetIds.length, "Release target IDs must be unique");
