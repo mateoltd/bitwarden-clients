@@ -13,7 +13,7 @@ import {
   ButtonModule,
   DialogService,
 } from "@bitwarden/components";
-import { AlgorithmInfo } from "@bitwarden/generator-core";
+import { AlgorithmInfo, GeneratedCredential } from "@bitwarden/generator-core";
 import { I18nPipe } from "@bitwarden/ui-common";
 import { CipherFormGeneratorComponent } from "@bitwarden/vault";
 
@@ -29,6 +29,7 @@ export interface GeneratorDialogParams {
 export interface GeneratorDialogResult {
   action: GeneratorDialogAction;
   generatedValue?: string;
+  generatedCredential?: GeneratedCredential;
 }
 
 export const GeneratorDialogAction = {
@@ -70,6 +71,7 @@ export class VaultGeneratorDialogComponent {
    * @protected
    */
   protected generatedValue: string = "";
+  protected generatedCredential?: GeneratedCredential;
 
   protected uri: string;
 
@@ -95,11 +97,13 @@ export class VaultGeneratorDialogComponent {
     void this.dialogRef.close({
       action: GeneratorDialogAction.Selected,
       generatedValue: this.generatedValue,
+      generatedCredential: this.generatedCredential,
     });
   };
 
-  onValueGenerated(value: string) {
-    this.generatedValue = value;
+  onValueGenerated(value: GeneratedCredential) {
+    this.generatedCredential = value;
+    this.generatedValue = value.credential;
   }
 
   onAlgorithmSelected = (selected?: AlgorithmInfo) => {
@@ -110,6 +114,7 @@ export class VaultGeneratorDialogComponent {
       this.selectButtonText = this.i18nService.t("useThisEmail");
     }
     this.generatedValue = undefined;
+    this.generatedCredential = undefined;
   };
 
   /**

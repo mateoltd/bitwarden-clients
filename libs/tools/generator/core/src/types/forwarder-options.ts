@@ -1,3 +1,4 @@
+import { AliasSyncDocument } from "@bitwarden/common/tools/alias";
 import { IntegrationId } from "@bitwarden/common/tools/integration";
 import {
   ApiSettings,
@@ -50,6 +51,15 @@ export type ForwarderOptions = Partial<
      *  When this is undefined or empty, the forwarder's default production API is used.
      */
     baseUrl: string;
+
+    /** Stable non-secret UUID v4 identifying one configured provider connection. */
+    connectionId: string;
+
+    /**
+     * Encrypted, append-only provider operation journal. It deliberately contains no provider
+     * credential and is merged by vector clock when multiple persisted profiles reconnect.
+     */
+    aliasSync: AliasSyncDocument;
 
     /** The domain part of the generated email address.
      *  @remarks The domain should be authorized by the forwarder before

@@ -1,4 +1,4 @@
-import { HubConnectionState } from "@microsoft/signalr";
+import { HubConnectionState, ILogger, LogLevel } from "@microsoft/signalr";
 import { mock, MockProxy } from "jest-mock-extended";
 
 import { awaitAsync } from "../../../../spec";
@@ -29,6 +29,7 @@ describe("SignalRConnectionService", () => {
     stop: jest.Mock;
     state: HubConnectionState;
   };
+  let signalRLogger: ILogger;
 
   let sut: SignalRConnectionService;
 
@@ -46,10 +47,18 @@ describe("SignalRConnectionService", () => {
       state: HubConnectionState.Disconnected,
     };
 
-    const builder = {
+    const builder: {
+      withUrl: jest.Mock;
+      withHubProtocol: jest.Mock;
+      configureLogging: jest.Mock;
+      build: jest.Mock;
+    } = {
       withUrl: jest.fn().mockReturnThis(),
       withHubProtocol: jest.fn().mockReturnThis(),
-      configureLogging: jest.fn().mockReturnThis(),
+      configureLogging: jest.fn((logger: ILogger) => {
+        signalRLogger = logger;
+        return builder;
+      }),
       build: jest.fn().mockReturnValue(connection),
     };
 
@@ -100,5 +109,54 @@ describe("SignalRConnectionService", () => {
 
     expect(received).toEqual([{ type: "Connected" }, { type: "Connected" }]);
     subscription.unsubscribe();
+  });
+
+  it("redacts access tokens from WebSocket diagnostics without discarding the error context", () => {
+    const subscription = sut.connect$(userId, notificationsUrl).subscribe();
+    const secret = "bitwarden-access-token";
+
+    signalRLogger.log(
+      LogLevel.Error,
+      `WebSocket connection to 'wss://notifications.example/hub?access_token=${secret}&id=42' failed`,
+    );
+
+    expect(logService.error).toHaveBeenCalledWith(
+      "[SignalR] WebSocket connection to 'wss://notifications.example/hub?access_token=[REDACTED]&id=42' failed",
+    );
+    expect(logService.error.mock.calls.flat().join(" ")).not.toContain(secret);
+    subscription.unsubscribe();
+  });
+
+  it("redacts encoded query tokens and authorization headers from diagnostics", () => {
+    const subscription = sut.connect$(userId, notificationsUrl).subscribe();
+    const encodedSecret = "encoded-access-token";
+    const bearerSecret = "bearer-access-token";
+
+    signalRLogger.log(
+      LogLevel.Error,
+      `url=wss%3A%2F%2Fnotifications.example%2Fhub%3Faccess_token%3D${encodedSecret}%26id%3D42 Authorization: Bearer ${bearerSecret}`,
+    );
+
+    const logged = logService.error.mock.calls.flat().join(" ");
+    expect(logged).toContain("access_token%3D[REDACTED]%26id%3D42");
+    expect(logged).toContain("Authorization: Bearer [REDACTED]");
+    expect(logged).not.toContain(encodedSecret);
+    expect(logged).not.toContain(bearerSecret);
+    subscription.unsubscribe();
+  });
+
+  it("redacts tokens from connection shutdown errors", async () => {
+    const secret = "shutdown-access-token";
+    connection.stop.mockRejectedValue(
+      new Error(`stop failed for wss://notifications.example/hub?access_token=${secret}&id=42`),
+    );
+    const subscription = sut.connect$(userId, notificationsUrl).subscribe();
+
+    subscription.unsubscribe();
+    await awaitAsync(1);
+
+    const logged = logService.error.mock.calls.flat().join(" ");
+    expect(logged).toContain("access_token=[REDACTED]&id=42");
+    expect(logged).not.toContain(secret);
   });
 });

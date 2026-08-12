@@ -1,5 +1,6 @@
 // The root module interface has API stability guarantees
 export * from "./abstractions";
+export * from "./alias";
 export * from "./data";
 export { createRandomizer, createCredentialGeneratorService } from "./factories";
 export * from "./types";

@@ -17,7 +17,7 @@ import {
   CredentialGeneratorHistoryDialogComponent,
   GeneratorModule,
 } from "@bitwarden/generator-components";
-import { AlgorithmInfo } from "@bitwarden/generator-core";
+import { AlgorithmInfo, GeneratedCredential } from "@bitwarden/generator-core";
 import { I18nPipe } from "@bitwarden/ui-common";
 import { CipherFormGeneratorComponent } from "@bitwarden/vault";
 
@@ -31,6 +31,7 @@ type CredentialGeneratorParams = {
 export interface CredentialGeneratorDialogResult {
   action: CredentialGeneratorDialogAction;
   generatedValue?: string;
+  generatedCredential?: GeneratedCredential;
 }
 
 export const CredentialGeneratorDialogAction = {
@@ -59,6 +60,7 @@ type CredentialGeneratorDialogAction = UnionOfValues<typeof CredentialGeneratorD
 })
 export class CredentialGeneratorDialogComponent {
   credentialValue?: string;
+  generatedCredential?: GeneratedCredential;
   buttonLabel?: string;
 
   constructor(
@@ -76,6 +78,7 @@ export class CredentialGeneratorDialogComponent {
       this.buttonLabel = this.i18nService.t("useThisEmail");
     }
     this.credentialValue = undefined;
+    this.generatedCredential = undefined;
   };
 
   applyCredentials = () => {
@@ -83,15 +86,19 @@ export class CredentialGeneratorDialogComponent {
     void this.dialogRef.close({
       action: CredentialGeneratorDialogAction.Selected,
       generatedValue: this.credentialValue,
+      generatedCredential: this.generatedCredential,
     });
   };
 
   clearCredentials = () => {
     this.data.onCredentialGenerated?.();
+    this.credentialValue = undefined;
+    this.generatedCredential = undefined;
   };
 
-  onCredentialGenerated = (value: string) => {
-    this.credentialValue = value;
+  onCredentialGenerated = (value: GeneratedCredential) => {
+    this.generatedCredential = value;
+    this.credentialValue = value.credential;
   };
 
   openHistoryDialog = () => {

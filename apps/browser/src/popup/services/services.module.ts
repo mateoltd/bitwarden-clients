@@ -162,6 +162,7 @@ import {
   ToastService,
 } from "@bitwarden/components";
 import { GeneratorServicesModule } from "@bitwarden/generator-components";
+import { CredentialGeneratorService } from "@bitwarden/generator-core";
 import { PasswordGenerationServiceAbstraction } from "@bitwarden/generator-legacy";
 import {
   BiometricsService,
@@ -237,6 +238,7 @@ import {
   isNotificationsSupported,
 } from "../../platform/system-notifications/browser-system-notification.service";
 import { fromChromeRuntimeMessaging } from "../../platform/utils/from-chrome-runtime-messaging";
+import { BrowserSimpleLoginAliasService } from "../../tools/alias/browser-simple-login-alias.service";
 import { BrowserAutofillNudgeService } from "../../vault/popup/services/browser-autofill-nudge.service";
 import { Fido2UserVerificationService } from "../../vault/services/fido2-user-verification.service";
 import { ExtensionAnonLayoutWrapperDataService } from "../components/extension-anon-layout-wrapper/extension-anon-layout-wrapper-data.service";
@@ -259,6 +261,11 @@ const DISK_BACKUP_LOCAL_STORAGE = new SafeInjectionToken<
  * If you need help please ask for it, do NOT change the type of this array.
  */
 const safeProviders: SafeProvider[] = [
+  safeProvider({
+    provide: BrowserSimpleLoginAliasService,
+    useClass: BrowserSimpleLoginAliasService,
+    deps: [AccountService, CredentialGeneratorService, CipherService, SyncService],
+  }),
   safeProvider(InitService),
   safeProvider(DebounceNavigationService),
   safeProvider(DialogService),

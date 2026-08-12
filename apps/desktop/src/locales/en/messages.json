@@ -6376,5 +6376,191 @@
         "example": "Login"
       }
     }
+  },
+  "emailAliases": {
+    "message": "Email aliases"
+  },
+  "newAlias": {
+    "message": "New alias"
+  },
+  "aliasPinned": {
+    "message": "Pinned"
+  },
+  "enabled": {
+    "message": "Enabled"
+  },
+  "enable": {
+    "message": "Enable"
+  },
+  "disable": {
+    "message": "Disable"
+  },
+  "noAliasesFound": {
+    "message": "No aliases found."
+  },
+  "noName": {
+    "message": "No name"
+  },
+  "previous": {
+    "message": "Previous"
+  },
+  "pageNumber": {
+    "message": "Page $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1",
+        "example": "1"
+      }
+    }
+  },
+  "createAlias": {
+    "message": "Create an alias"
+  },
+  "websiteOptional": {
+    "message": "Website (optional)"
+  },
+  "createRandomAlias": {
+    "message": "Create random alias"
+  },
+  "recommendOrReuseAlias": {
+    "message": "Recommend or reuse"
+  },
+  "recommendAlias": {
+    "message": "Find recommendation"
+  },
+  "reusingAlias": {
+    "message": "Reusing $ADDRESS$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "alias@example.com"
+      }
+    }
+  },
+  "noReusableAlias": {
+    "message": "No existing alias matches this website."
+  },
+  "createRecommendedAlias": {
+    "message": "Create recommended alias"
+  },
+  "aliasCreationUnavailable": {
+    "message": "SimpleLogin cannot create another alias for this account."
+  },
+  "availableAliasDomains": {
+    "message": "Available domains"
+  },
+  "aliasDetails": {
+    "message": "Alias details"
+  },
+  "boundLogins": {
+    "message": "Bound logins"
+  },
+  "noBoundLogins": {
+    "message": "No vault login is bound to this alias."
+  },
+  "manage": {
+    "message": "Manage"
+  },
+  "contactsAndReverseAliases": {
+    "message": "Contacts and reverse aliases"
+  },
+  "contactEmail": {
+    "message": "Contact email"
+  },
+  "createReverseAlias": {
+    "message": "Create reverse alias"
+  },
+  "noAliasContacts": {
+    "message": "No contacts yet."
+  },
+  "block": {
+    "message": "Block"
+  },
+  "unblock": {
+    "message": "Unblock"
+  },
+  "forwarded": {
+    "message": "Forwarded"
+  },
+  "replied": {
+    "message": "Replied"
+  },
+  "blocked": {
+    "message": "Blocked"
+  },
+  "mailboxes": {
+    "message": "Mailboxes"
+  },
+  "selectAlias": {
+    "message": "Select an alias"
+  },
+  "selectAliasDescription": {
+    "message": "Choose an alias to view its details, bound logins, and reverse aliases."
+  },
+  "aliasConfigureSimpleLogin": {
+    "message": "Configure your SimpleLogin API token in the username generator before managing aliases."
+  },
+  "aliasRateLimited": {
+    "message": "SimpleLogin rate limited this request. Try again in $SECONDS$ seconds.",
+    "placeholders": {
+      "seconds": {
+        "content": "$1",
+        "example": "60"
+      }
+    }
+  },
+  "aliasUnknownError": {
+    "message": "The alias operation failed. Try again after unlocking your vault and checking SimpleLogin settings."
+  },
+  "aliasCreated": {
+    "message": "Alias created"
+  },
+  "aliasUpdated": {
+    "message": "Alias updated"
+  },
+  "aliasEnabled": {
+    "message": "Alias enabled"
+  },
+  "aliasDisabled": {
+    "message": "Alias disabled"
+  },
+  "aliasDeleted": {
+    "message": "Alias deleted"
+  },
+  "aliasDeleteTitle": {
+    "message": "Delete alias?"
+  },
+  "aliasDeleteConfirmation": {
+    "message": "$ADDRESS$ will stop receiving email. This cannot be undone.",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "alias@example.com"
+      }
+    }
+  },
+  "reverseAliasCreated": {
+    "message": "Reverse alias created"
+  },
+  "contactBlocked": {
+    "message": "Contact blocked"
+  },
+  "contactUnblocked": {
+    "message": "Contact unblocked"
+  },
+  "reverseAliasDeleted": {
+    "message": "Reverse alias deleted"
+  },
+  "reverseAliasDeleteTitle": {
+    "message": "Delete reverse alias?"
+  },
+  "reverseAliasDeleteConfirmation": {
+    "message": "Delete the reverse alias for $ADDRESS$? This cannot be undone.",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "contact@example.com"
+      }
+    }
   }
 }

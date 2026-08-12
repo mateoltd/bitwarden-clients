@@ -246,13 +246,48 @@ describe("LoginDetailsSectionComponent", () => {
     }));
 
     it("should generate a username when the generate username button is clicked", fakeAsync(() => {
-      generationService.generateUsername.mockResolvedValue("generated-username");
+      generationService.generateUsername.mockResolvedValue({
+        credential: "generated-username",
+      } as any);
 
       getGenerateUsernameBtn().click();
 
       tick();
 
       expect(component.loginDetailsForm.controls.username.value).toEqual("generated-username");
+    }));
+
+    it("binds generated alias identity and clears it after the username changes", fakeAsync(() => {
+      const alias = {
+        version: 2 as const,
+        provider: "simplelogin" as const,
+        providerInstance: "https://app.simplelogin.io/",
+        connectionId: "11111111-1111-4111-8111-111111111111",
+        aliasId: "42",
+        address: "bound-alias@sl.test",
+      };
+      generationService.generateUsername.mockResolvedValue({
+        credential: alias.address,
+        metadata: { kind: "email-alias", alias },
+      } as any);
+      cipherFormContainer.patchCipher.mockClear();
+
+      getGenerateUsernameBtn().click();
+      tick();
+
+      const cipher = new CipherView();
+      for (const [patchCipher] of cipherFormContainer.patchCipher.mock.calls) {
+        patchCipher(cipher);
+      }
+      expect(cipher.login.username).toBe(alias.address);
+      expect(cipher.aliasBinding).toEqual(alias);
+
+      cipherFormContainer.patchCipher.mockClear();
+      component.loginDetailsForm.controls.username.patchValue("ordinary@example.test");
+      const [patchCipher] = cipherFormContainer.patchCipher.mock.lastCall;
+      patchCipher(cipher);
+
+      expect(cipher.aliasBinding).toBeUndefined();
     }));
 
     it("should not replace an existing username if generation returns null", fakeAsync(() => {
@@ -331,7 +366,9 @@ describe("LoginDetailsSectionComponent", () => {
       }));
 
       it("should generate a password when the generate password button is clicked", fakeAsync(() => {
-        generationService.generatePassword.mockResolvedValue("generated-password");
+        generationService.generatePassword.mockResolvedValue({
+          credential: "generated-password",
+        } as any);
 
         getGeneratePasswordBtn().click();
 

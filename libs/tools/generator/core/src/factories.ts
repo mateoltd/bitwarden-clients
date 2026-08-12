@@ -7,10 +7,12 @@ import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { SdkService } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
 import { StateProvider } from "@bitwarden/common/platform/state";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { LegacyEncryptorProvider } from "@bitwarden/common/tools/cryptography/legacy-encryptor-provider";
 import { RestClient } from "@bitwarden/common/tools/integration/rpc";
 import { SystemServiceProvider } from "@bitwarden/common/tools/providers";
 import { UserStateSubjectDependencyProvider } from "@bitwarden/common/tools/state/user-state-subject-dependency-provider";
+import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 
 import { CredentialGeneratorService, Randomizer } from "./abstractions";
 import { SdkRandomizer } from "./engine/sdk-randomizer";
@@ -44,6 +46,8 @@ export async function createCredentialGeneratorService(
   i18n: I18nService,
   api: ApiService,
   sdkService: SdkService,
+  cipherService?: CipherService,
+  syncService?: SyncService,
 ): Promise<CredentialGeneratorService> {
   const userState: UserStateSubjectDependencyProvider = {
     encryptor,
@@ -75,6 +79,12 @@ export async function createCredentialGeneratorService(
     now: Date.now,
   };
 
-  const provide: CredentialGeneratorProviders = { userState, generator, profile, metadata };
+  const provide: CredentialGeneratorProviders = {
+    userState,
+    generator,
+    profile,
+    metadata,
+    aliasSync: cipherService ? { cipherService, syncService } : undefined,
+  };
   return new DefaultCredentialGeneratorService(provide, system);
 }
