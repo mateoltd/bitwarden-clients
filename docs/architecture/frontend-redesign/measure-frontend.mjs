@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, "../../..");
 const reportPath = resolve(scriptDirectory, "measured-inventory.md");
+const baselineCommit = "5f640f3bbe94cdc47dbebf81f0c32548080b76da";
 
 function git(args) {
   return execFileSync("git", args, {
@@ -120,10 +121,7 @@ function isStory(file) {
 }
 
 function isTest(file) {
-  return (
-    /\.(?:spec|test)\.[cm]?[jt]sx?$/.test(file) ||
-    /(?:^|\/)(?:spec|test|tests)\//.test(file)
-  );
+  return /\.(?:spec|test)\.[cm]?[jt]sx?$/.test(file) || /(?:^|\/)(?:spec|test|tests)\//.test(file);
 }
 
 function isProductionTypeScript(file) {
@@ -163,7 +161,9 @@ function measure(files) {
   const rxjsFiles = sources.filter(({ source }) => /["']rxjs(?:\/[^"']*)?["']/.test(source));
   const electronFiles = sources.filter(({ source }) => /from\s+["']electron["']/.test(source));
   const webExtensionApiFiles = sources.filter(({ code }) =>
-    /\b(?:chrome|browser)\.(?:runtime|tabs|storage|scripting|webNavigation|webRequest)\b/.test(code),
+    /\b(?:chrome|browser)\.(?:runtime|tabs|storage|scripting|webNavigation|webRequest)\b/.test(
+      code,
+    ),
   );
 
   return {
@@ -191,8 +191,7 @@ function measure(files) {
       0,
     ),
     routerRegistrations: angularRouterSources.reduce(
-      (total, { code }) =>
-        total + countMatches(code, /RouterModule\.(?:forRoot|forChild)\s*\(/g),
+      (total, { code }) => total + countMatches(code, /RouterModule\.(?:forRoot|forChild)\s*\(/g),
       0,
     ),
     angularFiles: angularFiles.length,
@@ -212,9 +211,14 @@ const measurements = new Map(
 );
 
 function markdownTable(headers, rows) {
-  const header = `| ${headers.join(" | ")} |`;
-  const divider = `| ${headers.map(() => "---").join(" | ")} |`;
-  return [header, divider, ...rows.map((row) => `| ${row.join(" | ")} |`)].join("\n");
+  const normalizedRows = rows.map((row) => row.map(String));
+  const widths = headers.map((header, index) =>
+    Math.max(3, header.length, ...normalizedRows.map((row) => row[index].length)),
+  );
+  const formatRow = (row) =>
+    `| ${row.map((value, index) => value.padEnd(widths[index])).join(" | ")} |`;
+  const divider = widths.map((width) => "-".repeat(width));
+  return [formatRow(headers), formatRow(divider), ...normalizedRows.map(formatRow)].join("\n");
 }
 
 function projectRoots() {
@@ -245,12 +249,13 @@ function sharedUiProjects() {
   return [...grouped.entries()]
     .map(([root, files]) => ({ root, ...measure(files) }))
     .filter(
-      (item) =>
-        item.components > 0 || item.directives > 0 || item.pipes > 0 || item.stories > 0,
+      (item) => item.components > 0 || item.directives > 0 || item.pipes > 0 || item.stories > 0,
     )
     .sort(
       (left, right) =>
-        right.components + right.directives + right.pipes -
+        right.components +
+          right.directives +
+          right.pipes -
           (left.components + left.directives + left.pipes) || left.root.localeCompare(right.root),
     );
 }
@@ -302,7 +307,11 @@ function workspaceImports(files) {
 
 function localeInventory() {
   const definitions = [
-    { name: "Web", prefix: "apps/web/src/locales/", english: "apps/web/src/locales/en/messages.json" },
+    {
+      name: "Web",
+      prefix: "apps/web/src/locales/",
+      english: "apps/web/src/locales/en/messages.json",
+    },
     {
       name: "Browser",
       prefix: "apps/browser/src/_locales/",
@@ -442,10 +451,7 @@ function frameworkNeutralCoreInventory() {
 function countPatternInFiles(files, expression) {
   return files
     .filter(isProductionTypeScript)
-    .reduce(
-      (total, file) => total + countMatches(stripComments(sourceFor(file)), expression),
-      0,
-    );
+    .reduce((total, file) => total + countMatches(stripComments(sourceFor(file)), expression), 0);
 }
 
 function themeInventory() {
@@ -461,7 +467,9 @@ function themeInventory() {
   );
   const tokenSource = read("libs/components/src/tw-theme.css");
   const tokenNames = new Set(tokenSource.match(/--color-[a-z0-9-]+/g) ?? []);
-  const utilityFiles = productionMarkup.filter((file) => /\btw-[a-z0-9-[\]]+/.test(sourceFor(file)));
+  const utilityFiles = productionMarkup.filter((file) =>
+    /\btw-[a-z0-9-[\]]+/.test(sourceFor(file)),
+  );
   return {
     colorTokens: tokenNames.size,
     utilityFiles: utilityFiles.length,
@@ -471,10 +479,7 @@ function themeInventory() {
     ),
     themeClassReferences: frontendFiles
       .filter((file) => /\.(?:ts|html|css|scss)$/.test(file))
-      .reduce(
-        (total, file) => total + countMatches(sourceFor(file), /theme_(?:light|dark)/g),
-        0,
-      ),
+      .reduce((total, file) => total + countMatches(sourceFor(file), /theme_(?:light|dark)/g), 0),
   };
 }
 
@@ -519,7 +524,7 @@ function refMetadata() {
   return {
     originMain: git(["rev-parse", "origin/main"]),
     upstreamMain: git(["rev-parse", "upstream/main"]),
-    base: git(["merge-base", "HEAD", "origin/main"]),
+    mainMergeBase: git(["merge-base", "HEAD", "origin/main"]),
     upstreamOnly,
     originOnly,
   };
@@ -554,7 +559,8 @@ function renderReport() {
     markdownTable(
       ["Field", "Value"],
       [
-        ["Exact `origin/main` base", `\`${refs.base}\``],
+        ["Exact consolidated baseline ancestor", `\`${baselineCommit}\``],
+        ["Merge base with local `origin/main`", `\`${refs.mainMergeBase}\``],
         ["Local `origin/main`", `\`${refs.originMain}\``],
         ["Local `upstream/main`", `\`${refs.upstreamMain}\``],
         [
@@ -564,7 +570,7 @@ function renderReport() {
       ],
     ),
     "",
-    "> No fetch is performed. Ref values are the local values present when the report is generated.",
+    "> Counts describe the current tracked checkout. No fetch is performed; ref values are the local values present when the report is generated.",
     "",
     "## Framework and boundary inventory",
     "",
