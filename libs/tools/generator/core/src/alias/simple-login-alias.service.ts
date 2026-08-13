@@ -1,4 +1,18 @@
 import {
+  Alias,
+  AliasClient,
+  AliasClientSettings,
+  AliasFilter,
+  AliasPage,
+  AliasProviderIdentity,
+  AliasReference,
+  AliasUpdateRequest,
+  OptionalSensitiveStringUpdate,
+  ReverseAlias,
+  SensitiveString,
+  parse_alias_reference,
+} from "@bitwarden/alias-sdk-internal";
+import {
   AliasProjectedOperation,
   AliasProviderOperation,
   AliasProviderSnapshot,
@@ -14,20 +28,6 @@ import {
   parseEmailAliasIdentity,
   projectAliasSync,
 } from "@bitwarden/common/tools/alias";
-import {
-  Alias,
-  AliasClient,
-  AliasClientSettings,
-  AliasFilter,
-  AliasPage,
-  AliasProviderIdentity,
-  AliasReference,
-  AliasUpdateRequest,
-  OptionalSensitiveStringUpdate,
-  ReverseAlias,
-  SensitiveString,
-  parse_alias_reference,
-} from "@bitwarden/sdk-internal";
 
 import { SimpleLoginAliasError, normalizeSimpleLoginAliasError } from "./simple-login-alias.error";
 import {

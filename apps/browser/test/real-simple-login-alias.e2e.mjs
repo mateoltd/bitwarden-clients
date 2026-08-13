@@ -62,6 +62,7 @@ try {
     headless: false,
     ignoreHTTPSErrors: true,
     args: [
+      "--ignore-certificate-errors",
       `--disable-extensions-except=${extensionDirectory}`,
       `--load-extension=${extensionDirectory}`,
       `--host-resolver-rules=MAP ${registrationHostname} 127.0.0.1`,

@@ -273,6 +273,23 @@ class RealVaultCipherAdapter implements Pick<
   }
 }
 
+async function removeBitwardenTestAliasConnections(profile: AuthenticatedProfile): Promise<void> {
+  const adapter = new RealVaultCipherAdapter(profile);
+  const ids = (await adapter.fullSync())
+    .filter(isAliasConnectionCipher)
+    .map((cipher) => cipher.id)
+    .filter((id): id is string => id !== undefined);
+  for (let index = 0; index < ids.length; index += 500) {
+    const deleted = await vaultRequest(profile.accessToken, "/ciphers", {
+      method: "DELETE",
+      body: JSON.stringify({ ids: ids.slice(index, index + 500) }),
+    });
+    if (deleted.response.status !== 200) {
+      throw new Error(`Bitwarden alias carrier cleanup failed (${deleted.response.status})`);
+    }
+  }
+}
+
 describeIntegration("real schema-v1 alias cross-device convergence", () => {
   jest.setTimeout(1_800_000);
 
@@ -328,6 +345,7 @@ describeIntegration("real schema-v1 alias cross-device convergence", () => {
       );
       expect(new Set(profiles.map((profile) => profile.directory)).size).toBe(3);
       expect(new Set(profiles.map((profile) => profile.userId)).size).toBe(1);
+      await removeBitwardenTestAliasConnections(profiles[0]);
 
       const fixtureViews = Array.from({ length: fixtureSize }, (_, index) => {
         const view = new CipherView();

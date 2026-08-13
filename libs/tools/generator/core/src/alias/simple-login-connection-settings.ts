@@ -1,5 +1,6 @@
 import { ReplaySubject, filter, firstValueFrom, skip } from "rxjs";
 
+import { AliasClient, SensitiveString } from "@bitwarden/alias-sdk-internal";
 import { Account } from "@bitwarden/common/auth/abstractions/account.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import {
@@ -17,7 +18,6 @@ import {
   AliasConnectionVaultStore,
   findAliasConnectionVaultPayloads,
 } from "@bitwarden/common/vault/alias-connection";
-import { AliasClient, SensitiveString } from "@bitwarden/sdk-internal";
 
 import { CredentialGeneratorService } from "../abstractions";
 import { ForwarderOptions } from "../types";

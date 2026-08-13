@@ -5,7 +5,7 @@ import {
   bind_alias_reference,
   parse_alias_reference,
   serialize_alias_reference,
-} from "@bitwarden/sdk-internal";
+} from "@bitwarden/alias-sdk-internal";
 
 import {
   EmailAliasIdentity,

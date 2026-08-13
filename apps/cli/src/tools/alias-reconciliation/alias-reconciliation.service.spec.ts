@@ -1,11 +1,11 @@
 import { MockProxy, mock } from "jest-mock-extended";
 
+import { Alias, AliasProviderIdentity, SensitiveString } from "@bitwarden/alias-sdk-internal";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { SimpleLoginAliasError, SimpleLoginAliasService } from "@bitwarden/generator-core";
-import { Alias, AliasProviderIdentity, SensitiveString } from "@bitwarden/sdk-internal";
 
 import { AliasReconciliationService } from "./alias-reconciliation.service";
 

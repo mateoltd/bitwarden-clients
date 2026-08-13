@@ -1,20 +1,20 @@
+import {
+  Alias,
+  AliasProviderIdentity,
+  AliasReconciliationOutcome,
+  AliasReconciliationPlan,
+  apply_alias_reconciliation,
+  create_alias_reference,
+  parse_alias_reference,
+  plan_alias_reconciliation,
+} from "@bitwarden/alias-sdk-internal";
 import { EmailAliasIdentity, parseEmailAliasIdentity } from "@bitwarden/common/tools/alias";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { SimpleLoginAliasError, SimpleLoginAliasService } from "@bitwarden/generator-core";
-import {
-  Alias,
-  AliasProviderIdentity,
-  AliasReconciliationOutcome,
-  AliasReconciliationPlan,
-  CipherId,
-  apply_alias_reconciliation,
-  create_alias_reference,
-  parse_alias_reference,
-  plan_alias_reconciliation,
-} from "@bitwarden/sdk-internal";
+import { CipherId } from "@bitwarden/sdk-internal";
 
 export const ALIAS_RECONCILIATION_REPORT_VERSION = 1 as const;
 
