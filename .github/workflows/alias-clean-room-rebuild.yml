@@ -45,6 +45,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Apply release lane name to dispatched checkout
+        if: github.event_name == 'workflow_dispatch' && github.ref_name != 'build/alias-client-release'
+        run: git branch -m build/alias-client-release
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: ${{ matrix.node }}
