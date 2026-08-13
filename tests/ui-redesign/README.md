@@ -52,6 +52,7 @@ changed and the replacement assertion proves the new behavior.
 | Unlock                       | `auth-unlock--master-password`                                       |
 | Vault list                   | `web-vault-items--individual`                                        |
 | Vault search and popup shell | `browser-popup-layout--filterable-table-list`                        |
+| Narrow vault search          | `browser-popup-layout--filterable-table-list-narrow`                 |
 | Narrow extension shell       | `browser-popup-layout--narrow-width`                                 |
 | Item edit                    | `vault-cipher-form--edit`                                            |
 | Generator                    | `components-inline-menu-password-generator--fill-generated-password` |
@@ -62,11 +63,7 @@ changed and the replacement assertion proves the new behavior.
 The stable data belongs in the Storybook stories so visual inspection, component documentation, the
 existing Storybook axe runner, Chromatic, and this suite observe the same fixture.
 
-## Known accessibility debt
+## Accessibility enforcement
 
-The popup vault table fixture currently triggers three axe rules: `aria-allowed-role` on its
-collapsible group header button, `empty-table-header` on its actions column, and
-`scrollable-region-focusable` on its horizontally scrollable header row. The popup-search test
-disables only those three rules and continues to enforce every other axe rule. All other baseline
-stories have no rule exceptions. Remove each exception when the corresponding table primitive is
-fixed; do not broaden this list for redesign work.
+The full axe ruleset is enforced for every baseline story, including the popup vault table at its
+default and narrow widths. No popup accessibility rule is disabled or waived.

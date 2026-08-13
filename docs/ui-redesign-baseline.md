@@ -154,10 +154,9 @@ motion, fixture data, and viewport dimensions. Every covered story receives:
   Storybook test runner;
 - keyboard interaction or focus checks where the flow is interactive.
 
-The extension popup table has a narrow, recorded exception for its existing `aria-allowed-role`,
-`empty-table-header`, and `scrollable-region-focusable` violations. Every other axe rule remains
-active there, and every rule remains active on all other baseline stories. The exception is a debt
-marker, not an accessibility acceptance decision.
+The full axe ruleset remains active for every baseline story. The extension popup table is checked
+without rule exceptions at both its default and narrow boundaries, so no popup accessibility rule
+is waived.
 
 The desktop viewport is `1440 x 900`; the narrow shared viewport is `390 x 844`. Extension popup
 checks use its actual `480 px` default boundary and `380 px` narrow fixture. Autofill overlays use a

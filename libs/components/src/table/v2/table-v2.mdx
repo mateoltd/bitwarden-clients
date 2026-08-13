@@ -121,6 +121,9 @@ The header is a plain `<bit-header-cell>` child of the column — no directive n
 When the column is `sortable`, the header cell shows a sort button automatically and wires up its
 click behavior and `aria-sort` for you.
 
+For an icon-only actions column, keep the header visually empty and name it for assistive technology
+with `accessibleLabel="Actions"`.
+
 ### Column sizing
 
 Set a column's width with `width` on `<bit-column>`. Use content-independent widths so columns stay
@@ -155,7 +158,7 @@ const table = defineTable<User, "actions">(users);
 
 ```html
 <bit-column>
-  <bit-header-cell></bit-header-cell>
+  <bit-header-cell accessibleLabel="Actions"></bit-header-cell>
   <bit-cell *bitCellDef="table.columns.actions; let row">
     <button bitIconButton="bwi-ellipsis-v">Actions</button>
   </bit-cell>

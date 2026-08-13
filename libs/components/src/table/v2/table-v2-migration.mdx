@@ -262,8 +262,8 @@ cell wrapped (truncation is on by default).
 ## Action columns
 
 For columns with no field on `T` (action menus, expand toggles), declare a synthetic column via
-`defineTable`'s second type parameter and reference it like any other column. Give it an empty
-header.
+`defineTable`'s second type parameter and reference it like any other column. Give a visually empty
+header an accessible label.
 
 **v1**
 
@@ -282,14 +282,14 @@ protected readonly table = defineTable<User, "actions">(this.users);
 
 ```html
 <bit-column width="50px">
-  <bit-header-cell></bit-header-cell>
+  <bit-header-cell accessibleLabel="Actions"></bit-header-cell>
   <bit-cell *bitCellDef="table.columns.actions; let row">
     <button bitIconButton="bwi-ellipsis-v" [bitMenuTriggerFor]="menu"></button>
   </bit-cell>
 </bit-column>
 ```
 
-Every column needs a `<bit-header-cell>`, even an empty one — screen readers rely on it.
+Every column needs a named `<bit-header-cell>` so screen readers can identify its cells.
 
 ## Forms
 
