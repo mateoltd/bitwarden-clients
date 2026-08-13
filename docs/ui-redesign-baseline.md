@@ -5,16 +5,19 @@ does not propose colors, layout, navigation, product behavior, or framework chan
 
 ## Baseline identity
 
-| Field              | Value                                                          |
-| ------------------ | -------------------------------------------------------------- |
-| Branch             | `test/ui-redesign-baseline`                                    |
-| Base ref inspected | Local `origin/main`                                            |
-| Base commit        | `1f881babc15eb7d3a88cad41730ce167d8e49a41`                     |
-| Base subject       | `[CL-51] create file upload component (#20899)`                |
-| Worktree           | `/Users/mateo/.t3/worktrees/bitwarden-clients/t3code-9c3b232b` |
+| Field                      | Value                                        |
+| -------------------------- | -------------------------------------------- |
+| Consolidated branch        | `test/ui-redesign-ready`                     |
+| Baseline source ref        | `origin/test/ui-redesign-baseline`           |
+| Exact baseline commit      | `5f640f3bbe94cdc47dbebf81f0c32548080b76da`   |
+| Baseline subject           | `test(ui): add redesign baseline safety net` |
+| Storybook CI source        | `80e38d0aaf29d28798ad105cbc8a90b13dde4093`   |
+| Popup accessibility source | `66dfb218e82465674e8b72e33a221528c9773a71`   |
+| Architecture dossier tip   | `dc81e422e3d0a3e06e87a5319933e0f3243ea89f`   |
 
-No fetch was performed because this work must not mutate remote refs. The commit above is the exact
-local `origin/main` value from which the worktree started.
+The consolidation starts at the exact baseline commit above. The two fixes were applied as their
+complete source changes, and the architecture dossier was imported as its two documentation-only
+commits without merging the dossier branch's unrelated ancestry.
 
 ## UI ownership map
 
