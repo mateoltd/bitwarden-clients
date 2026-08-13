@@ -61,12 +61,18 @@ import { PopupTabNavigationComponent } from "./popup-tab-navigation.component";
 @Component({
   selector: "extension-container",
   template: `
-    <div class="tw-h-[640px] tw-w-[480px] tw-border tw-border-solid tw-border-secondary-300">
+    <div
+      class="tw-h-[640px] tw-border tw-border-solid tw-border-secondary-300"
+      [class.tw-w-[480px]]="width() === 'default'"
+      [class.tw-w-[380px]]="width() === 'narrow'"
+    >
       <ng-content></ng-content>
     </div>
   `,
 })
-class ExtensionContainerComponent {}
+class ExtensionContainerComponent {
+  readonly width = input<"default" | "narrow">("default");
+}
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
@@ -587,7 +593,7 @@ type TableVaultFilters = {
             }}</bit-cell>
           </bit-column>
           <bit-column width="auto">
-            <bit-header-cell></bit-header-cell>
+            <bit-header-cell accessibleLabel="Actions"></bit-header-cell>
             <bit-cell *bitCellDef="table.columns.actions; let row">
               <button type="button" bit-chip-action variant="primary" label="Fill"></button>
               <button type="button" bitIconButton="bwi-clone" label="Copy item"></button>
@@ -867,20 +873,26 @@ export const PopupPage: Story = {
  * The table uses `fill`, so its toolbar/header stay pinned while the rows scroll.
  */
 export const FilterableTableList: StoryObj = {
-  args: { presentation: "list", navButtons: navButtons() },
+  tags: ["popup-accessibility"],
+  args: { presentation: "list", navButtons: navButtons(), width: "default" },
   argTypes: {
     presentation: { control: "inline-radio", options: ["table", "list"] },
   },
   render: (args) => ({
     props: args,
     template: /* HTML */ `
-      <extension-container>
+      <extension-container [width]="width">
         <popup-tab-navigation [navButtons]="navButtons">
           <mock-vault-table-page [presentation]="presentation"></mock-vault-table-page>
         </popup-tab-navigation>
       </extension-container>
     `,
   }),
+};
+
+export const FilterableTableListNarrow: StoryObj = {
+  ...FilterableTableList,
+  args: { ...FilterableTableList.args, width: "narrow" },
 };
 
 export const PopupPageWithFooter: Story = {

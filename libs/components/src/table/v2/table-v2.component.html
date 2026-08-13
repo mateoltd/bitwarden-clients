@@ -65,26 +65,26 @@
     -->
     <div role="row">
       @if (item.group.collapsible()) {
-        <button
-          type="button"
-          role="columnheader"
-          [attr.aria-colspan]="columnCount()"
-          [attr.aria-expanded]="!item.group.collapsed()"
-          [class]="groupHeaderButtonClass(item.level)"
-          [style.height.px]="forceHeight ? headerHeight(item.level) : null"
-          (click)="item.group.toggle()"
-        >
-          <ng-container *ngTemplateOutlet="item.group.headerTemplate()"></ng-container>
-          <!-- Count only on top-level group headers. -->
-          @if (item.level === 0) {
-            <span class="tw-ms-auto tw-font-normal">{{ item.count }}</span>
-          }
-          <bit-icon
-            [class]="item.level === 0 ? 'tw-ps-2' : 'tw-ms-auto'"
-            [name]="item.group.collapsed() ? 'bwi-angle-down' : 'bwi-angle-up'"
-            aria-hidden="true"
-          ></bit-icon>
-        </button>
+        <div role="columnheader" [attr.aria-colspan]="columnCount()" class="tw-w-full">
+          <button
+            type="button"
+            [attr.aria-expanded]="!item.group.collapsed()"
+            [class]="groupHeaderButtonClass(item.level)"
+            [style.height.px]="forceHeight ? headerHeight(item.level) : null"
+            (click)="item.group.toggle()"
+          >
+            <ng-container *ngTemplateOutlet="item.group.headerTemplate()"></ng-container>
+            <!-- Count only on top-level group headers. -->
+            @if (item.level === 0) {
+              <span class="tw-ms-auto tw-font-normal">{{ item.count }}</span>
+            }
+            <bit-icon
+              [class]="item.level === 0 ? 'tw-ps-2' : 'tw-ms-auto'"
+              [name]="item.group.collapsed() ? 'bwi-angle-down' : 'bwi-angle-up'"
+              aria-hidden="true"
+            ></bit-icon>
+          </button>
+        </div>
       } @else {
         <div
           role="columnheader"
@@ -129,11 +129,12 @@
         The header sits above the scroll region (not inside it), so it stays
         pinned vertically while the body scrolls. Keeping it out of the
         virtual-scroll viewport also avoids CDK's transformed/absolutely-
-        positioned row content. It's its own horizontal scroll container, synced
-        to the body via `bitSyncScrollLeft` so columns stay aligned and scrolling
-        over the header moves the table too; its background stays put (it's the
-        scroll viewport, not the scrolled content) so it doesn't blank out past
-        the overflow. Its scrollbar is hidden — the body owns the visible one.
+        positioned row content. In table presentation it's a keyboard-focusable
+        horizontal scroll container, synced to the body via `bitSyncScrollLeft`
+        so columns stay aligned and scrolling over the header moves the table too;
+        its background stays put (it's the scroll viewport, not the scrolled
+        content) so it doesn't blank out past the overflow. Its scrollbar is
+        hidden — the body owns the visible one.
       -->
       <!--
         In `list` presentation the header is visually hidden but kept in the
@@ -142,8 +143,10 @@
       -->
       <bit-header-row
         data-hide-scrollbar
-        class="tw-overflow-x-auto tw-overscroll-x-none"
+        class="tw-overscroll-x-none"
+        [class.tw-overflow-x-auto]="presentation() === 'table'"
         [class.tw-sr-only]="presentation() === 'list'"
+        [attr.tabindex]="presentation() === 'table' ? 0 : null"
         [(bitSyncScrollLeft)]="horizontalScroll"
       >
         <ng-container *ngTemplateOutlet="headerCells"></ng-container>

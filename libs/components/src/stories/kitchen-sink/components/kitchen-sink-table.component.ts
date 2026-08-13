@@ -27,7 +27,7 @@ import { KitchenSinkSharedModule } from "../kitchen-sink-shared.module";
       <bit-header-row>
         <bit-header-cell>Product</bit-header-cell>
         <bit-header-cell>User</bit-header-cell>
-        <bit-header-cell></bit-header-cell>
+        <bit-header-cell accessibleLabel="Actions"></bit-header-cell>
       </bit-header-row>
       <bit-row>
         <bit-cell>
