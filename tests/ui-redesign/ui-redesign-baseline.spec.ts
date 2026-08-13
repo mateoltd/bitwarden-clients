@@ -27,7 +27,7 @@ async function openStory(page: Page, storyId: string, storybook = MAIN_STORYBOOK
   await injectAxe(page);
 }
 
-async function expectAccessible(page: Page, disabledRules: string[] = []) {
+async function expectAccessible(page: Page) {
   await checkA11y(
     page,
     {
@@ -37,9 +37,6 @@ async function expectAccessible(page: Page, disabledRules: string[] = []) {
     {
       detailedReport: true,
       detailedReportOptions: { html: true },
-      axeOptions: {
-        rules: Object.fromEntries(disabledRules.map((rule) => [rule, { enabled: false }])),
-      },
     },
     false,
     "v2",
@@ -125,25 +122,59 @@ for (const viewport of viewports) {
 }
 
 test.describe("browser extension surfaces", () => {
-  test("vault search filters the rendered popup with the keyboard", async ({ page }) => {
-    await page.setViewportSize({ width: 520, height: 760 });
-    await openStory(page, "browser-popup-layout--filterable-table-list");
+  const popupSearchFixtures = [
+    {
+      name: "default",
+      storyId: "browser-popup-layout--filterable-table-list",
+      viewport: { width: 520, height: 760 },
+      screenshot: "browser-vault-search",
+    },
+    {
+      name: "narrow",
+      storyId: "browser-popup-layout--filterable-table-list-narrow",
+      viewport: { width: 420, height: 720 },
+      screenshot: "browser-vault-search-narrow",
+    },
+  ] as const;
 
-    const search = page.getByRole("searchbox", { name: "Search" });
-    await search.focus();
-    await search.pressSequentially("GitHub");
-    await expect(page.getByText("GitHub", { exact: true })).toBeVisible();
-    await expect(page.getByText("Amazon", { exact: true })).toBeHidden();
-    await search.press("Tab");
-    await expect(page.locator(":focus")).not.toHaveJSProperty("tagName", "BODY");
+  for (const fixture of popupSearchFixtures) {
+    test(`vault search filters the ${fixture.name} popup with the keyboard`, async ({ page }) => {
+      await page.setViewportSize(fixture.viewport);
+      await openStory(page, fixture.storyId);
 
-    await expectAccessible(page, [
-      "aria-allowed-role",
-      "empty-table-header",
-      "scrollable-region-focusable",
-    ]);
-    await expectBaseline(page, "browser-vault-search");
-  });
+      const search = page.getByRole("searchbox", { name: "Search" });
+      await search.focus();
+      await search.pressSequentially("GitHub");
+      await expect(page.getByText("GitHub", { exact: true })).toBeVisible();
+      await expect(page.getByText("Amazon", { exact: true })).toBeHidden();
+
+      await search.press("Tab");
+      const resetSearch = page.getByRole("button", { name: "Reset search" });
+      await expect(resetSearch).toBeFocused();
+      await resetSearch.press("Tab");
+      await expect(page.getByRole("button", { name: "Filters", exact: true })).toBeFocused();
+
+      const favoritesGroup = page.getByRole("button", { name: /^Favorites 1$/ });
+      await favoritesGroup.focus();
+      await expect(favoritesGroup).toHaveAttribute("aria-expanded", "true");
+      await favoritesGroup.press("Enter");
+      await expect(favoritesGroup).toHaveAttribute("aria-expanded", "false");
+      await expect(page.getByText("GitHub", { exact: true })).toBeHidden();
+      await favoritesGroup.press("Enter");
+      await expect(favoritesGroup).toHaveAttribute("aria-expanded", "true");
+      await expect(page.getByText("GitHub", { exact: true })).toBeVisible();
+
+      await expect(page.getByRole("columnheader", { name: "Actions", exact: true })).toHaveCount(1);
+
+      // Match the established screenshot focus state after exercising the full keyboard path.
+      await search.focus();
+      await search.press("Tab");
+      await expect(resetSearch).toBeFocused();
+
+      await expectAccessible(page);
+      await expectBaseline(page, fixture.screenshot);
+    });
+  }
 
   test("narrow popup shell retains its primary controls", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 720 });

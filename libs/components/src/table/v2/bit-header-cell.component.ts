@@ -5,6 +5,7 @@ import {
   computed,
   forwardRef,
   inject,
+  input,
   TemplateRef,
   viewChild,
 } from "@angular/core";
@@ -55,6 +56,12 @@ export class BitHeaderCellComponent {
 
   /** The rendered header markup, stamped by `<bit-table-v2>` in column-def mode. */
   readonly template = viewChild.required<TemplateRef<void>>("tpl");
+
+  /**
+   * A visually hidden label for columns whose visible cells contain only controls, such as an
+   * actions menu. Omit when the projected header content already names the column.
+   */
+  readonly accessibleLabel = input<string>();
 
   /** True when there's no owning column, so the cell renders itself inline. */
   protected readonly manual = computed(() => this.column == null);

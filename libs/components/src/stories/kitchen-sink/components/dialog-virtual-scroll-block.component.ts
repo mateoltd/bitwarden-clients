@@ -57,7 +57,7 @@ const TAG_POOL = ["Personal", "Work", "Shared", "Archived", "Favorite", "Family"
       </bit-cell>
     </bit-column>
     <bit-column width="64px">
-      <bit-header-cell></bit-header-cell>
+      <bit-header-cell accessibleLabel="Actions"></bit-header-cell>
       <bit-cell *bitCellDef="table.columns.actions; let row">
         <button
           slot="end"
