@@ -13,19 +13,14 @@ import {
   parseEmailAliasIdentity,
   parseGeneratedCredentialMetadata,
 } from "../../tools/alias";
-import { CipherType, FieldType } from "../enums";
-import { FieldView } from "../models/view/field.view";
+import { CipherType } from "../enums";
 
-/** Reserved encrypted custom-field name. It is removed before fields reach user-facing views. */
-export const ALIAS_BINDING_FIELD_NAME = "bitwarden.alias.reference";
-
-/** Versioned public identity persisted inside the encrypted cipher field path. */
+/** Versioned public identity persisted inside the encrypted login payload. */
 export type AliasBinding = EmailAliasIdentity;
 
 type AliasBindableCipher = {
   type: CipherType;
-  login?: { username?: string | null };
-  fields?: FieldView[];
+  login?: { username?: string | null; aliasReference?: string | null };
   aliasBinding?: AliasBinding;
 };
 
@@ -41,20 +36,16 @@ function usernameMatches(binding: AliasBinding, username: string | null | undefi
   );
 }
 
-function parseBindingField(field: FieldView): AliasBinding | undefined {
-  if (field.name !== ALIAS_BINDING_FIELD_NAME || !field.value) {
+function parseBindingReference(value: string | null | undefined): AliasBinding | undefined {
+  if (!value) {
     return undefined;
   }
 
   try {
-    return aliasBindingFromReference(parse_alias_reference(field.value));
+    return aliasBindingFromReference(parse_alias_reference(value));
   } catch {
     return undefined;
   }
-}
-
-function isReservedAliasField(field: FieldView): boolean {
-  return field.name === ALIAS_BINDING_FIELD_NAME;
 }
 
 function aliasReference(binding: AliasBinding): AliasReference {
@@ -80,30 +71,26 @@ function aliasBindingFromReference(reference: AliasReference): AliasBinding | un
 }
 
 /**
- * Extract the reserved field after decryption. Reserved fields are always hidden from ordinary
- * custom-field consumers, including when their payload is malformed.
+ * Parse the first-class reference after decryption. The reference is never inferred from a
+ * username, and malformed payloads fail closed without touching unrelated custom fields.
  */
 export function hydrateAliasBinding(cipher: AliasBindableCipher, candidate?: unknown): void {
-  let binding = parseEmailAliasIdentity(candidate);
-  const visibleFields: FieldView[] = [];
-
-  for (const field of cipher.fields ?? []) {
-    if (isReservedAliasField(field)) {
-      binding ??= parseBindingField(field);
-    } else {
-      visibleFields.push(field);
-    }
-  }
-
-  cipher.fields = visibleFields;
+  const binding =
+    parseEmailAliasIdentity(candidate) ?? parseBindingReference(cipher.login?.aliasReference);
   if (
     cipher.type === CipherType.Login &&
     binding &&
     usernameMatches(binding, cipher.login?.username)
   ) {
     cipher.aliasBinding = binding;
+    if (cipher.login) {
+      cipher.login.aliasReference = serialize_alias_reference(aliasReference(binding));
+    }
   } else {
     delete cipher.aliasBinding;
+    if (cipher.login) {
+      cipher.login.aliasReference = undefined;
+    }
   }
 }
 
@@ -115,6 +102,9 @@ export function reconcileAliasBinding(cipher: AliasBindableCipher): void {
     !usernameMatches(cipher.aliasBinding, cipher.login?.username)
   ) {
     delete cipher.aliasBinding;
+    if (cipher.login) {
+      cipher.login.aliasReference = undefined;
+    }
   }
 }
 
@@ -135,39 +125,17 @@ export function bindGeneratedAlias(
       normalizeEmailAliasAddress(binding.address)
   ) {
     delete cipher.aliasBinding;
+    if (cipher.login) {
+      cipher.login.aliasReference = undefined;
+    }
     return undefined;
   }
 
   cipher.aliasBinding = binding;
-  return binding;
-}
-
-/**
- * Materialize the binding as exactly one reserved field immediately before SDK encryption.
- * The returned array never mutates the user-visible field collection.
- */
-export function fieldsWithAliasBinding(cipher: AliasBindableCipher): FieldView[] {
-  const fields = fieldsWithoutAliasReferences(cipher);
-  const binding = parseEmailAliasIdentity(cipher.aliasBinding);
-
-  if (
-    cipher.type !== CipherType.Login ||
-    !binding ||
-    !usernameMatches(binding, cipher.login?.username)
-  ) {
-    return fields;
+  if (cipher.login) {
+    cipher.login.aliasReference = serialize_alias_reference(aliasReference(binding));
   }
-
-  const bindingField = new FieldView();
-  bindingField.type = FieldType.Hidden;
-  bindingField.name = ALIAS_BINDING_FIELD_NAME;
-  bindingField.value = serialize_alias_reference(aliasReference(binding));
-  return [...fields, bindingField];
-}
-
-/** Remove all reserved generations from the user field path before SDK validation/persistence. */
-export function fieldsWithoutAliasReferences(cipher: AliasBindableCipher): FieldView[] {
-  return (cipher.fields ?? []).filter((field) => !isReservedAliasField(field));
+  return binding;
 }
 
 /** Let the canonical SDK validate and attach the reference to a decrypted SDK cipher view. */
@@ -181,6 +149,9 @@ export function bindAliasReferenceToSdkCipher(
     !binding ||
     !usernameMatches(binding, cipher.login?.username)
   ) {
+    if (sdkCipher.login) {
+      sdkCipher.login.aliasReference = undefined;
+    }
     return sdkCipher;
   }
 

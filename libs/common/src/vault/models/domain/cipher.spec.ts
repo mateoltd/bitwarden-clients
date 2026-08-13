@@ -173,6 +173,7 @@ describe("Cipher DTO", () => {
           ],
           username: "EncryptedString",
           password: "EncryptedString",
+          aliasReference: null,
           passwordRevisionDate: "2022-01-31T12:00:00.000Z",
           totp: "EncryptedString",
           autofillOnPageLoad: false,
@@ -1050,6 +1051,7 @@ describe("Cipher DTO", () => {
         login: {
           username: "EncryptedString" as SdkEncString,
           password: "EncryptedString" as SdkEncString,
+          aliasReference: undefined,
           passwordRevisionDate: "2022-01-31T12:00:00.000Z",
           uris: [
             {

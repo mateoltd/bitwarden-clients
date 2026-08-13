@@ -7,8 +7,6 @@ import { CipherType } from "../enums";
 import { Cipher } from "../models/domain/cipher";
 import { CipherView } from "../models/view/cipher.view";
 
-import { ALIAS_BINDING_FIELD_NAME } from "./alias-binding";
-
 const userId = "89d55fa7-395c-48a0-966a-3d412954082f";
 const alias = {
   version: 1 as const,
@@ -45,7 +43,7 @@ describe("alias binding SDK encryption", () => {
 
   afterAll(() => client.free());
 
-  it("encrypts the reserved field and recovers it in a second client view", async () => {
+  it("encrypts the first-class login member and recovers it in a second client view", async () => {
     const original = new CipherView();
     original.type = CipherType.Login;
     original.name = "Alias-bound account";
@@ -57,7 +55,7 @@ describe("alias binding SDK encryption", () => {
     const encrypted = Cipher.fromSdkCipher(encryption.cipher)!;
     const serializedVaultData = JSON.stringify(encrypted);
 
-    expect(serializedVaultData).not.toContain(ALIAS_BINDING_FIELD_NAME);
+    expect(encrypted.login?.aliasReference).toBeDefined();
     expect(serializedVaultData).not.toContain(alias.address);
     expect(serializedVaultData).not.toContain(alias.aliasId);
 
@@ -65,6 +63,7 @@ describe("alias binding SDK encryption", () => {
     const restored = CipherView.fromSdkCipherView(decryptedSdkView)!;
 
     expect(restored.login.username).toBe(alias.address);
+    expect(restored.login.aliasReference).toContain('"version":1');
     expect(restored.aliasBinding).toEqual(alias);
     expect(restored.fields).toEqual([]);
 

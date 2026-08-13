@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 3,
+  "aliasReferenceSchemaVersion": 1,
+  "releaseVersion": "0.2.0-alias-platform.3",
+  "source": {
+    "repository": "https://github.com/mateoltd/bitwarden-sdk-internal.git",
+    "publicBaseCommit": "4a08b5fe81c363169d36f582cc13c03b59d212d8",
+    "commit": "8e15f78d18a49c42f235c9698df794306754d6ac",
+    "upstreamBase": "fbd21679c1c3690cba424ad3dbb0ba662eb9863e"
+  },
+  "clientsIntegrationBase": {
+    "repository": "https://github.com/mateoltd/bitwarden-clients.git",
+    "commit": "cd1f5cb4456a27e4c75d2206c7993c7b2c1ed038"
+  },
+  "providerPin": {
+    "provider": "SimpleLogin",
+    "repository": "https://github.com/simple-login/app.git",
+    "commit": "dbc45fcce4e8e6b4fa615cc729ca95a67bf75266"
+  },
+  "artifacts": {
+    "typescriptWasm": {
+      "name": "@bitwarden/sdk-internal",
+      "version": "0.2.0-alias-platform.3",
+      "path": "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.3.tgz",
+      "bytes": 11122884,
+      "sha256": "d54dccaccbbe0808264db46c6dcffd662cc8c798dd3235e09aef7686712d98d4",
+      "npmIntegrity": "sha512-Pxr5OWuT3t8vqfnB2M8G+tHppi7zb8Wq3jqzcabm15I84/MvXkP4rZ8YCLQ5ISh8Pe114SPI9ervb2Eutb6wpQ=="
+    },
+    "swift": {
+      "name": "BitwardenSdk",
+      "version": "0.2.0-alias-platform.3",
+      "repository": "https://github.com/mateoltd/sdk-swift.git",
+      "packageCommit": "858d31ac18214e47c5264fc73da8c9885565bda0",
+      "artifactCommit": "f4904102b838d65b929d85eeab2f73c42614e793",
+      "binaryUrl": "https://raw.githubusercontent.com/mateoltd/sdk-swift/f4904102b838d65b929d85eeab2f73c42614e793/BitwardenFFI.xcframework.zip",
+      "bytes": 104154946,
+      "swiftPackageChecksum": "16eab95682836fc9382cdb8e3417911e510a4f379e38eef05c750e1ea0544fb7",
+      "fullSourceArchiveSha256": "790f9565225f6bec80b2fcb96f6d95acba4460470ea3e5efc179e68ffa6b44f6",
+      "architectures": {
+        "ios": ["arm64"],
+        "iosSimulator": ["arm64"]
+      }
+    }
+  },
+  "constraints": [
+    "Persist only SDK-created alias reference schema version 1 values.",
+    "Reject zero, malformed, version 2, and unknown future versions without migration or inference.",
+    "Keep the existing WASM initialization path and the shared encrypted schema as the sole contract.",
+    "Use the pinned provider commit for the reproducible real SimpleLogin lifecycle gate."
+  ]
+}

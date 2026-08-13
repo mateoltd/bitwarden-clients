@@ -206,7 +206,6 @@ describeIntegration("real SimpleLogin to Bitwarden encrypted alias binding", () 
 
       expect(serializedCreateRequest).not.toContain(generated.credential);
       expect(serializedCreateRequest).not.toContain(JSON.stringify(generated.metadata?.alias));
-      expect(serializedCreateRequest).not.toContain("bitwarden.alias.reference");
       expect(serializedCreateRequest).not.toContain(providerToken);
 
       const created = await vaultRequest(firstClient.accessToken, "/ciphers", {

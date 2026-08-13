@@ -3,8 +3,8 @@
 Version 1 is the first public email-alias schema. Browser, web, desktop, CLI, and shared
 generator/vault code must emit and accept only version 1 records.
 
-The encrypted login binding is the canonical SDK alias reference stored in the hidden
-`bitwarden.alias.reference` field. It contains only `version`, `provider`,
+The encrypted login binding is the canonical SDK alias reference stored in the first-class
+`login.aliasReference` member. It contains only `version`, `provider`,
 `providerInstance`, `connectionId`, `aliasId`, and the last observed `address`. The SDK creates,
 parses, serializes, and binds this reference. Client code does not infer a reference from a login
 address.

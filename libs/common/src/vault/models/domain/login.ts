@@ -16,6 +16,7 @@ export class Login extends Domain {
   uris?: LoginUri[];
   username?: EncString;
   password?: EncString;
+  aliasReference?: EncString;
   passwordRevisionDate?: Date;
   totp?: EncString;
   autofillOnPageLoad?: boolean;
@@ -32,6 +33,7 @@ export class Login extends Domain {
     this.autofillOnPageLoad = obj.autofillOnPageLoad;
     this.username = conditionalEncString(obj.username);
     this.password = conditionalEncString(obj.password);
+    this.aliasReference = conditionalEncString(obj.aliasReference);
     this.totp = conditionalEncString(obj.totp);
 
     if (obj.uris) {
@@ -51,7 +53,7 @@ export class Login extends Domain {
     const view = await this.decryptObj<Login, LoginView>(
       this,
       new LoginView(this),
-      ["username", "password", "totp"],
+      ["username", "password", "aliasReference", "totp"],
       encKey,
       `DomainType: Login; ${context}`,
     );
@@ -105,6 +107,7 @@ export class Login extends Domain {
     this.buildDataModel(this, l, {
       username: null,
       password: null,
+      aliasReference: null,
       totp: null,
     });
 
@@ -130,6 +133,7 @@ export class Login extends Domain {
     login.autofillOnPageLoad = obj.autofillOnPageLoad;
     login.username = encStringFrom(obj.username);
     login.password = encStringFrom(obj.password);
+    login.aliasReference = encStringFrom(obj.aliasReference);
     login.totp = encStringFrom(obj.totp);
     login.uris = obj.uris
       ?.map((uri: any) => LoginUri.fromJSON(uri))
@@ -152,6 +156,7 @@ export class Login extends Domain {
       uris: this.uris?.map((u) => u.toSdkLoginUri()),
       username: this.username?.toSdk(),
       password: this.password?.toSdk(),
+      aliasReference: this.aliasReference?.toSdk(),
       passwordRevisionDate: this.passwordRevisionDate?.toISOString(),
       totp: this.totp?.toSdk(),
       autofillOnPageLoad: this.autofillOnPageLoad ?? undefined,
@@ -174,6 +179,7 @@ export class Login extends Domain {
     login.autofillOnPageLoad = obj.autofillOnPageLoad;
     login.username = encStringFrom(obj.username);
     login.password = encStringFrom(obj.password);
+    login.aliasReference = encStringFrom(obj.aliasReference);
     login.totp = encStringFrom(obj.totp);
     login.uris =
       obj.uris

@@ -7,6 +7,7 @@ export class LoginData {
   uris?: LoginUriData[];
   username?: string;
   password?: string;
+  aliasReference?: string;
   passwordRevisionDate?: string;
   totp?: string;
   autofillOnPageLoad?: boolean;

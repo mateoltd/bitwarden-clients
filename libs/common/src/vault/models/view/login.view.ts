@@ -16,6 +16,8 @@ export class LoginView extends ItemView {
   username: string | undefined;
   @linkedFieldOption(LinkedId.Password, { sortPosition: 1 })
   password: string | undefined;
+  /** Canonical first-class reference persisted inside the encrypted login payload. */
+  aliasReference: string | undefined;
 
   passwordRevisionDate?: Date;
   totp: string | undefined;
@@ -121,6 +123,7 @@ export class LoginView extends ItemView {
 
     loginView.username = obj.username;
     loginView.password = obj.password;
+    loginView.aliasReference = obj.aliasReference;
     loginView.passwordRevisionDate =
       obj.passwordRevisionDate == null ? undefined : new Date(obj.passwordRevisionDate);
     loginView.totp = obj.totp;
@@ -144,6 +147,7 @@ export class LoginView extends ItemView {
     return {
       username: this.username || undefined,
       password: this.password || undefined,
+      aliasReference: this.aliasReference || undefined,
       passwordRevisionDate: this.passwordRevisionDate?.toISOString(),
       totp: this.hasTotp ? this.totp : undefined,
       autofillOnPageLoad: this.autofillOnPageLoad ?? undefined,
