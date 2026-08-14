@@ -99,11 +99,19 @@ jobs:
           cd "$RUNNER_TEMP/source"
           HUSKY=0 npm ci
           npm ci --prefix release/tooling
-      - name: Install browser runtime
+      - name: Resolve hosted browser runtime
         if: runner.os == 'Linux'
         run: |
-          cd "$RUNNER_TEMP/source"
-          npx playwright install --with-deps ${{ matrix.engine }}
+          if [[ "${{ matrix.engine }}" == "chromium" ]]; then
+            browser_path="$(command -v google-chrome)"
+            test -x "$browser_path"
+            echo "CHROMIUM_PATH=$browser_path" >> "$GITHUB_ENV"
+          else
+            browser_path="$(command -v firefox)"
+            test -x "$browser_path"
+            echo "FIREFOX_PATH=$browser_path" >> "$GITHUB_ENV"
+          fi
+          "$browser_path" --version
       - name: Build candidate
         run: |
           cd "$RUNNER_TEMP/source"
