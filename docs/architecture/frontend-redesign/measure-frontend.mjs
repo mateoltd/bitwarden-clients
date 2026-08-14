@@ -465,7 +465,7 @@ function themeInventory() {
     (file) =>
       (isProductionTypeScript(file) || file.endsWith(".html")) && !file.includes("/locales/"),
   );
-  const tokenSource = read("libs/components/src/tw-theme.css");
+  const tokenSource = read("libs/components/src/semantic-tokens.css");
   const tokenNames = new Set(tokenSource.match(/--color-[a-z0-9-]+/g) ?? []);
   const utilityFiles = productionMarkup.filter((file) =>
     /\btw-[a-z0-9-[\]]+/.test(sourceFor(file)),
@@ -754,7 +754,10 @@ function renderReport() {
     markdownTable(
       ["Theme measure", "Count"],
       [
-        ["Unique `--color-*` tokens in `libs/components/src/tw-theme.css`", theme.colorTokens],
+        [
+          "Unique `--color-*` tokens in `libs/components/src/semantic-tokens.css`",
+          theme.colorTokens,
+        ],
         ["Production TS/HTML files containing prefixed Tailwind utilities", theme.utilityFiles],
         ["Prefixed Tailwind utility references", theme.utilityReferences],
         ["`theme_light` / `theme_dark` references", theme.themeClassReferences],

@@ -8,6 +8,7 @@
   "files": [
     "./preview.tsx",
     "../libs/components/src/main.ts",
-    "../libs/components/src/polyfills.ts"
+    "../libs/components/src/polyfills.ts",
+    "../tests/ui-redesign/renderer-pilot/storybook/renderer-pilot.stories.ts"
   ]
 }

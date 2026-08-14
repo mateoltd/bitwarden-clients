@@ -1,0 +1,128 @@
+@import "../../../libs/components/src/semantic-tokens.css";
+
+#renderer-pilot-harness {
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: var(--color-bg-primary);
+  color: var(--color-fg-body);
+  font-family: var(--font-sans);
+  padding: 1.5rem;
+}
+
+#renderer-pilot-harness *,
+#renderer-pilot-harness *::before,
+#renderer-pilot-harness *::after,
+.renderer-pilot-surface,
+.renderer-pilot-surface *,
+.renderer-pilot-surface *::before,
+.renderer-pilot-surface *::after {
+  box-sizing: border-box;
+}
+
+#renderer-pilot-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  max-width: 40rem;
+  margin: 0 auto 2rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border-base);
+  border-radius: 0.25rem;
+  background: var(--color-bg-secondary);
+}
+
+#renderer-pilot-controls label {
+  color: var(--color-fg-body);
+  font-weight: 600;
+}
+
+#renderer-pilot-controls select {
+  min-height: 2.5rem;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.25rem;
+  background: var(--color-bg-primary);
+  color: var(--color-fg-body);
+  font: inherit;
+}
+
+.renderer-pilot-surface {
+  display: flex;
+  max-width: 32rem;
+  margin-inline: auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: var(--color-fg-body);
+  font-family: var(--font-sans);
+  text-align: center;
+}
+
+.renderer-pilot-surface h1,
+.renderer-pilot-surface p {
+  margin: 0;
+}
+
+.renderer-pilot-surface h1 {
+  color: var(--color-fg-heading);
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+
+.renderer-pilot-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.renderer-pilot-surface button {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--color-border-brand);
+  border-radius: 0.25rem;
+  background: var(--color-bg-brand);
+  color: var(--color-fg-contrast);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.renderer-pilot-surface button[data-action="cancel"] {
+  border-color: var(--color-border-base);
+  background: var(--color-bg-primary);
+  color: var(--color-fg-body);
+}
+
+.renderer-pilot-surface button:disabled {
+  border-color: var(--color-border-base);
+  background: var(--color-bg-inactive);
+  color: var(--color-fg-inactive);
+  cursor: default;
+}
+
+.renderer-pilot-surface button:focus-visible,
+#renderer-pilot-controls select:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.renderer-pilot-status {
+  min-height: 1.5rem;
+}
+
+.renderer-pilot-error {
+  color: var(--color-fg-danger);
+}
+
+@media (max-width: 24rem) {
+  #renderer-pilot-harness {
+    padding: 1rem;
+  }
+
+  #renderer-pilot-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

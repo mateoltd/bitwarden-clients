@@ -36,6 +36,7 @@ const config: StorybookConfig = {
     "../bitwarden_license/bit-browser/src/**/*.mdx",
     "../bitwarden_license/bit-browser/src/**/*.stories.@(js|jsx|ts|tsx)",
     "../libs/angular/src/**/*.stories.@(js|jsx|ts|tsx)",
+    "../tests/ui-redesign/renderer-pilot/storybook/**/*.stories.@(js|jsx|ts|tsx)",
   ],
   addons: [
     getAbsolutePath("@storybook/addon-links"),
