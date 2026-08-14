@@ -37,6 +37,7 @@ jobs:
           repository: mateoltd/simplelogin-owned-provider
           ref: e157b6804f7b1b60e149207cebe2d414f6e4a73f
           path: provider
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
@@ -49,6 +50,7 @@ jobs:
         run: |
           test "$(git -C provider rev-parse HEAD)" = "$PROVIDER_OPERATIONS_COMMIT"
           test "$(tr -d '[:space:]' < provider/ops/owned-provider/UPSTREAM_COMMIT)" = "$PROVIDER_UPSTREAM_COMMIT"
+          git -C provider merge-base --is-ancestor "$PROVIDER_UPSTREAM_COMMIT" "$PROVIDER_OPERATIONS_COMMIT"
       - name: Prepare OSS client source
         run: |
           scripts/release/export-oss-source.sh "$RUNNER_TEMP/source"
