@@ -428,6 +428,7 @@ This dossier intentionally leaves these choices unresolved:
 
 - [Measured inventory report](./measured-inventory.md)
 - [Inventory script](./measure-frontend.mjs)
+- [Renderer pilot evidence](./renderer-pilot-evidence.md)
 - [Angular incremental custom-element bridge](https://angular.dev/guide/elements)
 - [React incremental adoption](https://react.dev/learn/add-react-to-an-existing-project)
 - [Lit custom elements](https://lit.dev/docs/components/overview/)

@@ -1,0 +1,15 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "emitDecoratorMetadata": false,
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "strict": true,
+    "types": ["jest", "node", "react", "react-dom"]
+  },
+  "include": ["./**/*.ts", "./**/*.tsx", "./styles.d.ts"],
+  "exclude": ["./tooling/**/*.mjs"]
+}

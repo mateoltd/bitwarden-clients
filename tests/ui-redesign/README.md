@@ -30,6 +30,25 @@ port 6007. Existing servers on those ports are reused outside CI.
 Failure traces are written to `test-results`; the CI HTML report is written to `playwright-report`.
 Both directories are ignored.
 
+## Renderer pilot
+
+The non-production renderer comparison has a separate deterministic harness:
+
+```sh
+npm run typecheck:ui-redesign-pilot
+npm run test:ui-redesign-pilot:unit
+npm run test:ui-redesign-pilot
+npm run check:ui-redesign-pilot-boundaries
+npm run measure:ui-redesign-pilot:bundles
+npm run measure:ui-redesign-pilot:runtime
+npm run measure:ui-redesign-pilot:maintenance
+```
+
+Run `npm run build:ui-redesign-pilot` and
+`node tests/ui-redesign/renderer-pilot/tooling/serve.mjs` to inspect Angular, React, and Lit at
+`http://127.0.0.1:6010`. The [evidence report](../../docs/architecture/frontend-redesign/renderer-pilot-evidence.md)
+records scope, measurements, exclusions, and go/stop criteria.
+
 ## Update screenshot baselines
 
 Only update snapshots after intentionally changing an in-scope rendered surface:
@@ -62,6 +81,11 @@ changed and the replacement assertion proves the new behavior.
 
 The stable data belongs in the Storybook stories so visual inspection, component documentation, the
 existing Storybook axe runner, Chromatic, and this suite observe the same fixture.
+
+The renderer pilot uses the unchanged `Component Library/No Items` story as its light/dark visual
+baseline. Angular, React, and Lit pilots intentionally have no visual snapshots: they compare
+behavior, semantics, tokens, localization, accessibility, cost, and maintenance without proposing a
+new visual design.
 
 ## Accessibility enforcement
 

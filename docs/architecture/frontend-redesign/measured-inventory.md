@@ -172,12 +172,12 @@ The two manifest templates are transformed per Chrome, Edge, Firefox, Opera, and
 
 The three English catalogs contain **5077 distinct keys**; **1326 keys** exist in all three. Key overlap supports a shared translation contract, but the bundles are not interchangeable.
 
-| Theme measure                                                   | Count |
-| --------------------------------------------------------------- | ----- |
-| Unique `--color-*` tokens in `libs/components/src/tw-theme.css` | 282   |
-| Production TS/HTML files containing prefixed Tailwind utilities | 695   |
-| Prefixed Tailwind utility references                            | 9565  |
-| `theme_light` / `theme_dark` references                         | 33    |
+| Theme measure                                                          | Count |
+| ---------------------------------------------------------------------- | ----- |
+| Unique `--color-*` tokens in `libs/components/src/semantic-tokens.css` | 282   |
+| Production TS/HTML files containing prefixed Tailwind utilities        | 695   |
+| Prefixed Tailwind utility references                                   | 9565  |
+| `theme_light` / `theme_dark` references                                | 33    |
 
 The shared Tailwind base scans shared feature libraries, while app configs add web, browser, desktop, and commercial overlay paths. Theme selection is persisted through the shared state provider and applied as `theme_light` or `theme_dark`; the web app also applies a pre-bootstrap theme to avoid a flash.
 

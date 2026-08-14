@@ -9,8 +9,13 @@ const viewports = [
   { name: "narrow", width: 390, height: 844 },
 ] as const;
 
-async function openStory(page: Page, storyId: string, storybook = MAIN_STORYBOOK) {
-  await page.goto(`${storybook}/iframe.html?id=${storyId}&viewMode=story&globals=theme:light`);
+async function openStory(
+  page: Page,
+  storyId: string,
+  storybook = MAIN_STORYBOOK,
+  theme: "light" | "dark" = "light",
+) {
+  await page.goto(`${storybook}/iframe.html?id=${storyId}&viewMode=story&globals=theme:${theme}`);
   await page.locator("#storybook-root").waitFor({ state: "visible" });
   await page.waitForFunction(() => document.fonts.status === "loaded");
   await page.addStyleTag({
@@ -25,6 +30,18 @@ async function openStory(page: Page, storyId: string, storybook = MAIN_STORYBOOK
     `,
   });
   await injectAxe(page);
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`unchanged No Items leaf in the ${theme} theme`, async ({ page }) => {
+    await openStory(page, "component-library-no-items--default", MAIN_STORYBOOK, theme);
+
+    await expect(page.getByText("No items found", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "New item" })).toBeVisible();
+
+    await expectAccessible(page);
+    await expectBaseline(page, `no-items-${theme}`);
+  });
 }
 
 async function expectAccessible(page: Page) {
