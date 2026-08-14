@@ -63,14 +63,21 @@ jobs:
           sudo apt-get update
           audio_package=libasound2
           if apt-cache show libasound2t64 >/dev/null 2>&1; then audio_package=libasound2t64; fi
-          sudo apt-get install --yes pkg-config libxss-dev "$audio_package" xvfb
+          sudo apt-get install --yes acl pkg-config libxss-dev "$audio_package" xvfb
       - name: Start pinned real provider
         run: |
           provider/ops/owned-provider/bin/owned-provider init
-          provider/ops/owned-provider/bin/owned-provider up
           provider_password="$(tr -d '\r\n' < provider/.owned-provider/secrets/admin_password)"
           echo "::add-mask::$provider_password"
           echo "SIMPLELOGIN_PASSWORD=$provider_password" >> "$GITHUB_ENV"
+          restore_secret_acls() {
+            find provider/.owned-provider/secrets -type f -exec setfacl -x u:65532 {} +
+          }
+          trap restore_secret_acls EXIT
+          find provider/.owned-provider/secrets -type f -exec setfacl -m u:65532:r-- {} +
+          provider/ops/owned-provider/bin/owned-provider up
+          restore_secret_acls
+          trap - EXIT
       - name: Start pinned ephemeral vault
         run: |
           mkdir -p "$RUNNER_TEMP/vault-data"
