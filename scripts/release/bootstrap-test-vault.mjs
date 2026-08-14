@@ -8,7 +8,10 @@ const password = process.env.BITWARDEN_PASSWORD;
 assert.ok(email, "BITWARDEN_EMAIL is required");
 assert.ok(password, "BITWARDEN_PASSWORD is required");
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  executablePath: process.env.CHROMIUM_PATH || undefined,
+  headless: true,
+});
 try {
   const page = await browser.newPage({ ignoreHTTPSErrors: true });
   page.setDefaultTimeout(30_000);
