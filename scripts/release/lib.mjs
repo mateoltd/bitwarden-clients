@@ -28,7 +28,17 @@ export function sha512Integrity(file) {
 }
 
 export function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  let executable = command;
+  let executableArgs = args;
+  if ((command === "npm" || command === "npx") && process.env.npm_execpath) {
+    executable = process.execPath;
+    const cli =
+      command === "npm"
+        ? process.env.npm_execpath
+        : path.join(path.dirname(process.env.npm_execpath), "npx-cli.js");
+    executableArgs = [cli, ...args];
+  }
+  const result = spawnSync(executable, executableArgs, {
     cwd: options.cwd ?? repositoryRoot,
     env: { ...process.env, ...options.env },
     encoding: "utf8",
@@ -37,7 +47,14 @@ export function run(command, args, options = {}) {
   });
   if (result.status !== 0) {
     const detail = options.capture ? `\n${result.stdout ?? ""}${result.stderr ?? ""}` : "";
-    throw new Error(`${command} ${args.join(" ")} failed with status ${result.status}${detail}`);
+    const cause = result.error
+      ? `: ${result.error.message}`
+      : result.signal
+        ? ` (${result.signal})`
+        : "";
+    throw new Error(
+      `${command} ${args.join(" ")} failed with status ${result.status}${cause}${detail}`,
+    );
   }
   return result.stdout?.trim() ?? "";
 }

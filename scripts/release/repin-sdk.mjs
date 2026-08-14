@@ -22,13 +22,21 @@ const candidateDirectory = path.resolve(
 );
 const sourceCommit = requireString(args["source-commit"], "--source-commit is required");
 assert(/^[0-9a-f]{40}$/.test(sourceCommit), "--source-commit must be a full lowercase Git commit");
-const functionalCleanupCommit = requireString(
-  args["functional-commit"],
-  "--functional-commit is required",
+const workflowRunId = Number(requireString(args["workflow-run"], "--workflow-run is required"));
+const artifactId = Number(requireString(args["artifact-id"], "--artifact-id is required"));
+const artifactName = requireString(args["artifact-name"], "--artifact-name is required");
+const artifactZipSha256 = requireString(
+  args["artifact-zip-sha256"],
+  "--artifact-zip-sha256 is required",
 );
 assert(
-  /^[0-9a-f]{40}$/.test(functionalCleanupCommit),
-  "--functional-commit must be a full lowercase Git commit",
+  Number.isSafeInteger(workflowRunId) && Number.isSafeInteger(artifactId),
+  "workflow and artifact IDs must be integers",
+);
+assert(/^[0-9a-f]{64}$/.test(artifactZipSha256), "artifact ZIP SHA-256 is invalid");
+assert(
+  artifactName === `alias-sdk-release-candidate-${sourceCommit}`,
+  "artifact name does not match the source commit",
 );
 
 function resolveCandidate(relative) {
@@ -179,9 +187,12 @@ if (args.check) {
     candidateChecksumsSha256 === sdk.candidateChecksumsSha256,
     "Checked candidate checksum index differs from the release manifest",
   );
+  assert(workflowRunId === sdk.workflow.runId, "Checked workflow run differs");
+  assert(artifactId === sdk.workflow.artifactId, "Checked artifact ID differs");
+  assert(artifactName === sdk.workflow.artifactName, "Checked artifact name differs");
   assert(
-    functionalCleanupCommit === sdk.functionalCleanupCommit,
-    "Checked functional cleanup commit differs from the release manifest",
+    artifactZipSha256 === sdk.workflow.artifactZipSha256,
+    "Checked artifact ZIP digest differs",
   );
   run(process.execPath, ["scripts/release/verify-sdk.mjs"]);
   run(process.execPath, ["scripts/release/scope-audit.mjs"]);
@@ -213,12 +224,23 @@ Object.assign(manifest.canonicalSdk, {
   sha256,
   integrity,
   sourceCommit,
-  functionalCleanupCommit,
+  aliasReferenceSchemaVersion: provenance.aliasReferenceSchemaVersion,
+  workflow: {
+    runId: workflowRunId,
+    url: `${manifest.canonicalSdk.sourceRepository.replace(/\.git$/, "")}/actions/runs/${workflowRunId}`,
+    conclusion: "success",
+    artifactId,
+    artifactName,
+    artifactZipSha256,
+  },
 });
 writeJson(path.join(repositoryRoot, "release/alias-client-release.json"), manifest);
 
 const rootPackage = readJson(path.join(repositoryRoot, "package.json"));
-rootPackage.dependencies[embeddedPackage.name] = `file:${relativeArtifact}`;
+const installedPackageNames = [embeddedPackage.name, "@bitwarden/alias-sdk-internal"];
+for (const packageName of installedPackageNames) {
+  rootPackage.dependencies[packageName] = `file:${relativeArtifact}`;
+}
 writeJson(path.join(repositoryRoot, "package.json"), rootPackage);
 
 fs.writeFileSync(
@@ -228,8 +250,13 @@ fs.writeFileSync(
     "",
     `- Package: \`${embeddedPackage.name}\``,
     `- Source repository: ${manifest.canonicalSdk.sourceRepository}`,
+    `- Public ref: \`${manifest.canonicalSdk.publicRef}\``,
     `- Source commit: \`${sourceCommit}\``,
-    `- Functional cleanup commit: \`${functionalCleanupCommit}\``,
+    `- Alias reference schema: \`${provenance.aliasReferenceSchemaVersion}\``,
+    `- Workflow run: \`${workflowRunId}\``,
+    `- Workflow URL: ${manifest.canonicalSdk.workflow.url}`,
+    `- Artifact: \`${artifactName}\` (\`${artifactId}\`)`,
+    `- Artifact ZIP SHA-256: \`${artifactZipSha256}\``,
     `- SHA-256: \`${sha256}\``,
     `- npm integrity: \`${integrity}\``,
     `- Published handoff manifest: \`${relativeProvenance}\``,
@@ -247,6 +274,16 @@ assert(
   npmVersion === manifest.toolchains.npm,
   `npm ${manifest.toolchains.npm} is required; found ${npmVersion}`,
 );
+
+// npm retains the previous integrity when a local tarball is replaced without
+// changing its version or path. Remove only this package's generated lock entry
+// so the exact candidate bytes are re-read during lockfile regeneration.
+const lockPath = path.join(repositoryRoot, "package-lock.json");
+const lock = readJson(lockPath);
+for (const packageName of installedPackageNames) {
+  delete lock.packages?.[`node_modules/${packageName}`];
+}
+writeJson(lockPath, lock);
 run("npm", ["install", "--package-lock-only", "--ignore-scripts"]);
 
 for (const oldPath of [

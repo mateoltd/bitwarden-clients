@@ -1,7 +1,9 @@
 {
   "schemaVersion": 2,
-  "sourceCommit": "ff60528b2f899baec1cea72fd8efbdc509fbab4e",
-  "releaseVersion": "0.2.0-alias-platform.1",
+  "aliasReferenceSchemaVersion": 1,
+  "sourceCommit": "4a08b5fe81c363169d36f582cc13c03b59d212d8",
+  "releaseVersion": "0.2.0-alias-platform.2",
+  "integrationBase": "fbd21679c1c3690cba424ad3dbb0ba662eb9863e",
   "upstreamBase": "fbd21679c1c3690cba424ad3dbb0ba662eb9863e",
   "providerPin": {
     "provider": "SimpleLogin",
@@ -36,49 +38,53 @@
   "packages": {
     "typescriptWasm": {
       "name": "@bitwarden/sdk-internal",
-      "version": "0.2.0-alias-platform.1",
+      "version": "0.2.0-alias-platform.2",
+      "aliasReferenceSchemaVersion": 1,
       "format": "npm-tarball",
       "artifact": {
-        "path": "alias-sdk-typescript/bitwarden-sdk-internal-0.2.0-alias-platform.1.tgz",
-        "bytes": 11124392,
-        "sha256": "513fc09282335910ea50dfcdd46608e89b81469763f668f4f0ea4ad056e5aa97"
+        "path": "alias-sdk-typescript/bitwarden-sdk-internal-0.2.0-alias-platform.2.tgz",
+        "bytes": 11124382,
+        "sha256": "bc9106926f418fbc139e4bb29031e2d27cf59e503abcd08455cc29ea8f79af47"
       }
     },
     "swift": {
       "name": "BitwardenSdk",
-      "version": "0.2.0-alias-platform.1",
+      "version": "0.2.0-alias-platform.2",
+      "aliasReferenceSchemaVersion": 1,
       "format": "swift-package-tarball",
       "artifact": {
-        "path": "alias-sdk-swift/bitwarden-alias-sdk-swift-0.2.0-alias-platform.1.tar.gz",
-        "bytes": 164744607,
-        "sha256": "130d0f2dbaf4746773c3b6a391cd0b29be6e4595adef035e2985e192b1a8bd81"
+        "path": "alias-sdk-swift/bitwarden-alias-sdk-swift-0.2.0-alias-platform.2.tar.gz",
+        "bytes": 164744091,
+        "sha256": "542203d00aa54ba10f4038d04112dd077150ebeabfc43b408fcc75bd684e9107"
       }
     },
     "kotlinJvm": {
       "name": "bitwarden-alias-sdk-kotlin-host",
-      "version": "0.2.0-alias-platform.1",
+      "version": "0.2.0-alias-platform.2",
+      "aliasReferenceSchemaVersion": 1,
       "format": "jar-with-host-native-library",
       "artifact": {
-        "path": "alias-sdk-kotlin/bitwarden-alias-sdk-kotlin-host-0.2.0-alias-platform.1.jar",
-        "bytes": 6479515,
-        "sha256": "72a97a9102d6ffb9db5efcc5e787d34df01edaa5941f63f4831f6a8191c159ae"
+        "path": "alias-sdk-kotlin/bitwarden-alias-sdk-kotlin-host-0.2.0-alias-platform.2.jar",
+        "bytes": 6479516,
+        "sha256": "6afadb0471f670a4660ae5e7c04a2f7fc864192f0d1a5e30de45d6e80e87e6cf"
       },
       "supportingArtifacts": [
         {
           "path": "alias-sdk-kotlin/libbitwarden_uniffi.so",
           "bytes": 25841656,
-          "sha256": "efb188495f3166c4215b8e2e9b77ea592f95313696491e67bcbd8e9deea7d9ca"
+          "sha256": "51daba82c6b2a243854ae2efc55f976741302e23b6c33fb99b6b5ac7c5a05a8e"
         }
       ]
     },
     "android": {
       "name": "com.bitwarden.sdk",
-      "version": "0.2.0-alias-platform.1",
+      "version": "0.2.0-alias-platform.2",
+      "aliasReferenceSchemaVersion": 1,
       "format": "aar",
       "artifact": {
-        "path": "alias-sdk-android/bitwarden-alias-sdk-android-0.2.0-alias-platform.1.aar",
-        "bytes": 39605293,
-        "sha256": "fa1fb6776910c416e78f2b6da2249c826af9a30420a5719918bf9adf3185904d"
+        "path": "alias-sdk-android/bitwarden-alias-sdk-android-0.2.0-alias-platform.2.aar",
+        "bytes": 39604799,
+        "sha256": "d2ab7d35105adaadeb8cb9c3fb4d59a28a43506ba4e9f11dbb2fc69b948785e2"
       }
     }
   },
@@ -129,7 +135,7 @@
         "kotlinJvm",
         "android"
       ],
-      "instruction": "Persist only current-schema alias references created and parsed by the SDK; reject unsupported schemas and do not infer bindings from usernames or addresses."
+      "instruction": "Persist only alias reference schema version 1 values created and parsed by the SDK. Reject missing, zero, malformed, version 2, and unknown future versions; do not migrate them or infer bindings from usernames or addresses."
     },
     {
       "id": "provider-pin",
@@ -144,89 +150,109 @@
   ],
   "artifacts": [
     {
+      "path": "alias-sdk-android/ALIAS_REFERENCE_SCHEMA_VERSION",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
       "path": "alias-sdk-android/BUILD-ENVIRONMENT.txt",
       "bytes": 317,
-      "sha256": "d82a100f72e6b18092ee4f2cc2435768252de8dc5f8051eab09cdb209f80f2ae"
+      "sha256": "ff022f0de2b6536259f0ec02edd952edd6d3206d02ef0c3bba130d0eef7fc63e"
     },
     {
       "path": "alias-sdk-android/PACKAGE_VERSION",
       "bytes": 23,
-      "sha256": "b293ce0a00446728a5f8e88ddc35c16be1e1a78093d600249ef558c4105c83d1"
+      "sha256": "509da8f19192bcc8509e71a58e7d88797b1262b0f226e64b5fae9b626003eacc"
     },
     {
       "path": "alias-sdk-android/VERSION",
       "bytes": 41,
-      "sha256": "eca74b799f6664f506fc2b48b8987d321b04b8406fe648678b1416f0bdcc9132"
+      "sha256": "894892b0b22af7952043f9a9d855f5bf930880106a0b604ea23ac1748f193d36"
     },
     {
-      "path": "alias-sdk-android/bitwarden-alias-sdk-android-0.2.0-alias-platform.1.aar",
-      "bytes": 39605293,
-      "sha256": "fa1fb6776910c416e78f2b6da2249c826af9a30420a5719918bf9adf3185904d"
+      "path": "alias-sdk-android/bitwarden-alias-sdk-android-0.2.0-alias-platform.2.aar",
+      "bytes": 39604799,
+      "sha256": "d2ab7d35105adaadeb8cb9c3fb4d59a28a43506ba4e9f11dbb2fc69b948785e2"
+    },
+    {
+      "path": "alias-sdk-kotlin/ALIAS_REFERENCE_SCHEMA_VERSION",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
     },
     {
       "path": "alias-sdk-kotlin/BUILD-ENVIRONMENT.txt",
       "bytes": 311,
-      "sha256": "8be320fb49e12faa3a5ddabd97b2133610b2fc87cf2d4ea9916c8d28dbaa05c5"
+      "sha256": "e47faaa3dda16463306a9900f02730372fa291db15d5dc1265425d8557a93171"
     },
     {
       "path": "alias-sdk-kotlin/PACKAGE_VERSION",
       "bytes": 23,
-      "sha256": "b293ce0a00446728a5f8e88ddc35c16be1e1a78093d600249ef558c4105c83d1"
+      "sha256": "509da8f19192bcc8509e71a58e7d88797b1262b0f226e64b5fae9b626003eacc"
     },
     {
       "path": "alias-sdk-kotlin/VERSION",
       "bytes": 41,
-      "sha256": "eca74b799f6664f506fc2b48b8987d321b04b8406fe648678b1416f0bdcc9132"
+      "sha256": "894892b0b22af7952043f9a9d855f5bf930880106a0b604ea23ac1748f193d36"
     },
     {
-      "path": "alias-sdk-kotlin/bitwarden-alias-sdk-kotlin-host-0.2.0-alias-platform.1.jar",
-      "bytes": 6479515,
-      "sha256": "72a97a9102d6ffb9db5efcc5e787d34df01edaa5941f63f4831f6a8191c159ae"
+      "path": "alias-sdk-kotlin/bitwarden-alias-sdk-kotlin-host-0.2.0-alias-platform.2.jar",
+      "bytes": 6479516,
+      "sha256": "6afadb0471f670a4660ae5e7c04a2f7fc864192f0d1a5e30de45d6e80e87e6cf"
     },
     {
       "path": "alias-sdk-kotlin/libbitwarden_uniffi.so",
       "bytes": 25841656,
-      "sha256": "efb188495f3166c4215b8e2e9b77ea592f95313696491e67bcbd8e9deea7d9ca"
+      "sha256": "51daba82c6b2a243854ae2efc55f976741302e23b6c33fb99b6b5ac7c5a05a8e"
+    },
+    {
+      "path": "alias-sdk-swift/ALIAS_REFERENCE_SCHEMA_VERSION",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
     },
     {
       "path": "alias-sdk-swift/BUILD-ENVIRONMENT.txt",
       "bytes": 255,
-      "sha256": "efdece257f71125c300a570866f0e94d1c4ea6c021e748cbb2ea3f9cc8a0d24b"
+      "sha256": "2cfe98e686c822c97eb59b4d34970b2fbf919ad97942a1408b4b8b6a65b58c93"
     },
     {
       "path": "alias-sdk-swift/PACKAGE_VERSION",
       "bytes": 23,
-      "sha256": "b293ce0a00446728a5f8e88ddc35c16be1e1a78093d600249ef558c4105c83d1"
+      "sha256": "509da8f19192bcc8509e71a58e7d88797b1262b0f226e64b5fae9b626003eacc"
     },
     {
       "path": "alias-sdk-swift/VERSION",
       "bytes": 41,
-      "sha256": "eca74b799f6664f506fc2b48b8987d321b04b8406fe648678b1416f0bdcc9132"
+      "sha256": "894892b0b22af7952043f9a9d855f5bf930880106a0b604ea23ac1748f193d36"
     },
     {
-      "path": "alias-sdk-swift/bitwarden-alias-sdk-swift-0.2.0-alias-platform.1.tar.gz",
-      "bytes": 164744607,
-      "sha256": "130d0f2dbaf4746773c3b6a391cd0b29be6e4595adef035e2985e192b1a8bd81"
+      "path": "alias-sdk-swift/bitwarden-alias-sdk-swift-0.2.0-alias-platform.2.tar.gz",
+      "bytes": 164744091,
+      "sha256": "542203d00aa54ba10f4038d04112dd077150ebeabfc43b408fcc75bd684e9107"
+    },
+    {
+      "path": "alias-sdk-typescript/ALIAS_REFERENCE_SCHEMA_VERSION",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
     },
     {
       "path": "alias-sdk-typescript/BUILD-ENVIRONMENT.txt",
       "bytes": 180,
-      "sha256": "9690451c45e105bbc60366299e5a499111187ec8b8aad7f74575c4e53bd6164c"
+      "sha256": "3e2855d9d38968721caed7d2cba92e89b64cb4fa81f3ec43002a01021f99df0e"
     },
     {
       "path": "alias-sdk-typescript/PACKAGE_VERSION",
       "bytes": 23,
-      "sha256": "b293ce0a00446728a5f8e88ddc35c16be1e1a78093d600249ef558c4105c83d1"
+      "sha256": "509da8f19192bcc8509e71a58e7d88797b1262b0f226e64b5fae9b626003eacc"
     },
     {
       "path": "alias-sdk-typescript/VERSION",
       "bytes": 41,
-      "sha256": "eca74b799f6664f506fc2b48b8987d321b04b8406fe648678b1416f0bdcc9132"
+      "sha256": "894892b0b22af7952043f9a9d855f5bf930880106a0b604ea23ac1748f193d36"
     },
     {
-      "path": "alias-sdk-typescript/bitwarden-sdk-internal-0.2.0-alias-platform.1.tgz",
-      "bytes": 11124392,
-      "sha256": "513fc09282335910ea50dfcdd46608e89b81469763f668f4f0ea4ad056e5aa97"
+      "path": "alias-sdk-typescript/bitwarden-sdk-internal-0.2.0-alias-platform.2.tgz",
+      "bytes": 11124382,
+      "sha256": "bc9106926f418fbc139e4bb29031e2d27cf59e503abcd08455cc29ea8f79af47"
     }
   ]
 }

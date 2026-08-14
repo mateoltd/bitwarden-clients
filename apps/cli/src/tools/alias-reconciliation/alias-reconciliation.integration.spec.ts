@@ -281,7 +281,24 @@ class RealVaultCipherAdapter implements Pick<
   }
 }
 
-describeIntegration("real current-schema alias cross-device convergence", () => {
+async function removeBitwardenTestAliasConnections(profile: AuthenticatedProfile): Promise<void> {
+  const adapter = new RealVaultCipherAdapter(profile);
+  const ids = (await adapter.fullSync())
+    .filter(isAliasConnectionCipher)
+    .map((cipher) => cipher.id)
+    .filter((id): id is string => id !== undefined);
+  for (let index = 0; index < ids.length; index += 500) {
+    const deleted = await vaultRequest(profile.accessToken, "/ciphers", {
+      method: "DELETE",
+      body: JSON.stringify({ ids: ids.slice(index, index + 500) }),
+    });
+    if (deleted.response.status !== 200) {
+      throw new Error(`Bitwarden alias carrier cleanup failed (${deleted.response.status})`);
+    }
+  }
+}
+
+describeIntegration("real schema-v1 alias cross-device convergence", () => {
   jest.setTimeout(1_800_000);
 
   const simpleLoginBaseUrl = process.env["SIMPLELOGIN_BASE_URL"] ?? "http://127.0.0.1:32769";
@@ -336,6 +353,7 @@ describeIntegration("real current-schema alias cross-device convergence", () => 
       );
       expect(new Set(profiles.map((profile) => profile.directory)).size).toBe(3);
       expect(new Set(profiles.map((profile) => profile.userId)).size).toBe(1);
+      await removeBitwardenTestAliasConnections(profiles[0]);
 
       const fixtureViews = Array.from({ length: fixtureSize }, (_, index) => {
         const view = new CipherView();
@@ -489,7 +507,7 @@ describeIntegration("real current-schema alias cross-device convergence", () => 
       let offline = await locals[0].load();
       offline = appendAliasSyncEvent(offline, {
         kind: "reference-set",
-        cipherId: "offline-current-schema-reference",
+        cipherId: "offline-schema-v1-reference",
         expectedAliasKey: null,
         alias: primary.identity,
       });
@@ -531,7 +549,7 @@ describeIntegration("real current-schema alias cross-device convergence", () => 
       );
       expect(projections[0]).toEqual(projections[1]);
       expect(projections[1]).toEqual(projections[2]);
-      expect(projections[0].references["offline-current-schema-reference"].alias).toEqual(
+      expect(projections[0].references["offline-schema-v1-reference"].alias).toEqual(
         primary.identity,
       );
       expect(projections[0].conflicts).toEqual(
@@ -559,7 +577,7 @@ describeIntegration("real current-schema alias cross-device convergence", () => 
         await stores[profile].load();
       }
 
-      // Normal encrypted export/import restoration of one current-schema carrier.
+      // Normal encrypted export/import restoration of one schema-v1 carrier.
       phase = "encrypted export/import restoration";
       const profileZeroViews = await adapters[0].fullSync();
       phase = "encrypted export before backup";

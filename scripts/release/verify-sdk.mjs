@@ -60,22 +60,39 @@ const provenance = readJson(provenanceFile);
 assert(provenance.schemaVersion === 2, "Unsupported SDK handoff manifest schema");
 assert(provenance.sourceCommit === sdk.sourceCommit, "SDK provenance source commit differs");
 assert(
-  /^[0-9a-f]{40}$/.test(sdk.functionalCleanupCommit),
-  "SDK functional cleanup commit is invalid",
+  provenance.aliasReferenceSchemaVersion === sdk.aliasReferenceSchemaVersion &&
+    sdk.aliasReferenceSchemaVersion === 1,
+  "SDK alias reference schema is not public v1",
 );
 assert(provenance.releaseVersion === sdk.version, "SDK provenance release version differs");
 const packageRecord = provenance.packages?.typescriptWasm;
 assert(packageRecord?.name === sdk.package, "SDK provenance package name differs");
 assert(packageRecord?.version === sdk.version, "SDK provenance package version differs");
+assert(
+  packageRecord?.aliasReferenceSchemaVersion === sdk.aliasReferenceSchemaVersion,
+  "SDK package alias reference schema differs",
+);
 assert(packageRecord?.format === "npm-tarball", "SDK provenance package format differs");
 assert(packageRecord?.artifact?.sha256 === sdk.sha256, "SDK provenance package digest differs");
 assert(
   packageRecord?.artifact?.bytes === fs.statSync(artifact).size,
   "SDK provenance package size differs",
 );
+const checksumLines = fs.readFileSync(candidateChecksumsFile, "utf8").trim().split("\n");
+const checksums = new Map(
+  checksumLines.map((line) => {
+    const match = /^([0-9a-f]{64})  (.+)$/.exec(line);
+    assert(match, `Invalid SDK checksum line: ${line}`);
+    return [match[2], match[1]];
+  }),
+);
+assert(checksums.size === provenance.artifacts.length, "SDK artifact inventories differ");
+for (const entry of provenance.artifacts) {
+  assert(checksums.get(entry.path) === entry.sha256, `SDK checksum differs: ${entry.path}`);
+}
 const checksumLine = `${sdk.sha256}  ${packageRecord.artifact.path}`;
 assert(
-  fs.readFileSync(candidateChecksumsFile, "utf8").split("\n").includes(checksumLine),
+  checksumLines.includes(checksumLine),
   "SDK candidate checksum index does not contain the pinned package",
 );
 assert(
@@ -84,37 +101,50 @@ assert(
 );
 
 const dependency = `file:${sdk.artifact}`;
+for (const packageName of [sdk.package, "@bitwarden/alias-sdk-internal"]) {
+  assert(
+    packageJson.dependencies[packageName] === dependency,
+    `${packageName} does not consume the checksum-pinned SDK artifact`,
+  );
+  assert(
+    packageLock.packages[""].dependencies[packageName] === dependency,
+    `${packageName} root lock dependency is not pinned`,
+  );
+  const lockEntry = packageLock.packages[`node_modules/${packageName}`];
+  assert(lockEntry?.version === sdk.version, `${packageName} lock version differs`);
+  assert(
+    lockEntry?.resolved === sdk.artifact.replace(/^vendor\//, "file:vendor/"),
+    `${packageName} lock path is not pinned`,
+  );
+  assert(lockEntry?.integrity === sdk.integrity, `${packageName} lock integrity differs`);
+}
+assert(sdk.publicRef === "refs/heads/integration/public-alias-sdk", "SDK public ref differs");
+assert(sdk.workflow?.conclusion === "success", "SDK workflow did not conclude successfully");
+assert(Number.isSafeInteger(sdk.workflow?.runId), "SDK workflow run ID is invalid");
+assert(Number.isSafeInteger(sdk.workflow?.artifactId), "SDK workflow artifact ID is invalid");
 assert(
-  packageJson.dependencies[sdk.package] === dependency,
-  "package.json does not consume the checksum-pinned SDK artifact",
+  sdk.workflow?.artifactName === `alias-sdk-release-candidate-${sdk.sourceCommit}`,
+  "SDK workflow artifact name differs",
 );
 assert(
-  packageLock.packages[""].dependencies[sdk.package] === dependency,
-  "package-lock.json root dependency does not consume the pinned SDK artifact",
-);
-
-const lockEntry = packageLock.packages[`node_modules/${sdk.package}`];
-assert(lockEntry?.version === sdk.version, "SDK lock entry version does not match the manifest");
-assert(
-  lockEntry?.resolved === sdk.artifact.replace(/^vendor\//, "file:vendor/"),
-  "SDK lock entry path is not pinned",
-);
-assert(
-  lockEntry?.integrity === sdk.integrity,
-  "SDK lock entry integrity does not match the manifest",
+  /^[0-9a-f]{64}$/.test(sdk.workflow?.artifactZipSha256),
+  "SDK workflow artifact ZIP SHA-256 is invalid",
 );
 
 const metadata = fs.readFileSync(path.join(repositoryRoot, sdk.metadata), "utf8");
 for (const value of [
   sdk.version,
   sdk.sourceCommit,
-  sdk.functionalCleanupCommit,
   sdk.sha256,
   sdk.integrity,
   sdk.provenance,
   sdk.provenanceSha256,
   sdk.candidateChecksums,
   sdk.candidateChecksumsSha256,
+  String(sdk.workflow.runId),
+  String(sdk.workflow.artifactId),
+  sdk.workflow.artifactName,
+  sdk.workflow.artifactZipSha256,
 ]) {
   assert(metadata.includes(value), `SDK metadata does not contain ${value}`);
 }

@@ -7,6 +7,7 @@ import {
   createAliasSyncDocument,
   emailAliasKey,
   mergeAliasSyncDocuments,
+  parseAliasSyncDocument,
   projectAliasSync,
 } from "./alias-sync";
 
@@ -20,7 +21,7 @@ const connection = {
   connectionId,
 };
 const alias = {
-  version: 2 as const,
+  version: 1 as const,
   provider: "simplelogin" as const,
   providerInstance: connection.providerInstance,
   connectionId,
@@ -54,6 +55,41 @@ function shuffled<T>(source: T[], seed: number): T[] {
 }
 
 describe("alias synchronization state machine", () => {
+  it.each([
+    ["missing", undefined],
+    ["zero", 0],
+    ["malformed", "1"],
+    ["version 2", 2],
+    ["unknown", 99],
+  ])("rejects a %s journal schema version", (_name, version) => {
+    expect(() => parseAliasSyncDocument({ ...createAliasSyncDocument(replicaA), version })).toThrow(
+      "Unsupported alias sync document version",
+    );
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["zero", 0],
+    ["malformed", "1"],
+    ["version 2", 2],
+    ["unknown", 99],
+  ])("rejects a %s journal event schema version", (_name, version) => {
+    const event = append(
+      createAliasSyncDocument(replicaA),
+      { kind: "connection-upsert", connection },
+      900,
+    ).events[0];
+
+    expect(() =>
+      parseAliasSyncDocument({
+        version: 1,
+        replicaId: replicaA,
+        clock: event.clock,
+        events: [{ ...event, version }],
+      }),
+    ).toThrow("Unsupported alias sync event version");
+  });
+
   it("converges for duplicate, reordered, and stale event snapshots", () => {
     let first = createAliasSyncDocument(replicaA);
     first = append(first, { kind: "connection-upsert", connection }, 1);
@@ -400,11 +436,7 @@ describe("alias synchronization state machine", () => {
     );
     const operationId = document.events.at(-1)!.id;
     document = append(document, { kind: "provider-dispatched", operationId }, 49);
-    document = append(
-      document,
-      { kind: "provider-failed", operationId, reason: "forbidden" },
-      50,
-    );
+    document = append(document, { kind: "provider-failed", operationId, reason: "forbidden" }, 50);
 
     const projection = projectAliasSync(document);
     expect(projection.operations[operationId]).toMatchObject({ status: "failed" });

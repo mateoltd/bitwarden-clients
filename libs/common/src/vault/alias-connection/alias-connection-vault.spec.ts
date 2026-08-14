@@ -17,6 +17,7 @@ import { CipherView } from "../models/view/cipher.view";
 import {
   ALIAS_CONNECTION_MARKER_FIELD,
   ALIAS_CONNECTION_PAYLOAD_FIELD,
+  ALIAS_CONNECTION_VERSION,
   AliasConnectionVaultConflictError,
   AliasConnectionVaultStore,
   createAliasConnectionCipher,
@@ -75,7 +76,7 @@ describe("alias connection vault carrier", () => {
       "00000001-0000-4000-8000-000000000001",
     );
     const view = createAliasConnectionCipher({
-      version: 1,
+      version: ALIAS_CONNECTION_VERSION,
       connection,
       credential: { token, baseUrl: connection.providerInstance },
       sync,
@@ -101,9 +102,9 @@ describe("alias connection vault carrier", () => {
     expect(restored.sync).toEqual(sync);
   });
 
-  it("fails closed for malformed or removed connection payloads without reflecting credentials", () => {
+  it("fails closed for a malformed connection payload without reflecting credentials", () => {
     const cipher = createAliasConnectionCipher({
-      version: 1,
+      version: ALIAS_CONNECTION_VERSION,
       connection,
       credential: { token, baseUrl: connection.providerInstance },
       sync: createAliasSyncDocument(replicaId),
@@ -120,6 +121,32 @@ describe("alias connection vault carrier", () => {
     }
     expect(error).toBeInstanceOf(AliasConnectionVaultConflictError);
     expect(error.message).not.toContain(token);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["zero", 0],
+    ["malformed", "1"],
+    ["version 2", 2],
+    ["unknown", 99],
+  ])("rejects a %s encrypted carrier schema version", (_name, version) => {
+    const cipher = createAliasConnectionCipher({
+      version: ALIAS_CONNECTION_VERSION,
+      connection,
+      credential: { token, baseUrl: connection.providerInstance },
+      sync: createAliasSyncDocument(replicaId),
+    });
+    const payload = cipher.fields.find((field) =>
+      field.name?.startsWith(ALIAS_CONNECTION_PAYLOAD_FIELD),
+    )!;
+    payload.value = JSON.stringify({
+      version,
+      connection,
+      credential: { token, baseUrl: connection.providerInstance },
+      sync: createAliasSyncDocument(replicaId),
+    });
+
+    expect(() => parseAliasConnectionCipher(cipher)).toThrow(AliasConnectionVaultConflictError);
   });
 
   it("converges three independently persisted profiles after offline edits and restarts", async () => {
@@ -169,7 +196,7 @@ describe("alias connection vault carrier", () => {
     expect(remote.size).toBe(3);
 
     const firstAlias = {
-      version: 2 as const,
+      version: 1 as const,
       provider: "simplelogin" as const,
       providerInstance: connection.providerInstance,
       connectionId: connection.connectionId,

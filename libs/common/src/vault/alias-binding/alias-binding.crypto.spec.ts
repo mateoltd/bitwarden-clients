@@ -11,7 +11,7 @@ import { ALIAS_BINDING_FIELD_NAME } from "./alias-binding";
 
 const userId = "89d55fa7-395c-48a0-966a-3d412954082f";
 const alias = {
-  version: 2 as const,
+  version: 1 as const,
   provider: "simplelogin" as const,
   providerInstance: "https://app.simplelogin.io/",
   connectionId: "11111111-1111-4111-8111-111111111111",

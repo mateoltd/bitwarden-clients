@@ -94,12 +94,12 @@ describe("alias binding", () => {
     expect(JSON.stringify(cipher)).not.toContain("must-not-survive");
   });
 
-  it("drops a malformed current payload from the reserved field", () => {
+  it("drops a malformed v1 payload from the reserved field", () => {
     const field = new FieldView();
     field.name = ALIAS_BINDING_FIELD_NAME;
     field.type = FieldType.Hidden;
     field.value = JSON.stringify({
-      version: 2,
+      version: EMAIL_ALIAS_IDENTITY_VERSION,
       provider: "simplelogin",
       providerInstance: firstAlias.providerInstance,
       connectionId: "invalid",
@@ -114,6 +114,20 @@ describe("alias binding", () => {
     expect(cipher.fields).toEqual([]);
     expect(cipher.aliasBinding).toBeUndefined();
     expect(fieldsWithoutAliasReferences(cipher)).toEqual([]);
+  });
+
+  it("rejects an unreleased version 2 payload from the reserved field", () => {
+    const field = new FieldView();
+    field.name = ALIAS_BINDING_FIELD_NAME;
+    field.type = FieldType.Hidden;
+    field.value = JSON.stringify({ ...firstAlias, version: 2 });
+    const cipher = login();
+    cipher.fields = [field];
+
+    hydrateAliasBinding(cipher);
+
+    expect(cipher.aliasBinding).toBeUndefined();
+    expect(cipher.fields).toEqual([]);
   });
 
   it("property: canonical references round-trip for generated IDs, cases and addresses", () => {

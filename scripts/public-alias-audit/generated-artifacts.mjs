@@ -23,14 +23,17 @@ for (const change of changedEntries(base, target)) {
   if (entry?.size > 5_000_000) {
     const expected = policy.allowedArtifacts[change.path];
     const actual = sha256(blob(target, change.path));
-    if (!expected) findings.push(`large artifact is not allowlisted: ${change.path} (${entry.size} bytes)`);
-    else if (actual !== expected) findings.push(`allowlisted artifact digest mismatch: ${change.path}`);
+    if (!expected)
+      findings.push(`large artifact is not allowlisted: ${change.path} (${entry.size} bytes)`);
+    else if (actual !== expected)
+      findings.push(`allowlisted artifact digest mismatch: ${change.path}`);
   }
 }
 
 for (const [path, expected] of Object.entries(policy.allowedArtifacts)) {
   const entry = targetTree.get(path);
-  if (entry && sha256(blob(target, path)) !== expected) findings.push(`artifact digest mismatch: ${path}`);
+  if (entry && sha256(blob(target, path)) !== expected)
+    findings.push(`artifact digest mismatch: ${path}`);
 }
 
 fail("Generated-artifact scan failed", findings);

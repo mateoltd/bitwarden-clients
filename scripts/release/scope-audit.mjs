@@ -92,12 +92,6 @@ for (const relative of sourceFiles()) {
   } catch {
     continue;
   }
-  if (relative === "release/alias-client-release.json") {
-    const parsed = JSON.parse(text);
-    parsed.releaseLane.cleanupTrackingRef = "reviewed-client-cleanup-ref";
-    parsed.canonicalSdk.cleanupTrackingRef = "reviewed-sdk-cleanup-ref";
-    text = JSON.stringify(parsed);
-  }
   auditText(relative, text, !compatibilityAllowlist.has(relative));
 }
 

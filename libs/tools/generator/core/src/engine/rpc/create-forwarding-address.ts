@@ -14,7 +14,11 @@ export class CreateForwardingAddressRpc<
   ) {}
 
   private get createForwardingEmail() {
-    return this.requestor.forwarder.createForwardingEmail;
+    const definition = this.requestor.forwarder.createForwardingEmail;
+    if (!definition) {
+      throw new Error(`Forwarder ${this.requestor.name} does not define an address endpoint`);
+    }
+    return definition;
   }
 
   toRequest(req: Req) {

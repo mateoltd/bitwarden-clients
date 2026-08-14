@@ -48,21 +48,65 @@ function executableContaining(fragment) {
   });
 }
 
+async function removeTemporaryDirectory() {
+  const transientWindowsErrors = new Set(["EBUSY", "EMFILE", "ENFILE", "ENOTEMPTY", "EPERM"]);
+  const attempts = process.platform === "win32" ? 21 : 1;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const isTransientWindowsError =
+        process.platform === "win32" && transientWindowsErrors.has(error.code);
+      if (!isTransientWindowsError) throw error;
+      if (attempt === attempts) {
+        console.warn(
+          `Windows retained a transient handle in ${temporaryDirectory}; cleanup is deferred to the temporary-directory owner`,
+        );
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+}
+
 function waitForLaunch(command, commandArgs, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, commandArgs, { stdio: "inherit", ...options });
-    let finished = false;
     child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      finished = true;
-      reject(new Error(`${command} exited before smoke window (code ${code}, signal ${signal})`));
-    });
-    setTimeout(() => {
-      if (!finished) {
-        child.kill(process.platform === "win32" ? undefined : "SIGTERM");
-        resolve();
+    let stopping = false;
+    let childClosed = false;
+    let windowsKillerClosed = process.platform !== "win32";
+    const resolveStoppedProcess = () => {
+      if (stopping && childClosed && windowsKillerClosed) resolve();
+    };
+    const timer = setTimeout(() => {
+      stopping = true;
+      if (process.platform === "win32") {
+        const killer = spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+          stdio: "ignore",
+        });
+        killer.once("error", reject);
+        killer.once("close", (code) => {
+          if (code !== 0 && child.exitCode == null) {
+            reject(new Error(`taskkill failed for ${command} with code ${code}`));
+          }
+          windowsKillerClosed = true;
+          resolveStoppedProcess();
+        });
+      } else {
+        child.kill("SIGTERM");
       }
     }, 12_000);
+    child.once("close", (code, signal) => {
+      childClosed = true;
+      clearTimeout(timer);
+      if (stopping) {
+        resolveStoppedProcess();
+      } else {
+        reject(new Error(`${command} exited before smoke window (code ${code}, signal ${signal})`));
+      }
+    });
   });
 }
 
@@ -127,10 +171,20 @@ async function smokeSafariProject() {
   ]);
   const project = filesBelow(conversion).find((file) => file.endsWith(".xcodeproj"));
   assert(project, "Safari conversion did not produce an Xcode project");
+  const projectMetadata = JSON.parse(
+    run("xcodebuild", ["-list", "-json", "-project", project], { capture: true }),
+  );
+  const scheme = projectMetadata.project?.schemes?.find((candidate) =>
+    candidate.toLowerCase().includes("macos"),
+  );
+  assert(scheme, "Safari conversion did not produce a macOS Xcode scheme");
   run("xcodebuild", [
     "-project",
     project,
-    "-alltargets",
+    "-scheme",
+    scheme,
+    "-destination",
+    "generic/platform=macOS",
     "-derivedDataPath",
     derivedData,
     "CODE_SIGNING_ALLOWED=NO",
@@ -227,5 +281,5 @@ try {
   else await smokeDesktop();
   console.log(`Smoke test passed: ${target.id}`);
 } finally {
-  fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  await removeTemporaryDirectory();
 }

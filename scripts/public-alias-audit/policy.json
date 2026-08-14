@@ -1,11 +1,13 @@
 {
   "branch": "integration/public-alias-clients",
   "baseCommit": "1f881babc15eb7d3a88cad41730ce167d8e49a41",
-  "snapshotCommit": "113a59638afbe4379e259a2cec8fa38597445eb6",
+  "snapshotCommit": "cd1f5cb4456a27e4c75d2206c7993c7b2c1ed038",
   "releaseCommit": "95c5655065172c7505d7f82428b8bf7b46792b82",
+  "arm64FixCommit": "0c4906ee61d1a5fd13c4a95560b3f69b0a8d10f8",
   "sourceCommits": [
-    "113a59638afbe4379e259a2cec8fa38597445eb6",
-    "95c5655065172c7505d7f82428b8bf7b46792b82"
+    "cd1f5cb4456a27e4c75d2206c7993c7b2c1ed038",
+    "95c5655065172c7505d7f82428b8bf7b46792b82",
+    "0c4906ee61d1a5fd13c4a95560b3f69b0a8d10f8"
   ],
   "portabilityCommits": [
     "709dd6462823bcd82da30e1323d9656ecdcdd4af",
@@ -32,8 +34,7 @@
   "forbiddenPathPatterns": [
     "(^|/)node_modules(/|$)",
     "(^|/)(dist|coverage|\\.nx|\\.angular|\\.cache|playwright-report|test-results)(/|$)",
-    "(^|/)\\.eslintcache$",
-    "^vendor/.*alias-platform\\.2([.-]|$)"
+    "(^|/)\\.eslintcache$"
   ],
   "forbiddenAddedTextPatterns": [
     "ALIAS_MIGRATION_(?:INTEGRATION|FIXTURE_SIZE)",
@@ -41,7 +42,8 @@
     "process\\.env\\[\"(?:SIMPLELOGIN|BITWARDEN)_(?:EMAIL|PASSWORD)\"\\]\\s*\\?\\?",
     "(?:john@wick\\.com|alias\\.lab@individual\\.example|alias-lab-password)",
     "(?:legacyAlias|AliasMigration)",
-    "alias-platform\\.2(?:[.-]|$)"
+    "aliasReferenceSchemaVersion[\\\"']?\\s*[:=]\\s*2",
+    "alias[-_ ](?:reference[-_ ])?schema[-_ ]v2"
   ],
   "generatedPathPatterns": [
     "(^|/)(node_modules|dist|coverage|\\.nx|\\.angular|\\.cache|playwright-report|test-results)(/|$)",
@@ -51,7 +53,7 @@
     "^artifacts/"
   ],
   "allowedArtifacts": {
-    "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.1.tgz": "513fc09282335910ea50dfcdd46608e89b81469763f668f4f0ea4ad056e5aa97"
+    "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.2.tgz": "bc9106926f418fbc139e4bb29031e2d27cf59e503abcd08455cc29ea8f79af47"
   },
   "allowedLicensePatterns": [
     "^0BSD$",

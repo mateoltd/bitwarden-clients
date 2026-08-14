@@ -9,19 +9,24 @@ import path from "path";
 const packageJson = JSON.parse(
   fs.readFileSync(path.join(__dirname, "..", "..", "package.json"), "utf8"),
 );
-const releaseManifest = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "..", "..", "release", "alias-client-release.json"), "utf8"),
-);
 
 const sdkInternal = packageJson.dependencies["@bitwarden/sdk-internal"];
+const aliasSdkInternal = packageJson.dependencies["@bitwarden/alias-sdk-internal"];
 const commercialSdkInternal = packageJson.dependencies["@bitwarden/commercial-sdk-internal"];
 
-const canonicalAliasArtifact = `file:${releaseManifest.canonicalSdk.artifact}`;
-const canonicalAliasArtifactSha256 = releaseManifest.canonicalSdk.sha256;
-const sdkVersion =
-  sdkInternal === canonicalAliasArtifact ? releaseManifest.canonicalSdk.version : sdkInternal;
+const canonicalAliasArtifact = "file:vendor/bitwarden-sdk-internal-0.2.0-alias-platform.2.tgz";
+const canonicalAliasArtifactSha256 =
+  "bc9106926f418fbc139e4bb29031e2d27cf59e503abcd08455cc29ea8f79af47";
+const sdkVersion = sdkInternal === canonicalAliasArtifact ? "0.2.0-main.950" : sdkInternal;
 
-if (sdkInternal !== canonicalAliasArtifact && sdkVersion !== commercialSdkInternal) {
+if (aliasSdkInternal !== canonicalAliasArtifact) {
+  console.error(
+    `Alias SDK must use the canonical verified artifact (${canonicalAliasArtifact}), found ${aliasSdkInternal}.`,
+  );
+  process.exit(1);
+}
+
+if (sdkVersion !== commercialSdkInternal) {
   console.error(
     `Version mismatch between @bitwarden/sdk-internal (${sdkInternal}) and @bitwarden/commercial-sdk-internal (${commercialSdkInternal}), must be an exact match.`,
   );
@@ -37,8 +42,4 @@ if (sdkInternal === canonicalAliasArtifact) {
   }
 }
 
-console.log(
-  sdkInternal === canonicalAliasArtifact
-    ? `Canonical OSS SDK artifact is checksum-pinned: ${sdkVersion}`
-    : `All dependencies have matching versions: ${sdkVersion}`,
-);
+console.log(`All dependencies have matching versions: ${sdkVersion}`);

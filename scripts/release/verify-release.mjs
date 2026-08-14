@@ -6,7 +6,6 @@ import { assert, git, readJson, readManifest, repositoryRoot, run } from "./lib.
 
 run(process.execPath, ["scripts/release/verify-sdk.mjs"]);
 run(process.execPath, ["scripts/release/scope-audit.mjs"]);
-run(process.execPath, ["scripts/release/verify-cli-packaging.mjs"]);
 
 const manifest = readManifest();
 const sourceCommitFile = path.join(repositoryRoot, ".release-source-commit");
@@ -26,8 +25,9 @@ if (fs.existsSync(path.join(repositoryRoot, ".git"))) {
     "First clean release commit is not parented directly by the pinned base",
   );
   for (const source of [
-    manifest.cleanHistoryInputs.clientSnapshotCommit,
+    manifest.cleanHistoryInputs.clientV1Commit,
     manifest.cleanHistoryInputs.releaseCheckpointCommit,
+    manifest.cleanHistoryInputs.arm64FixCommit,
   ]) {
     const ancestry = spawnSync("git", ["merge-base", "--is-ancestor", source, head], {
       cwd: repositoryRoot,

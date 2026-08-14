@@ -56,8 +56,8 @@ export type ForwarderOptions = Partial<
     connectionId: string;
 
     /**
-     * Encrypted, append-only provider operation journal. It deliberately contains no provider
-     * credential and is merged by vector clock when multiple persisted profiles reconnect.
+     * Encrypted schema-v1, append-only provider operation journal. It deliberately contains no
+     * provider credential and is merged by vector clock when multiple persisted profiles reconnect.
      */
     aliasSync: AliasSyncDocument;
 

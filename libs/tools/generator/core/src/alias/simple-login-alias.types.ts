@@ -1,4 +1,8 @@
-import { EmailAliasCredentialMetadata, EmailAliasIdentity , AliasSyncStore } from "@bitwarden/common/tools/alias";
+import {
+  AliasSyncStore,
+  EmailAliasCredentialMetadata,
+  EmailAliasIdentity,
+} from "@bitwarden/common/tools/alias";
 
 export type SimpleLoginAliasSettings = {
   token: string;

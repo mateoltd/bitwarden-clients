@@ -114,7 +114,7 @@ describe("VaultCipherRowComponent", () => {
     cipher.name = "Test Login";
     cipher.type = CipherType.Login;
     cipher.aliasBinding = {
-      version: 2,
+      version: 1,
       provider: "simplelogin",
       providerInstance: "https://app.simplelogin.io/",
       connectionId: "11111111-1111-4111-8111-111111111111",

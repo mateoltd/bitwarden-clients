@@ -1,4 +1,4 @@
-source_commit=ff60528b2f899baec1cea72fd8efbdc509fbab4e
+source_commit=4a08b5fe81c363169d36f582cc13c03b59d212d8
 runner_image=ubuntu24-20260720.247.2
 v24.17.0
 11.13.0

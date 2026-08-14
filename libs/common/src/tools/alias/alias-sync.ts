@@ -356,10 +356,7 @@ function sanitizeOperation(value: unknown): AliasProviderOperation {
           request: {
             kind: "custom",
             hostname: optionalString(request.hostname, "hostname"),
-            requestFingerprint: nonEmptyString(
-              request.requestFingerprint,
-              "request fingerprint",
-            ),
+            requestFingerprint: nonEmptyString(request.requestFingerprint, "request fingerprint"),
           },
         };
       }
@@ -932,7 +929,7 @@ export function projectAliasSync(document: AliasSyncDocument): AliasSyncProjecti
         ),
       );
       if (predecessors.length === 0) {
-        // The first journal event may be based on an existing current-schema cipher reference.
+        // The first journal event may be based on an existing schema-v1 cipher reference.
         valid.push(event);
         continue;
       }
