@@ -73,6 +73,13 @@ if (target.family === "browser") {
   payloadDirectory = path.join(repositoryRoot, "apps/cli/dist/oss", folder);
   version = readJson(path.join(repositoryRoot, "apps/cli/package.json")).version;
 } else if (target.family === "desktop") {
+  process.env.CARGO_INCREMENTAL = "0";
+  if (target.platform === "win") {
+    const reproducibleLinkerFlag = "-C link-arg=/Brepro";
+    process.env.RUSTFLAGS = [process.env.RUSTFLAGS, reproducibleLinkerFlag]
+      .filter(Boolean)
+      .join(" ");
+  }
   run(process.execPath, [
     "apps/desktop/desktop_native/build.js",
     `--target=${target.rustTarget}`,

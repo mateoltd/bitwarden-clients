@@ -24,6 +24,12 @@ const bitwardenApiUrl = new URL(process.env.BITWARDEN_API_URL ?? "http://localho
 const bitwardenIdentityUrl = new URL(
   process.env.BITWARDEN_IDENTITY_URL ?? "http://localhost:33656",
 );
+const vaultwarden = process.env.BITWARDEN_DB_DIALECT === "vaultwarden";
+const bitwardenApiBaseUrl = serviceBaseUrl(bitwardenApiUrl, vaultwarden ? "/api/" : "/");
+const bitwardenIdentityBaseUrl = serviceBaseUrl(
+  bitwardenIdentityUrl,
+  vaultwarden ? "/identity/" : "/",
+);
 const bitwardenDbPath = requiredEnvironment("BITWARDEN_DB_PATH");
 const simpleLoginUrl = new URL(process.env.SIMPLELOGIN_URL ?? "http://127.0.0.1:32769");
 const simpleLoginEmail = requiredEnvironment("SIMPLELOGIN_EMAIL");
@@ -44,8 +50,8 @@ const safeDiagnostics = [];
 
 try {
   simpleLoginToken = await authenticateSimpleLogin();
-  const apiProxy = await startHttpsProxy(bitwardenApiUrl);
-  const identityProxy = await startHttpsProxy(bitwardenIdentityUrl);
+  const apiProxy = await startHttpsProxy(bitwardenApiBaseUrl);
+  const identityProxy = await startHttpsProxy(bitwardenIdentityBaseUrl);
   const registrationServer = await startRegistrationServer();
   const registrationHostname = `alias-browser-${Date.now()}.test`;
   const registrationUrl = new URL(registrationServer.url);
@@ -57,6 +63,7 @@ try {
     headless: false,
     ignoreHTTPSErrors: true,
     args: [
+      "--ignore-certificate-errors",
       `--disable-extensions-except=${extensionDirectory}`,
       `--load-extension=${extensionDirectory}`,
       `--host-resolver-rules=MAP ${registrationHostname} 127.0.0.1`,
@@ -375,6 +382,14 @@ function observeContext(browserContext, apiProxy) {
       bitwardenAuthorization = request.headers().authorization ?? bitwardenAuthorization;
     }
   });
+  browserContext.on("requestfailed", (request) => {
+    if (request.url().startsWith(apiProxy.url.origin)) {
+      recordDiagnostic(
+        "BITWARDEN_REQUEST_FAILED",
+        `${request.method()} ${new URL(request.url()).pathname} ${request.failure()?.errorText ?? "unknown"}`,
+      );
+    }
+  });
 }
 
 function observeWorker(serviceWorker) {
@@ -413,7 +428,7 @@ function assertServiceLogsDoNotContain(secret) {
 }
 
 async function permanentlyDeleteBitwardenCipher(authorization, cipherId) {
-  const response = await fetch(new URL(`ciphers/${cipherId}`, bitwardenApiUrl), {
+  const response = await fetch(new URL(`ciphers/${cipherId}`, bitwardenApiBaseUrl), {
     method: "DELETE",
     headers: { authorization },
   });
@@ -516,22 +531,34 @@ function readCipher(database, cipherId, includeDeletedDate) {
     .get(cipherId);
 }
 
+function serviceBaseUrl(target, fallbackPath) {
+  const path = target.pathname === "/" ? fallbackPath : `${target.pathname.replace(/\/+$/, "")}/`;
+  return new URL(path, target.origin);
+}
+
 async function startHttpsProxy(target) {
   const server = https.createServer(
     { key: certificate, cert: certificate },
     (request, response) => {
       const upstream = http.request(
-        new URL(request.url ?? "/", target),
+        new URL((request.url ?? "/").replace(/^\//, ""), target),
         {
           method: request.method,
           headers: { ...request.headers, host: target.host },
         },
         (upstreamResponse) => {
+          if ((upstreamResponse.statusCode ?? 500) >= 400) {
+            recordDiagnostic(
+              "BITWARDEN_PROXY_RESPONSE",
+              `${request.method} ${request.url ?? "/"} ${upstreamResponse.statusCode ?? 502}`,
+            );
+          }
           response.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.headers);
           upstreamResponse.pipe(response);
         },
       );
       upstream.on("error", (error) => {
+        recordDiagnostic("BITWARDEN_PROXY_ERROR", error.message);
         response.writeHead(502, { "Content-Type": "text/plain" });
         response.end(error.message);
       });

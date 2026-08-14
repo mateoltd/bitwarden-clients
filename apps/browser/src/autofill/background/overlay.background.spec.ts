@@ -1885,7 +1885,7 @@ describe("OverlayBackground", () => {
             {
               kind: "email-alias",
               alias: {
-                version: 2,
+                version: 1,
                 provider: "simplelogin",
                 providerInstance: "https://app.simplelogin.io/",
                 connectionId: "11111111-1111-4111-8111-111111111111",
@@ -1914,7 +1914,7 @@ describe("OverlayBackground", () => {
 
         const savedCipher = cipherService.setAddEditCipherInfo.mock.calls[0][0].cipher;
         expect(savedCipher.aliasBinding).toEqual({
-          version: 2,
+          version: 1,
           provider: "simplelogin",
           providerInstance: "https://app.simplelogin.io/",
           connectionId: "11111111-1111-4111-8111-111111111111",

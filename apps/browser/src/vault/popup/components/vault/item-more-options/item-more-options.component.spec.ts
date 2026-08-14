@@ -141,7 +141,7 @@ describe("ItemMoreOptionsComponent", () => {
 
   it("reacts to the decrypted cipher binding used by the vault list menu", async () => {
     const aliasBinding = {
-      version: 2 as const,
+      version: 1 as const,
       provider: "simplelogin" as const,
       providerInstance: "https://app.simplelogin.io/",
       connectionId: "11111111-1111-4111-8111-111111111111",

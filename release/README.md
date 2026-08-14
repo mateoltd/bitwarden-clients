@@ -6,12 +6,11 @@ store, registry, release, signing, or notarization operation is part of the lane
 
 ## Trust inputs
 
-`alias-client-release.json` is the single release manifest. It pins `origin/main`, the two state-only
-client and release inputs, toolchains, canonical SDK artifact and source commit, real provider test
-deployment, vault test backend, supported targets, and explicit handoffs. `npm run release:verify`
-fails if the linear public history does not begin directly at the pinned base, either development
-history is inherited, the SDK archive or lock entry differs, a target is duplicated, a lock is
-missing, or commercial source is present in an OSS clean room.
+`alias-client-release.json` is the single release manifest. It pins the starting client commit,
+toolchains, canonical SDK artifact and source commit, real provider test deployment, vault test
+backend, supported targets, and explicit handoffs. `npm run release:verify` fails if the checked-out
+branch does not descend from the pinned base, the SDK archive or lock entry differs, a target is
+duplicated, a lock is missing, or commercial source is present in an OSS clean room.
 
 The build scripts consume the canonical SDK tarball only through the root lockfile. The archive
 SHA-256, npm integrity, embedded package version, embedded source commit, and the published SDK
@@ -47,7 +46,7 @@ Download and extract the complete SDK candidate produced by the canonical SDK re
 then run one command:
 
 ```sh
-npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --source-commit BUILD_COMMIT --functional-commit FUNCTIONAL_COMMIT
+npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --source-commit BUILD_COMMIT --workflow-run RUN_ID --artifact-id ARTIFACT_ID --artifact-name ARTIFACT_NAME --artifact-zip-sha256 ZIP_SHA256
 ```
 
 The command verifies every file against the candidate `SHA256SUMS`, requires a schema-2
@@ -64,43 +63,32 @@ contract and is removed from clean-room dependency graphs before installation.
 Validate the candidate against the committed pin without changing files:
 
 ```sh
-npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --source-commit BUILD_COMMIT --functional-commit FUNCTIONAL_COMMIT --check
+npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --source-commit BUILD_COMMIT --workflow-run RUN_ID --artifact-id ARTIFACT_ID --artifact-name ARTIFACT_NAME --artifact-zip-sha256 ZIP_SHA256 --check
 ```
 
 ## Clean-room rebuild
 
 The clean-room workflow exports only tracked OSS source, excludes `bitwarden_license`, removes the
-commercial SDK from the exported package manifest and lock before dependency installation, builds
-the requested target twice in separate directories, and compares candidate SHA-256 values. Run the
-same path locally with:
+commercial SDK from the exported package manifest and lock before dependency installation, and
+builds the requested target twice from fresh installs. Both passes use the same guarded canonical
+workspace path, with the first source removed before the second export, so path-sensitive native
+toolchains receive identical inputs. It compares the logical archive content and then the final
+candidate SHA-256 values. Run the same path locally with:
 
 ```sh
 scripts/release/clean-room-rebuild.sh browser-chrome
 ```
 
-### CLI reproducibility
-
-The pre-fix `cli-linux-arm64` rebuilds differed at
-`dc0f8e285c95b9a1384cd15e55e52c0979e9cd444367a48276770630685a5b47` and
-`5dd3b4d17efff98ad74d8d99d9ed68d3b6b7447806c87854604540c78f8ded59`. The
-archive wrapper was deterministic; the packaged executable was not. `@yao-pkg/pkg` 6.5.1 documents
-V8 bytecode generation as nondeterministic, so public CLI candidates disable bytecode and mark all
-GPL-distributed packages public. `npm run release:verify` enforces those arguments. The release gate
-must also prove the real target twice:
-
-```sh
-scripts/release/clean-room-rebuild.sh cli-linux-arm64
-```
-
-The comparator fails with per-file digests when payloads differ, so an equal outer archive cannot
-hide a target payload mismatch.
+The OSS Linux ARM64 CLI packages JavaScript source instead of V8 cached bytecode because V8's
+cached-data blobs are process-dependent on that target. The input remains the verified OSS clean
+room, and both its logical content digest and normalized archive checksum remain enforced.
 
 ## Upstream maintenance
 
-The drift workflow fetches Bitwarden client main, the canonical SDK tracking ref, and the two
-cleanup refs into temporary checkout paths. It reports commit distance, changed release and alias
-surfaces, overlap risk, missing refs, and exact review or repin commands. It uploads a Markdown
-report and never merges, rebases, force-pushes, or changes configured remotes.
+The drift workflow fetches Bitwarden client main and the canonical public SDK ref into temporary
+checkout paths. It reports commit distance, changed release and alias surfaces, overlap risk,
+missing refs, and exact review or repin commands. It uploads a Markdown report and never merges,
+rebases, force-pushes, or changes configured remotes.
 
 There is no native iOS or Android source in this repository. Mobile release artifacts therefore
 require a separate source handoff and are not represented by placeholder jobs.

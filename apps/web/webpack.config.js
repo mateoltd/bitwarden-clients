@@ -16,6 +16,12 @@ module.exports = (webpackConfig, context) => {
       tsConfig: "apps/web/tsconfig.build.json",
       outputPath: path.resolve(context.context.root, context.options.outputPath),
       env: context.options.env,
+      importAliases: [
+        {
+          name: "@bitwarden/alias-sdk-internal",
+          alias: "@bitwarden/sdk-internal",
+        },
+      ],
     });
   } else {
     return buildConfig({
@@ -25,6 +31,12 @@ module.exports = (webpackConfig, context) => {
         entryModule: "src/app/app.module#AppModule",
       },
       tsConfig: "tsconfig.build.json",
+      importAliases: [
+        {
+          name: "@bitwarden/alias-sdk-internal",
+          alias: "@bitwarden/sdk-internal",
+        },
+      ],
     });
   }
 };

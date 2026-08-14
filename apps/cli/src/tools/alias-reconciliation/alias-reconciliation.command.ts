@@ -22,9 +22,18 @@ import { Response } from "../../models/response";
 
 import { AliasReconciliationService } from "./alias-reconciliation.service";
 
+type AliasReconciliationCommandCipherService = Pick<
+  CipherService,
+  | "clearCache"
+  | "createWithServer"
+  | "getAllDecrypted"
+  | "getAllDecryptedIncludingInternal"
+  | "updateWithServer"
+>;
+
 export class AliasReconciliationCommand {
   constructor(
-    private readonly cipherService: CipherService,
+    private readonly cipherService: AliasReconciliationCommandCipherService,
     private readonly accountService: AccountService,
     private readonly stateProvider: StateProvider,
     private readonly syncService: SyncService,
