@@ -114,6 +114,7 @@ async function smokeChromium() {
   const { chromium } = await import("playwright");
   const userDataDir = path.join(temporaryDirectory, "chromium-profile");
   const context = await chromium.launchPersistentContext(userDataDir, {
+    executablePath: process.env.CHROMIUM_PATH || undefined,
     headless: false,
     args: [
       `--disable-extensions-except=${extracted}`,
@@ -142,6 +143,7 @@ async function smokeChromium() {
 
 async function smokeFirefox() {
   const { firefox } = await import("playwright");
+  const firefoxExecutable = process.env.FIREFOX_PATH ?? firefox.executablePath();
   const webExt = path.join(repositoryRoot, "release/tooling/node_modules/.bin/web-ext");
   assert(fs.existsSync(webExt), "release tooling is not installed");
   run(webExt, ["lint", "--source-dir", extracted]);
@@ -150,7 +152,7 @@ async function smokeFirefox() {
     "--source-dir",
     extracted,
     "--firefox",
-    firefox.executablePath(),
+    firefoxExecutable,
     "--no-reload",
     "--start-url",
     "about:blank",
