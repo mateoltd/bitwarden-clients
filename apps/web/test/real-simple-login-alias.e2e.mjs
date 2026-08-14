@@ -313,12 +313,19 @@ function assertServiceLogsDoNotContain(secret) {
 
 function readDeviceIds() {
   const database = new DatabaseSync(bitwardenDbPath, { readOnly: true });
-  const rows = database.prepare('SELECT "Id" FROM "Device"').all();
+  const rows =
+    process.env.BITWARDEN_DB_DIALECT === "vaultwarden"
+      ? database.prepare('SELECT uuid AS "Id" FROM devices').all()
+      : database.prepare('SELECT "Id" FROM "Device"').all();
   database.close();
   return new Set(rows.map((row) => row.Id));
 }
 
 function removeCreatedWebDevices() {
+  if (process.env.BITWARDEN_DB_DIALECT === "vaultwarden") {
+    // The hosted test database is ephemeral and removed with its pinned container.
+    return;
+  }
   const database = new DatabaseSync(bitwardenDbPath);
   const created = database
     .prepare('SELECT "Id" FROM "Device"')

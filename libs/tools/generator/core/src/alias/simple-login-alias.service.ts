@@ -1,4 +1,18 @@
 import {
+  Alias,
+  AliasClient,
+  AliasClientSettings,
+  AliasFilter,
+  AliasPage,
+  AliasProviderIdentity,
+  AliasReference,
+  AliasUpdateRequest,
+  OptionalSensitiveStringUpdate,
+  ReverseAlias,
+  SensitiveString,
+  parse_alias_reference,
+} from "@bitwarden/alias-sdk-internal";
+import {
   AliasProjectedOperation,
   AliasProviderOperation,
   AliasProviderSnapshot,
@@ -6,25 +20,14 @@ import {
   AliasSyncEventInput,
   AliasSyncProjection,
   AliasSyncStore,
+  EmailAliasIdentity,
   aliasConnectionKey,
   appendAliasSyncEvent,
   emailAliasKey,
   normalizeEmailAliasAddress,
+  parseEmailAliasIdentity,
   projectAliasSync,
 } from "@bitwarden/common/tools/alias";
-import {
-  Alias,
-  AliasClient,
-  AliasClientSettings,
-  AliasFilter,
-  AliasPage,
-  AliasProviderIdentity,
-  AliasUpdateRequest,
-  OptionalSensitiveStringUpdate,
-  ReverseAlias,
-  SensitiveString,
-  parse_alias_reference,
-} from "@bitwarden/sdk-internal";
 
 import { SimpleLoginAliasError, normalizeSimpleLoginAliasError } from "./simple-login-alias.error";
 import {
@@ -44,6 +47,24 @@ const DEFAULT_SIMPLELOGIN_BASE_URL = "https://app.simplelogin.io";
 const SIMPLELOGIN_PAGE_SIZE = 20;
 
 const sensitive = (value: string): SensitiveString => value as SensitiveString;
+
+function emailAliasIdentityFromReference(reference: AliasReference): EmailAliasIdentity {
+  const identity = parseEmailAliasIdentity({
+    version: reference.version,
+    provider: reference.provider,
+    providerInstance: reference.providerInstance,
+    connectionId: reference.connectionId,
+    aliasId: reference.aliasId.toString(),
+    address: reference.address as string,
+  });
+  if (!identity) {
+    throw new SimpleLoginAliasError(
+      "The alias SDK returned an unsupported reference schema",
+      "invalid-response",
+    );
+  }
+  return identity;
+}
 
 function safeNumber(value: bigint, field: string): number {
   const number = Number(value);
@@ -140,14 +161,7 @@ function simpleLoginAliasFromSdk(client: AliasClient, alias: Alias): SimpleLogin
           },
         }
       : null,
-    identity: {
-      version: 2,
-      provider: reference.provider,
-      providerInstance: reference.providerInstance,
-      connectionId: reference.connectionId,
-      aliasId: reference.aliasId.toString(),
-      address: reference.address as string,
-    },
+    identity: emailAliasIdentityFromReference(reference),
   };
 }
 
@@ -626,12 +640,10 @@ export class SimpleLoginAliasService {
       );
     }
     document = await this.record(document, { kind: "provider-operation", value: operation });
+    const replicaId = document.replicaId;
     const operationId = document.events
       .filter((event) => event.kind === "provider-operation")
-      .sort(
-        (left, right) =>
-          (left.clock[document.replicaId] ?? 0) - (right.clock[document.replicaId] ?? 0),
-      )
+      .sort((left, right) => (left.clock[replicaId] ?? 0) - (right.clock[replicaId] ?? 0))
       .at(-1)!.id;
     document = await this.record(document, { kind: "provider-dispatched", operationId });
     try {

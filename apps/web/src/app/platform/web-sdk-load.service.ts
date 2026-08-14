@@ -1,3 +1,4 @@
+import * as aliasSdk from "@bitwarden/alias-sdk-internal";
 import { SdkLoadService } from "@bitwarden/common/platform/abstractions/sdk/sdk-load.service";
 import * as sdk from "@bitwarden/sdk-internal";
 
@@ -21,11 +22,16 @@ const supported = (() => {
 export class WebSdkLoadService extends SdkLoadService {
   async load(): Promise<void> {
     let module: any;
+    let aliasModule: any;
     if (supported) {
       module = await import("@bitwarden/sdk-internal/bitwarden_wasm_internal_bg.wasm");
+      aliasModule = await import("@bitwarden/alias-sdk-internal/bitwarden_wasm_internal_bg.wasm");
     } else {
       module = await import("@bitwarden/sdk-internal/bitwarden_wasm_internal_bg.wasm.js");
+      aliasModule =
+        await import("@bitwarden/alias-sdk-internal/bitwarden_wasm_internal_bg.wasm.js");
     }
     (sdk as any).init(module);
+    (aliasSdk as any).init(aliasModule);
   }
 }

@@ -36,6 +36,12 @@ module.exports = (webpackConfig, context) => {
           : context.options.outputPath,
       mode: mode,
       env: ENV,
+      importAliases: [
+        {
+          name: "@bitwarden/alias-sdk-internal",
+          alias: "@bitwarden/sdk-internal",
+        },
+      ],
     });
   } else {
     // npm build configuration
@@ -49,6 +55,12 @@ module.exports = (webpackConfig, context) => {
         entry: path.resolve(__dirname, "src/platform/background.ts"),
       },
       tsConfig: "tsconfig.build.json",
+      importAliases: [
+        {
+          name: "@bitwarden/alias-sdk-internal",
+          alias: "@bitwarden/sdk-internal",
+        },
+      ],
     });
   }
 };

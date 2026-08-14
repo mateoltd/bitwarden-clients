@@ -17,24 +17,11 @@
     "schemaVersion": { "const": 1 },
     "releaseLane": {
       "type": "object",
-      "required": [
-        "branch",
-        "baseCommit",
-        "cleanupCommit",
-        "sourceRepository",
-        "upstreamRepository"
-      ]
+      "required": ["branch", "baseCommit", "sourceRepository", "upstreamRepository"]
     },
     "cleanHistoryInputs": {
       "type": "object",
-      "required": [
-        "requestedClientSnapshotRef",
-        "publishedClientSnapshotRef",
-        "clientSnapshotCommit",
-        "releaseCheckpointRef",
-        "releaseCheckpointCommit",
-        "stateOnly"
-      ]
+      "required": ["clientV1Commit", "releaseCheckpointCommit", "arm64FixCommit", "stateOnly"]
     },
     "canonicalSdk": {
       "type": "object",
@@ -50,7 +37,9 @@
         "sha256",
         "integrity",
         "sourceCommit",
-        "functionalCleanupCommit"
+        "publicRef",
+        "aliasReferenceSchemaVersion",
+        "workflow"
       ]
     },
     "testInfrastructure": { "type": "object" },

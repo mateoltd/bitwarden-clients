@@ -108,10 +108,30 @@ jobs:
           npx nx run browser:build --configuration=chrome-dev
           node apps/desktop/desktop_native/build.js --target=x86_64-unknown-linux-gnu --release
           npm run build --workspace apps/desktop
+          node -e '
+            const fs = require("node:fs");
+            fs.writeFileSync("apps/web/config/local.json", JSON.stringify({
+              dev: {
+                port: 8080,
+                proxyApi: "http://127.0.0.1:18080/api",
+                proxyIdentity: "http://127.0.0.1:18080/identity",
+                proxyEvents: "http://127.0.0.1:18080/events",
+                proxyNotifications: "http://127.0.0.1:18080/notifications",
+                simpleLoginConnectSrc: "http://127.0.0.1:*"
+              }
+            }));
+          '
+          npx nx serve web --configuration=oss-dev --host=localhost --port=8080 \
+            > "$RUNNER_TEMP/web.log" 2>&1 &
+          for attempt in $(seq 1 120); do
+            if curl --insecure --silent --fail https://localhost:8080/ >/dev/null; then break; fi
+            if [[ "$attempt" == 120 ]]; then cat "$RUNNER_TEMP/web.log"; exit 1; fi
+            sleep 1
+          done
       - name: Browser create, autofill, lock, restart, and unlock
         env: &alias-e2e-environment
-          BITWARDEN_API_URL: http://127.0.0.1:18080
-          BITWARDEN_IDENTITY_URL: http://127.0.0.1:18080
+          BITWARDEN_API_URL: http://127.0.0.1:18080/api
+          BITWARDEN_IDENTITY_URL: http://127.0.0.1:18080/identity
           BITWARDEN_DB_DIALECT: vaultwarden
           SIMPLELOGIN_URL: http://127.0.0.1:17777
           SIMPLELOGIN_EMAIL: admin@mailbox.lan
@@ -123,13 +143,69 @@ jobs:
         env: *alias-e2e-environment
         run: |
           cd "$RUNNER_TEMP/source"
+          docker exec simplelogin-owned-provider-redis-1 redis-cli --scan --pattern 'LIMITS:*' |
+            while IFS= read -r key; do
+              docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
+            done
           xvfb-run -a node apps/desktop/test/real-simple-login-alias.e2e.mjs
+      - name: Web alias lifecycle through the real application route
+        env: *alias-e2e-environment
+        run: |
+          cd "$RUNNER_TEMP/source"
+          docker exec simplelogin-owned-provider-redis-1 redis-cli --scan --pattern 'LIMITS:*' |
+            while IFS= read -r key; do
+              docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
+            done
+          WEB_URL=https://localhost:8080 \
+            xvfb-run -a node apps/web/test/real-simple-login-alias.e2e.mjs
+      - name: Real provider, encrypted vault, and 10,000-record cross-device suites
+        env:
+          ALIAS_CROSS_DEVICE_INTEGRATION: "1"
+          ALIAS_SYNC_FIXTURE_SIZE: "10000"
+          BITWARDEN_API_URL: http://127.0.0.1:18080/api
+          BITWARDEN_DB_DIALECT: vaultwarden
+          BITWARDEN_IDENTITY_URL: http://127.0.0.1:18080/identity
+          BITWARDEN_SERVER_INTEGRATION: "1"
+          SIMPLELOGIN_BASE_URL: http://127.0.0.1:17777
+          SIMPLELOGIN_DB_CONTAINER: simplelogin-owned-provider-postgres-1
+          SIMPLELOGIN_EMAIL: admin@mailbox.lan
+          SIMPLELOGIN_INTEGRATION: "1"
+          SIMPLELOGIN_APP_CONTAINER: simplelogin-owned-provider-app-1
+          SIMPLELOGIN_REDIS_CONTAINER: simplelogin-owned-provider-redis-1
+          SIMPLELOGIN_URL: http://127.0.0.1:17777
+        run: |
+          cd "$RUNNER_TEMP/source"
+          docker exec simplelogin-owned-provider-redis-1 redis-cli --scan --pattern 'LIMITS:*' |
+            while IFS= read -r key; do
+              docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
+            done
+          npx jest --runInBand --runTestsByPath \
+            libs/tools/generator/core/src/alias/simple-login-alias.integration.spec.ts \
+            libs/tools/generator/core/src/alias/alias-binding-server.integration.spec.ts \
+            apps/web/src/app/tools/email-aliases/email-aliases.integration.spec.ts \
+            apps/desktop/src/app/tools/aliases/desktop-alias.integration.spec.ts \
+            apps/cli/src/tools/alias-reconciliation/alias-reconciliation.integration.spec.ts
+      - name: Real provider rate-limit classification
+        env:
+          SIMPLELOGIN_BASE_URL: http://127.0.0.1:17777
+          SIMPLELOGIN_EMAIL: admin@mailbox.lan
+          SIMPLELOGIN_INTEGRATION: "1"
+          SIMPLELOGIN_RATE_LIMIT_INTEGRATION: "1"
+        run: |
+          cd "$RUNNER_TEMP/source"
+          docker exec simplelogin-owned-provider-redis-1 redis-cli --scan --pattern 'LIMITS:*' |
+            while IFS= read -r key; do
+              docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
+            done
+          npx jest --runInBand --runTestsByPath \
+            libs/tools/generator/core/src/alias/simple-login-alias.integration.spec.ts
       - name: Capture diagnostics
         if: always()
         run: |
           mkdir -p diagnostics
           docker logs alias-client-release-vault > diagnostics/vault.log 2>&1 || true
           docker logs simplelogin-owned-provider-app-1 > diagnostics/provider.log 2>&1 || true
+          cp "$RUNNER_TEMP/web.log" diagnostics/web.log 2>/dev/null || true
           find /tmp -maxdepth 1 -name 'alias-*.png' -exec cp {} diagnostics/ \; || true
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()

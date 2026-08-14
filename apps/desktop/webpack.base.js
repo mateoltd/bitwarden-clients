@@ -61,6 +61,12 @@ module.exports.buildConfig = function buildConfig(params) {
         path.resolve(__dirname, "../../node_modules"),
         path.resolve(process.cwd(), "node_modules"),
       ],
+      alias: [
+        {
+          name: "@bitwarden/alias-sdk-internal",
+          alias: "@bitwarden/sdk-internal",
+        },
+      ],
     },
   };
 

@@ -426,7 +426,7 @@ export class CipherView implements View, InitializerMetadata {
       notes: this.notes,
       favorite: this.favorite ?? false,
       reprompt: this.reprompt ?? CipherRepromptType.None,
-      fields: sdkCipherView.fields,
+      fields: sdkCipherView.fields ?? [],
       type: this.getSdkCipherViewType(),
       archivedDate: this.archivedDate?.toISOString(),
     };
@@ -455,7 +455,7 @@ export class CipherView implements View, InitializerMetadata {
       notes: this.notes,
       favorite: this.favorite ?? false,
       reprompt: this.reprompt ?? CipherRepromptType.None,
-      fields: sdkCipherView.fields,
+      fields: sdkCipherView.fields ?? [],
       type: this.getSdkCipherViewType(),
       revisionDate: this.revisionDate?.toISOString(),
       archivedDate: this.archivedDate?.toISOString(),

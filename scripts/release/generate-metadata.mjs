@@ -81,8 +81,8 @@ for (const artifact of artifacts) {
       { name: "bitwarden:source-commit", value: sourceCommit },
       { name: "bitwarden:canonical-sdk-commit", value: manifest.canonicalSdk.sourceCommit },
       {
-        name: "bitwarden:canonical-sdk-functional-commit",
-        value: manifest.canonicalSdk.functionalCleanupCommit,
+        name: "bitwarden:canonical-sdk-workflow-run",
+        value: String(manifest.canonicalSdk.workflow.runId),
       },
     ],
   };
@@ -142,12 +142,14 @@ for (const artifact of artifacts) {
     },
     canonicalSdk: {
       repository: manifest.canonicalSdk.sourceRepository,
+      publicRef: manifest.canonicalSdk.publicRef,
       commit: manifest.canonicalSdk.sourceCommit,
-      functionalCleanupCommit: manifest.canonicalSdk.functionalCleanupCommit,
+      aliasReferenceSchemaVersion: manifest.canonicalSdk.aliasReferenceSchemaVersion,
       artifact: manifest.canonicalSdk.artifact,
       sha256: manifest.canonicalSdk.sha256,
       provenance: manifest.canonicalSdk.provenance,
       provenanceSha256: manifest.canonicalSdk.provenanceSha256,
+      workflow: manifest.canonicalSdk.workflow,
     },
     unsigned: true,
   });

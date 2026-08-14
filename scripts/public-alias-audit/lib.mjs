@@ -53,7 +53,7 @@ export function changedEntries(base, target) {
     .toString("utf8")
     .split("\0");
   const entries = [];
-  for (let index = 0; index < fields.length - 1; ) {
+  for (let index = 0; index < fields.length - 1;) {
     const status = fields[index++];
     if (!status) continue;
     const oldPath = fields[index++];

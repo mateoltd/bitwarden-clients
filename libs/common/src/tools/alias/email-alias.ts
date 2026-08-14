@@ -2,10 +2,10 @@ import {
   AliasReference,
   SensitiveString,
   serialize_alias_reference,
-} from "@bitwarden/sdk-internal";
+} from "@bitwarden/alias-sdk-internal";
 
-/** Current canonical SDK alias-reference version exchanged by generators and vault ciphers. */
-export const EMAIL_ALIAS_IDENTITY_VERSION = 2 as const;
+/** First public SDK alias-reference version exchanged by generators and vault ciphers. */
+export const EMAIL_ALIAS_IDENTITY_VERSION = 1 as const;
 
 /** Providers whose aliases can be bound to a login cipher. */
 export type EmailAliasProvider = "simplelogin";

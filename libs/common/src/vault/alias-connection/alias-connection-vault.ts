@@ -19,6 +19,7 @@ import { FieldView } from "../models/view/field.view";
 export const ALIAS_CONNECTION_CIPHER_NAME = "bitwarden.alias.connection.v1";
 export const ALIAS_CONNECTION_MARKER_FIELD = "bitwarden.alias.connection.marker";
 export const ALIAS_CONNECTION_PAYLOAD_FIELD = "bitwarden.alias.connection.payload";
+export const ALIAS_CONNECTION_VERSION = 1 as const;
 const ALIAS_CONNECTION_FIELD_PART_SIZE = 1_500;
 const ALIAS_CONNECTION_SEGMENT_SIZE = 60_000;
 
@@ -28,7 +29,7 @@ export type AliasConnectionCredential = {
 };
 
 export type AliasConnectionVaultPayload = {
-  version: 1;
+  version: typeof ALIAS_CONNECTION_VERSION;
   connection: AliasProviderConnection;
   credential?: AliasConnectionCredential;
   sync: AliasSyncDocument;
@@ -103,7 +104,7 @@ function parseConnection(value: unknown): AliasProviderConnection {
     providerInstance: candidate.providerInstance ?? "",
     connectionId: candidate.connectionId ?? "",
   };
-  // The key helper applies all current-schema provider and UUID validation.
+  // The key helper applies all schema-v1 provider and UUID validation.
   aliasConnectionKey(connection);
   return connection;
 }
@@ -126,7 +127,7 @@ export function parseAliasConnectionCipher(cipher: CipherView): AliasConnectionV
   }
   try {
     const candidate = JSON.parse(encoded) as Partial<AliasConnectionVaultPayload>;
-    if (candidate.version !== 1) {
+    if (candidate.version !== ALIAS_CONNECTION_VERSION) {
       throw new Error("unsupported version");
     }
     const connection = parseConnection(candidate.connection);
@@ -145,7 +146,7 @@ export function parseAliasConnectionCipher(cipher: CipherView): AliasConnectionV
         baseUrl: candidate.credential.baseUrl,
       };
     }
-    return { version: 1, connection, credential, sync };
+    return { version: ALIAS_CONNECTION_VERSION, connection, credential, sync };
   } catch (error) {
     if (error instanceof AliasConnectionVaultConflictError) {
       throw error;
@@ -177,7 +178,7 @@ export type AliasConnectionVaultStoreOptions = {
 };
 
 /**
- * Replicates one current-schema connection journal through the real encrypted vault sync path.
+ * Replicates one schema-v1 connection journal through the real encrypted vault sync path.
  * The local encrypted store is written first so offline/process-kill recovery remains possible.
  */
 export class AliasConnectionVaultStore implements AliasSyncStore {
@@ -258,7 +259,7 @@ export class AliasConnectionVaultStore implements AliasSyncStore {
     credential?: AliasConnectionCredential,
   ): Promise<void> {
     const cipher = createAliasConnectionCipher({
-      version: 1,
+      version: ALIAS_CONNECTION_VERSION,
       connection: this.options.connection,
       credential,
       sync,
@@ -355,7 +356,7 @@ export async function findAliasConnectionVaultPayloads(
       );
     }
     return {
-      version: 1,
+      version: ALIAS_CONNECTION_VERSION,
       connection: entries[0].connection,
       credential: removed ? undefined : credentials.values().next().value,
       sync,

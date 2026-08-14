@@ -21,6 +21,12 @@ const bitwardenApiUrl = new URL(process.env.BITWARDEN_API_URL ?? "http://localho
 const bitwardenIdentityUrl = new URL(
   process.env.BITWARDEN_IDENTITY_URL ?? "http://localhost:33656",
 );
+const vaultwarden = process.env.BITWARDEN_DB_DIALECT === "vaultwarden";
+const bitwardenApiBaseUrl = serviceBaseUrl(bitwardenApiUrl, vaultwarden ? "/api/" : "/");
+const bitwardenIdentityBaseUrl = serviceBaseUrl(
+  bitwardenIdentityUrl,
+  vaultwarden ? "/identity/" : "/",
+);
 const bitwardenDbPath = requiredEnvironment("BITWARDEN_DB_PATH");
 const simpleLoginUrl = new URL(process.env.SIMPLELOGIN_URL ?? "http://127.0.0.1:32769");
 const simpleLoginEmail = requiredEnvironment("SIMPLELOGIN_EMAIL");
@@ -36,8 +42,8 @@ let createdContactId;
 
 try {
   simpleLoginToken = await authenticateSimpleLogin();
-  const apiProxy = await startHttpsProxy(bitwardenApiUrl);
-  const identityProxy = await startHttpsProxy(bitwardenIdentityUrl);
+  const apiProxy = await startHttpsProxy(bitwardenApiBaseUrl);
+  const identityProxy = await startHttpsProxy(bitwardenIdentityBaseUrl);
   servers.push(apiProxy.server, identityProxy.server);
 
   ({ app } = await launchDesktop());
@@ -382,12 +388,17 @@ function removeCreatedDesktopDevices() {
   database.close();
 }
 
+function serviceBaseUrl(target, fallbackPath) {
+  const path = target.pathname === "/" ? fallbackPath : `${target.pathname.replace(/\/+$/, "")}/`;
+  return new URL(path, target.origin);
+}
+
 async function startHttpsProxy(target) {
   const server = https.createServer(
     { key: certificate, cert: certificate },
     (request, response) => {
       const upstream = http.request(
-        new URL(request.url ?? "/", target),
+        new URL((request.url ?? "/").replace(/^\//, ""), target),
         {
           method: request.method,
           headers: { ...request.headers, host: target.host },

@@ -177,8 +177,10 @@ export class ForwarderSettingsComponent implements OnInit, OnChanges, OnDestroy 
           // convert prefix boolean back to sentinel string for the settings store
           const saveValues: ForwarderOptions = {
             ...current,
-            ...value,
-            prefix: (value as any).prefix ? "website" : "",
+            domain: value.domain ?? undefined,
+            token: value.token ?? undefined,
+            baseUrl: value.baseUrl ?? undefined,
+            prefix: value.prefix ? "website" : "",
           };
           if (
             this.forwarder === Vendor.simplelogin &&

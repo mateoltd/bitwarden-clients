@@ -38,17 +38,9 @@ try {
     manifest.releaseLane.upstreamRepository,
     manifest.releaseLane.upstreamRef,
   );
-  const clientCleanupCommit = remoteCommit(
-    manifest.releaseLane.sourceRepository,
-    manifest.releaseLane.cleanupTrackingRef,
-  );
   const sdkTrackingCommit = remoteCommit(
     manifest.canonicalSdk.sourceRepository,
-    manifest.canonicalSdk.trackingRef,
-  );
-  const sdkCleanupCommit = remoteCommit(
-    manifest.canonicalSdk.sourceRepository,
-    manifest.canonicalSdk.cleanupTrackingRef,
+    manifest.canonicalSdk.publicRef,
   );
 
   let upstreamFiles = [];
@@ -82,11 +74,7 @@ try {
   }
 
   let sdkFiles = [];
-  let sdkBuildDeltaFiles = [];
-  if (
-    (sdkTrackingCommit && sdkTrackingCommit !== manifest.canonicalSdk.sourceCommit) ||
-    manifest.canonicalSdk.functionalCleanupCommit !== manifest.canonicalSdk.sourceCommit
-  ) {
+  if (sdkTrackingCommit && sdkTrackingCommit !== manifest.canonicalSdk.sourceCommit) {
     const sdkDirectory = path.join(temporaryDirectory, "sdk");
     run("git", [
       "clone",
@@ -96,48 +84,27 @@ try {
       manifest.canonicalSdk.sourceRepository,
       sdkDirectory,
     ]);
-    const sdkCommits = [
-      manifest.canonicalSdk.functionalCleanupCommit,
-      manifest.canonicalSdk.sourceCommit,
-      sdkTrackingCommit,
-    ].filter((commit, index, commits) => commit && commits.indexOf(commit) === index);
+    const sdkCommits = [manifest.canonicalSdk.sourceCommit, sdkTrackingCommit].filter(
+      (commit, index, commits) => commit && commits.indexOf(commit) === index,
+    );
     run("git", ["-C", sdkDirectory, "fetch", "--quiet", "origin", ...sdkCommits]);
-    sdkBuildDeltaFiles = run(
+    sdkFiles = run(
       "git",
       [
         "-C",
         sdkDirectory,
         "diff",
         "--name-only",
-        `${manifest.canonicalSdk.functionalCleanupCommit}..${manifest.canonicalSdk.sourceCommit}`,
+        `${manifest.canonicalSdk.sourceCommit}..${sdkTrackingCommit}`,
       ],
       { capture: true },
     )
       .split("\n")
       .filter(Boolean);
-    if (sdkTrackingCommit && sdkTrackingCommit !== manifest.canonicalSdk.sourceCommit) {
-      sdkFiles = run(
-        "git",
-        [
-          "-C",
-          sdkDirectory,
-          "diff",
-          "--name-only",
-          `${manifest.canonicalSdk.sourceCommit}..${sdkTrackingCommit}`,
-        ],
-        { capture: true },
-      )
-        .split("\n")
-        .filter(Boolean);
-    }
   }
 
   const risk =
-    overlap.length ||
-    important(upstreamFiles).length ||
-    important(sdkFiles).length ||
-    clientCleanupCommit !== manifest.releaseLane.cleanupCommit ||
-    sdkCleanupCommit !== manifest.canonicalSdk.sourceCommit
+    overlap.length || important(upstreamFiles).length || important(sdkFiles).length
       ? "review required"
       : "low observed drift";
   const report = [
@@ -150,16 +117,15 @@ try {
     "",
     `- Client release HEAD: \`${git(["rev-parse", "HEAD"])}\``,
     `- Required base: \`${manifest.releaseLane.baseCommit}\``,
-    `- Integrated client cleanup: \`${manifest.releaseLane.cleanupCommit}\``,
+    `- Client v1 state input: \`${manifest.cleanHistoryInputs.clientV1Commit}\``,
+    `- Release checkpoint state input: \`${manifest.cleanHistoryInputs.releaseCheckpointCommit}\``,
+    `- Linux ARM64 fix state input: \`${manifest.cleanHistoryInputs.arm64FixCommit}\``,
     `- Canonical SDK artifact build: \`${manifest.canonicalSdk.sourceCommit}\` (${manifest.canonicalSdk.sha256})`,
-    `- Canonical SDK functional cleanup: \`${manifest.canonicalSdk.functionalCleanupCommit}\``,
     "",
     "## Available upstream state",
     "",
     `- Bitwarden client ${manifest.releaseLane.upstreamRef}: ${upstreamCommit ? `\`${upstreamCommit}\`` : "missing"}`,
-    `- Client cleanup ${manifest.releaseLane.cleanupTrackingRef}: ${clientCleanupCommit ? `\`${clientCleanupCommit}\`` : "not available"}`,
-    `- Canonical SDK ${manifest.canonicalSdk.trackingRef}: ${sdkTrackingCommit ? `\`${sdkTrackingCommit}\`` : "missing"}`,
-    `- SDK cleanup ${manifest.canonicalSdk.cleanupTrackingRef}: ${sdkCleanupCommit ? `\`${sdkCleanupCommit}\`` : "not available"}`,
+    `- Canonical SDK ${manifest.canonicalSdk.publicRef}: ${sdkTrackingCommit ? `\`${sdkTrackingCommit}\`` : "missing"}`,
     `- Client HEAD left/right count versus upstream: ${aheadBehind}`,
     "",
     "## Exact-path overlap",
@@ -174,16 +140,12 @@ try {
     "",
     bullets(important(sdkFiles)),
     "",
-    "## SDK build-only delta",
-    "",
-    bullets(sdkBuildDeltaFiles),
-    "",
     "## Required operator actions",
     "",
     "1. Review every exact-path overlap and relevant alias, SDK, cipher, autofill, lockfile, and workflow change above.",
     "2. Download and extract the complete cleaned SDK workflow candidate, then repin it with:",
     "",
-    "   `npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --source-commit BUILD_COMMIT --functional-commit FUNCTIONAL_COMMIT`",
+    "   `npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --source-commit BUILD_COMMIT --workflow-run RUN_ID --artifact-id ARTIFACT_ID --artifact-name ARTIFACT_NAME --artifact-zip-sha256 ZIP_SHA256`",
     "",
     "3. Run `npm run release:verify`, the candidate matrix, headed provider tests, and clean-room rebuilds.",
     "4. Update the pinned base only through a reviewed commit. This report never merges, rebases, force-pushes, or rewrites history.",
