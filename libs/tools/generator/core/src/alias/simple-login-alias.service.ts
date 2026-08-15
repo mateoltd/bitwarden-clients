@@ -14,6 +14,7 @@ import {
 } from "@bitwarden/alias-sdk-internal";
 import {
   AliasProjectedOperation,
+  AliasProjectedReferenceTransaction,
   AliasProviderOperation,
   AliasProviderSnapshot,
   AliasSyncDocument,
@@ -25,6 +26,7 @@ import {
   appendAliasSyncEvent,
   emailAliasKey,
   normalizeEmailAliasAddress,
+  pendingAliasReferenceTransactions,
   parseEmailAliasIdentity,
   projectAliasSync,
 } from "@bitwarden/common/tools/alias";
@@ -475,22 +477,71 @@ export class SimpleLoginAliasService {
     await this.safe((client) => client.delete_contact(positiveId(contactId, "contact id")));
   }
 
-  /** Persist a compare-and-set reference intent before the normal vault update path runs. */
-  async recordReference(
+  /** Persist an inert compare-and-set intent before the normal vault update path runs. */
+  async prepareReference(
     cipherId: string,
     expected: SimpleLoginAlias["identity"] | undefined,
     alias: SimpleLoginAlias["identity"],
+  ): Promise<string | undefined> {
+    const syncStore = this.syncStore;
+    if (!syncStore) {
+      return undefined;
+    }
+    const document = await syncStore.load();
+    const updated = appendAliasSyncEvent(document, {
+      kind: "reference-prepare",
+      cipherId,
+      expectedAlias: expected ?? null,
+      alias,
+    });
+    const prepared = updated.events.at(-1);
+    if (prepared?.kind !== "reference-prepare") {
+      throw new SimpleLoginAliasError(
+        "The alias reference transaction was not prepared",
+        "conflict",
+      );
+    }
+    await syncStore.save(updated);
+    return prepared.id;
+  }
+
+  /** Commit an inert reference intent only after vault persistence succeeds. */
+  async commitReference(transactionId: string): Promise<void> {
+    await this.settleReference(transactionId, "reference-commit", "committed");
+  }
+
+  /** Compensate an inert reference intent when vault persistence fails. */
+  async abortReference(transactionId: string): Promise<void> {
+    await this.settleReference(transactionId, "reference-abort", "aborted");
+  }
+
+  /** Return only transactions this replica is authorized to settle after a restart. */
+  async pendingReferenceTransactions(): Promise<AliasProjectedReferenceTransaction[]> {
+    const document = await this.loadJournal();
+    return document ? pendingAliasReferenceTransactions(document) : [];
+  }
+
+  private async settleReference(
+    transactionId: string,
+    kind: "reference-commit" | "reference-abort",
+    completedStatus: "committed" | "aborted",
   ): Promise<void> {
     const document = await this.loadJournal();
     if (!document) {
       return;
     }
-    await this.record(document, {
-      kind: "reference-set",
-      cipherId,
-      expectedAliasKey: expected ? emailAliasKey(expected) : null,
-      alias,
-    });
+    const transaction = projectAliasSync(document).referenceTransactions[transactionId];
+    if (transaction?.status === completedStatus) {
+      return;
+    }
+    if (
+      !transaction ||
+      transaction.ownerReplicaId !== document.replicaId ||
+      transaction.status !== "pending"
+    ) {
+      throw new SimpleLoginAliasError("The alias reference transaction is stale", "conflict");
+    }
+    await this.record(document, { kind, transactionId });
   }
 
   /** Persist an explicit unbind tombstone so a concurrent stale binding cannot silently return. */

@@ -3,6 +3,10 @@ import { firstValueFrom } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
+import {
+  emailAliasIdentitiesEqual,
+  normalizeEmailAliasAddress,
+} from "@bitwarden/common/tools/alias";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
@@ -42,17 +46,15 @@ export class DesktopAliasService {
       return [];
     }
     const ciphers = await this.cipherService.getAllDecrypted(account.id);
-    const aliasId = alias.id.toString();
-    const address = alias.address.trim().toLowerCase();
+    const address = normalizeEmailAliasAddress(alias.identity.address);
 
     return ciphers.filter((cipher) => {
       const binding = cipher.aliasBinding;
       return (
         !cipher.isDeleted &&
-        binding?.provider === "simplelogin" &&
-        binding.aliasId === aliasId &&
-        binding.address.trim().toLowerCase() === address &&
-        cipher.login?.username?.trim().toLowerCase() === address
+        binding !== undefined &&
+        emailAliasIdentitiesEqual(binding, alias.identity) &&
+        normalizeEmailAliasAddress(cipher.login?.username) === address
       );
     });
   }

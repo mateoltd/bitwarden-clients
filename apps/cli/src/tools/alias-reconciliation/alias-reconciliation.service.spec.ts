@@ -1,11 +1,21 @@
 import { MockProxy, mock } from "jest-mock-extended";
 
 import { Alias, AliasProviderIdentity, SensitiveString } from "@bitwarden/alias-sdk-internal";
+import {
+  AliasSyncDocument,
+  AliasSyncStore,
+  createAliasSyncDocument,
+  projectAliasSync,
+} from "@bitwarden/common/tools/alias";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
-import { SimpleLoginAliasError, SimpleLoginAliasService } from "@bitwarden/generator-core";
+import {
+  SimpleLoginAliasError,
+  SimpleLoginAliasService,
+  createSimpleLoginAliasService,
+} from "@bitwarden/generator-core";
 
 import { AliasReconciliationService } from "./alias-reconciliation.service";
 
@@ -17,6 +27,7 @@ const provider: AliasProviderIdentity = {
   connectionId,
 };
 const sensitive = (value: string): SensitiveString => value as SensitiveString;
+const transactionId = "33333333-3333-4333-8333-333333333333";
 
 function sdkAlias(id: number, address: string): Alias {
   return {
@@ -75,7 +86,34 @@ function serviceWithAliases(aliases: Alias[]): MockProxy<SimpleLoginAliasService
     }
     return alias;
   });
+  aliasService.prepareReference.mockResolvedValue(transactionId);
+  aliasService.pendingReferenceTransactions.mockResolvedValue([]);
   return aliasService;
+}
+
+type SaveFailure = "before" | "after";
+
+function durableReferenceJournal() {
+  const state: { document: AliasSyncDocument; failure?: SaveFailure } = {
+    document: createAliasSyncDocument("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+  };
+  const syncStore: AliasSyncStore = {
+    load: async () => state.document,
+    save: async (document) => {
+      const failure = state.failure;
+      state.failure = undefined;
+      if (failure === "before") {
+        throw new Error("journal-save-before-write");
+      }
+      state.document = document;
+      if (failure === "after") {
+        throw new Error("journal-save-after-write");
+      }
+    },
+  };
+  const createJournal = () =>
+    createSimpleLoginAliasService({ token: "provider-secret", connectionId, syncStore });
+  return { state, createJournal };
 }
 
 describe("alias reconciliation", () => {
@@ -104,6 +142,7 @@ describe("alias reconciliation", () => {
       cipherService,
     ).reconcile(userId, false);
 
+    expect(report).toMatchObject({ object: "aliasReconciliation", version: 2, mode: "dry-run" });
     expect(report.exactMatches[0]).toMatchObject({
       cipherId: cipherId(1),
       alias: { aliasId: "1" },
@@ -161,11 +200,12 @@ describe("alias reconciliation", () => {
     expect(stored[0].login.username).toBe("current@sl.test");
     expect(rerun.summary).toMatchObject({ plannedChanges: 0, appliedChanges: 0, exactMatches: 1 });
     expect(cipherService.updateWithServer).toHaveBeenCalledTimes(1);
-    expect(aliasService.recordReference).toHaveBeenCalledWith(
+    expect(aliasService.prepareReference).toHaveBeenCalledWith(
       cipherId(1),
       expect.objectContaining({ aliasId: "3", address: "stale@sl.test" }),
       expect.objectContaining({ aliasId: "3", address: "current@sl.test" }),
     );
+    expect(aliasService.commitReference).toHaveBeenCalledWith(transactionId);
   });
 
   it("does not infer a binding from an unbound login address", async () => {
@@ -203,6 +243,255 @@ describe("alias reconciliation", () => {
 
     expect(report.summary).toMatchObject({ appliedChanges: 0, failedChanges: 1, conflicts: 1 });
     expect(JSON.stringify(report)).not.toContain("provider-token-should-not-be-reported");
+  });
+
+  it("compensates a journal prepare that reports failure after becoming durable", async () => {
+    const aliases = [sdkAlias(1, "current@sl.test")];
+    const aliasService = serviceWithAliases(aliases);
+    const cipherService = mock<CipherService>();
+    cipherService.getAllDecrypted.mockResolvedValue([login(1, "stale@sl.test", 1)]);
+    const durable = durableReferenceJournal();
+    durable.state.failure = "after";
+
+    const report = await new AliasReconciliationService(
+      aliasService,
+      cipherService,
+      undefined,
+      durable.createJournal(),
+    ).reconcile(userId, true);
+
+    expect(report.changes).toEqual([
+      expect.objectContaining({ status: "failed", reason: "reference-prepare-failed" }),
+    ]);
+    expect(report.summary.pendingReferenceTransactions).toBe(0);
+    expect(Object.values(projectAliasSync(durable.state.document).referenceTransactions)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ status: "aborted" })]),
+    );
+    expect(cipherService.updateWithServer).not.toHaveBeenCalled();
+  });
+
+  it("leaves no transaction when the initial journal prepare fails before persistence", async () => {
+    const aliasService = serviceWithAliases([sdkAlias(1, "current@sl.test")]);
+    const cipherService = mock<CipherService>();
+    cipherService.getAllDecrypted.mockResolvedValue([login(1, "stale@sl.test", 1)]);
+    const durable = durableReferenceJournal();
+    durable.state.failure = "before";
+
+    const report = await new AliasReconciliationService(
+      aliasService,
+      cipherService,
+      undefined,
+      durable.createJournal(),
+    ).reconcile(userId, true);
+
+    expect(report.changes).toEqual([
+      expect.objectContaining({ status: "failed", reason: "reference-prepare-failed" }),
+    ]);
+    expect(projectAliasSync(durable.state.document).referenceTransactions).toEqual({});
+    expect(cipherService.updateWithServer).not.toHaveBeenCalled();
+  });
+
+  it("keeps an uncertain vault failure pending, then compensates and retries after restart", async () => {
+    const aliasService = serviceWithAliases([sdkAlias(1, "current@sl.test")]);
+    const cipherService = mock<CipherService>();
+    let stored = [login(1, "stale@sl.test", 1)];
+    cipherService.getAllDecrypted.mockImplementation(async () => stored);
+    const durable = durableReferenceJournal();
+    cipherService.updateWithServer.mockRejectedValueOnce(new Error("vault-update-failed"));
+
+    const first = await new AliasReconciliationService(
+      aliasService,
+      cipherService,
+      undefined,
+      durable.createJournal(),
+    ).reconcile(userId, true);
+
+    expect(first.changes).toEqual([
+      expect.objectContaining({ status: "pending", reason: "vault-update-outcome-unknown" }),
+    ]);
+    expect(first.summary.pendingReferenceTransactions).toBe(1);
+
+    cipherService.updateWithServer.mockImplementation(async (view) => {
+      stored = [view];
+      return view;
+    });
+    const restarted = await new AliasReconciliationService(
+      aliasService,
+      cipherService,
+      undefined,
+      durable.createJournal(),
+    ).reconcile(userId, true);
+
+    expect(restarted.summary).toMatchObject({
+      recoveredReferenceTransactions: 1,
+      pendingReferenceTransactions: 0,
+      appliedChanges: 1,
+    });
+    expect(Object.values(projectAliasSync(durable.state.document).referenceTransactions)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ status: "aborted" }),
+        expect.objectContaining({ status: "committed" }),
+      ]),
+    );
+  });
+
+  it("commits after restart when a vault write became durable before reporting failure", async () => {
+    const aliasService = serviceWithAliases([sdkAlias(1, "current@sl.test")]);
+    const cipherService = mock<CipherService>();
+    let stored = [login(1, "stale@sl.test", 1)];
+    cipherService.getAllDecrypted.mockImplementation(async () => stored);
+    const durable = durableReferenceJournal();
+    cipherService.updateWithServer.mockImplementationOnce(async (view) => {
+      stored = [view];
+      throw new Error("vault-update-after-write");
+    });
+
+    const first = await new AliasReconciliationService(
+      aliasService,
+      cipherService,
+      undefined,
+      durable.createJournal(),
+    ).reconcile(userId, true);
+
+    expect(first.changes).toEqual([
+      expect.objectContaining({ status: "pending", reason: "vault-update-outcome-unknown" }),
+    ]);
+    expect(first.summary.pendingReferenceTransactions).toBe(1);
+
+    const restarted = await new AliasReconciliationService(
+      aliasService,
+      cipherService,
+      undefined,
+      durable.createJournal(),
+    ).reconcile(userId, true);
+
+    expect(restarted.summary).toMatchObject({
+      plannedChanges: 0,
+      recoveredReferenceTransactions: 1,
+      pendingReferenceTransactions: 0,
+    });
+    expect(projectAliasSync(durable.state.document).references[cipherId(1)]).toMatchObject({
+      alias: expect.objectContaining({ address: "current@sl.test" }),
+      conflicted: false,
+    });
+  });
+
+  it.each(["before", "after"] as const)(
+    "recovers an abort that reports failure %s its durable write",
+    async (failure) => {
+      const aliasService = serviceWithAliases([sdkAlias(1, "current@sl.test")]);
+      const cipherService = mock<CipherService>();
+      let stored = [login(1, "stale@sl.test", 1)];
+      cipherService.getAllDecrypted.mockImplementation(async () => stored);
+      cipherService.updateWithServer.mockImplementation(async (view) => {
+        stored = [view];
+        return view;
+      });
+      const durable = durableReferenceJournal();
+      const journal = durable.createJournal();
+      const expected = stored[0].aliasBinding;
+      if (!expected) {
+        throw new Error("Test cipher is missing its alias binding");
+      }
+      const prepared = await journal.prepareReference(cipherId(1), expected, {
+        ...expected,
+        address: "current@sl.test",
+      });
+      durable.state.failure = failure;
+
+      const first = await new AliasReconciliationService(
+        aliasService,
+        cipherService,
+        undefined,
+        durable.createJournal(),
+      ).reconcile(userId, true);
+
+      if (failure === "before") {
+        expect(first.summary.pendingReferenceTransactions).toBe(1);
+        expect(cipherService.updateWithServer).not.toHaveBeenCalled();
+        await new AliasReconciliationService(
+          aliasService,
+          cipherService,
+          undefined,
+          durable.createJournal(),
+        ).reconcile(userId, true);
+      } else {
+        expect(first.summary).toMatchObject({
+          recoveredReferenceTransactions: 1,
+          pendingReferenceTransactions: 0,
+          appliedChanges: 1,
+        });
+      }
+
+      expect(
+        projectAliasSync(durable.state.document).referenceTransactions[prepared ?? ""],
+      ).toMatchObject({ status: "aborted" });
+      expect(stored[0].aliasBinding).toMatchObject({ address: "current@sl.test" });
+    },
+  );
+
+  it("recovers a pending commit after restart when the vault update already succeeded", async () => {
+    const aliasService = serviceWithAliases([sdkAlias(1, "current@sl.test")]);
+    const cipherService = mock<CipherService>();
+    let stored = [login(1, "stale@sl.test", 1)];
+    cipherService.getAllDecrypted.mockImplementation(async () => stored);
+    const durable = durableReferenceJournal();
+    cipherService.updateWithServer.mockImplementation(async (view) => {
+      stored = [view];
+      durable.state.failure = "before";
+      return view;
+    });
+
+    const first = await new AliasReconciliationService(
+      aliasService,
+      cipherService,
+      undefined,
+      durable.createJournal(),
+    ).reconcile(userId, true);
+
+    expect(first.changes).toEqual([
+      expect.objectContaining({ status: "pending", reason: "reference-commit-pending" }),
+    ]);
+    expect(first.summary.pendingReferenceTransactions).toBe(1);
+
+    const restarted = await new AliasReconciliationService(
+      aliasService,
+      cipherService,
+      undefined,
+      durable.createJournal(),
+    ).reconcile(userId, true);
+
+    expect(restarted.summary).toMatchObject({
+      plannedChanges: 0,
+      recoveredReferenceTransactions: 1,
+      pendingReferenceTransactions: 0,
+    });
+    expect(projectAliasSync(durable.state.document).references[cipherId(1)]).toMatchObject({
+      alias: expect.objectContaining({ address: "current@sl.test" }),
+      conflicted: false,
+    });
+  });
+
+  it("recognizes a commit that became durable before the store reported failure", async () => {
+    const aliasService = serviceWithAliases([sdkAlias(1, "current@sl.test")]);
+    const cipherService = mock<CipherService>();
+    cipherService.getAllDecrypted.mockResolvedValue([login(1, "stale@sl.test", 1)]);
+    const durable = durableReferenceJournal();
+    cipherService.updateWithServer.mockImplementation(async (view) => {
+      durable.state.failure = "after";
+      return view;
+    });
+
+    const report = await new AliasReconciliationService(
+      aliasService,
+      cipherService,
+      undefined,
+      durable.createJournal(),
+    ).reconcile(userId, true);
+
+    expect(report.changes).toEqual([expect.objectContaining({ status: "applied" })]);
+    expect(report.summary.pendingReferenceTransactions).toBe(0);
+    expect(projectAliasSync(durable.state.document).references[cipherId(1)]).toBeDefined();
   });
 
   it("reconciles 1,001 canonical bindings without manufacturing changes", async () => {

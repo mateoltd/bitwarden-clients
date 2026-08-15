@@ -30,10 +30,18 @@ describe("DesktopAliasService", () => {
     creationDate: undefined,
   } satisfies Account;
 
-  const alias = {
+  const alias = mock<SimpleLoginAlias>({
     id: 42,
     address: "alias@example.com",
-  } as SimpleLoginAlias;
+    identity: {
+      version: 1,
+      provider: "simplelogin",
+      providerInstance: "https://app.simplelogin.io/",
+      connectionId: "11111111-1111-4111-8111-111111111111",
+      aliasId: "42",
+      address: "alias@example.com",
+    },
+  });
 
   beforeEach(() => {
     accountService = mock<AccountService>();
@@ -100,7 +108,29 @@ describe("DesktopAliasService", () => {
     deleted.login = { username: alias.address } as any;
     deleted.aliasBinding = bound.aliasBinding;
 
-    cipherService.getAllDecrypted.mockResolvedValue([bound, mismatched, deleted]);
+    const otherInstance = new CipherView();
+    otherInstance.id = "other-instance" as any;
+    otherInstance.login = { username: alias.address } as any;
+    otherInstance.aliasBinding = {
+      ...bound.aliasBinding,
+      providerInstance: "https://other.simplelogin.example/",
+    };
+
+    const otherConnection = new CipherView();
+    otherConnection.id = "other-connection" as any;
+    otherConnection.login = { username: alias.address } as any;
+    otherConnection.aliasBinding = {
+      ...bound.aliasBinding,
+      connectionId: "22222222-2222-4222-8222-222222222222",
+    };
+
+    cipherService.getAllDecrypted.mockResolvedValue([
+      bound,
+      mismatched,
+      deleted,
+      otherInstance,
+      otherConnection,
+    ]);
 
     await expect(service.boundLogins(alias)).resolves.toEqual([bound]);
     expect(cipherService.getAllDecrypted).toHaveBeenCalledWith(account.id);
