@@ -35,7 +35,7 @@ assert(
   "Playwright Chromium version differs from pin",
 );
 assert(
-  runtime.playwrightVersion === manifest.toolchains.playwright,
+  runtime.playwrightVersion === manifest.clientToolchain.playwright,
   "Playwright runtime pin differs",
 );
 

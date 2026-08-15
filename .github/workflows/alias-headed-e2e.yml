@@ -2,8 +2,21 @@ name: Alias headed provider E2E
 
 on:
   push:
-    branches: [integration/public-alias-clients]
+    branches: [fix/public-alias-review-findings, integration/public-alias-clients]
   workflow_dispatch:
+    inputs:
+      provider_repository:
+        description: Public repository containing the owned-provider operations harness
+        type: string
+        default: mateoltd/simplelogin-owned-provider
+      provider_operations_ref:
+        description: Exact owned-provider operations commit
+        type: string
+        default: e157b6804f7b1b60e149207cebe2d414f6e4a73f
+      provider_upstream_ref:
+        description: Exact SimpleLogin upstream commit asserted by the harness
+        type: string
+        default: dbc45fcce4e8e6b4fa615cc729ca95a67bf75266
 
 permissions:
   contents: read
@@ -16,8 +29,9 @@ env:
   NODE_VERSION: 24.17.0
   NPM_VERSION: 11.18.0
   PYTHON_VERSION: 3.14.2
-  PROVIDER_OPERATIONS_COMMIT: e157b6804f7b1b60e149207cebe2d414f6e4a73f
-  PROVIDER_UPSTREAM_COMMIT: dbc45fcce4e8e6b4fa615cc729ca95a67bf75266
+  PROVIDER_REPOSITORY: ${{ inputs.provider_repository || 'mateoltd/simplelogin-owned-provider' }}
+  PROVIDER_OPERATIONS_COMMIT: ${{ inputs.provider_operations_ref || 'e157b6804f7b1b60e149207cebe2d414f6e4a73f' }}
+  PROVIDER_UPSTREAM_COMMIT: ${{ inputs.provider_upstream_ref || 'dbc45fcce4e8e6b4fa615cc729ca95a67bf75266' }}
   VAULT_IMAGE: docker.io/vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8
 
 jobs:
@@ -34,8 +48,8 @@ jobs:
       - name: Check out pinned real provider
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          repository: mateoltd/simplelogin-owned-provider
-          ref: e157b6804f7b1b60e149207cebe2d414f6e4a73f
+          repository: ${{ env.PROVIDER_REPOSITORY }}
+          ref: ${{ env.PROVIDER_OPERATIONS_COMMIT }}
           path: provider
           fetch-depth: 0
           persist-credentials: false
@@ -191,7 +205,13 @@ jobs:
             while IFS= read -r key; do
               docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
             done
-          npx jest --runInBand --runTestsByPath \
+          npx jest --runInBand \
+            --projects \
+              apps/cli/jest.config.js \
+              apps/desktop/jest.config.js \
+              apps/web/jest.config.js \
+              libs/tools/generator/core/jest.config.js \
+            --runTestsByPath \
             libs/tools/generator/core/src/alias/simple-login-alias.integration.spec.ts \
             libs/tools/generator/core/src/alias/alias-binding-server.integration.spec.ts \
             apps/web/src/app/tools/email-aliases/email-aliases.integration.spec.ts \
@@ -209,7 +229,9 @@ jobs:
             while IFS= read -r key; do
               docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
             done
-          npx jest --runInBand --runTestsByPath \
+          npx jest --runInBand \
+            --projects libs/tools/generator/core/jest.config.js \
+            --runTestsByPath \
             libs/tools/generator/core/src/alias/simple-login-alias.integration.spec.ts
       - name: Capture diagnostics
         if: always()

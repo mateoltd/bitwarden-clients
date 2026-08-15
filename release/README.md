@@ -62,8 +62,10 @@ root dependency, refreshes the lockfile with the pinned npm version, writes huma
 metadata, removes the superseded SDK pin, and re-runs every release and public-scope verifier. It
 does not fetch a branch or infer compatibility from a branch name.
 
-The repin changes only the public canonical SDK input. The commercial SDK is outside this release
-contract and is removed from clean-room dependency graphs before installation.
+The repin changes only the public canonical SDK input. The separately licensed commercial SDK is
+outside this release contract and is absent from the checked-in public default dependency graph.
+Its exact package metadata and opt-in install command live in `commercial-sdk-overlay.json`; see
+`commercial-sdk-boundary.md` for the license and source-usage audit.
 
 Validate the candidate against the committed pin without changing files:
 
@@ -73,9 +75,9 @@ npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --so
 
 ## Clean-room rebuild
 
-The clean-room workflow exports only tracked OSS source, excludes `bitwarden_license`, removes the
-commercial SDK from the exported package manifest and lock before dependency installation, and
-builds the requested target twice from fresh installs. Both passes use the same guarded canonical
+The clean-room workflow exports only tracked OSS source, excludes `bitwarden_license`, verifies
+that the already-OSS package manifest and lock need no rewrite, and builds the requested target
+twice from fresh installs. Both passes use the same guarded canonical
 workspace path, with the first source removed before the second export, so path-sensitive native
 toolchains receive identical inputs. It compares the logical archive content and then the final
 candidate SHA-256 values. Run the same path locally with:

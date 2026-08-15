@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "graph": "commercial-overlay",
+  "package": {
+    "name": "@bitwarden/commercial-sdk-internal",
+    "version": "0.2.0-main.950",
+    "license": "BITWARDEN SOFTWARE DEVELOPMENT KIT LICENSE AGREEMENT",
+    "repository": "https://github.com/bitwarden/sdk-internal.git",
+    "registryTarball": "https://registry.npmjs.org/@bitwarden/commercial-sdk-internal/-/commercial-sdk-internal-0.2.0-main.950.tgz",
+    "integrity": "sha512-17NkUfcm6HBxribbRtvVjCFkRfeZXOyta5T4yDDWnGPg/O9Vv72k1rksmz+rqlNdrPVG/dM3qdQ9MJu0PU1XWw=="
+  },
+  "consumers": [
+    "bitwarden_license/bit-browser/webpack.config.js",
+    "bitwarden_license/bit-cli/webpack.config.js",
+    "bitwarden_license/bit-common/src/platform/sdk/sdk-alias.d.ts",
+    "bitwarden_license/bit-web/webpack.config.js"
+  ],
+  "installCommand": "node scripts/release/commercial-sdk-overlay.mjs --install"
+}

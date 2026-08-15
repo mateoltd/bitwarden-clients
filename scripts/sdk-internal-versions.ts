@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 
-/// Ensure that `sdk-internal` and `commercial-sdk-internal` dependencies have matching versions.
+/// Ensure that public SDK pins and the explicit commercial overlay remain compatible.
 
 import { createHash } from "crypto";
 import fs from "fs";
@@ -9,15 +9,38 @@ import path from "path";
 const packageJson = JSON.parse(
   fs.readFileSync(path.join(__dirname, "..", "..", "package.json"), "utf8"),
 );
+const commercialOverlay = JSON.parse(
+  fs.readFileSync(
+    path.join(__dirname, "..", "..", "release", "commercial-sdk-overlay.json"),
+    "utf8",
+  ),
+);
 
 const sdkInternal = packageJson.dependencies["@bitwarden/sdk-internal"];
 const aliasSdkInternal = packageJson.dependencies["@bitwarden/alias-sdk-internal"];
-const commercialSdkInternal = packageJson.dependencies["@bitwarden/commercial-sdk-internal"];
+const commercialSdkInternal = commercialOverlay.package?.version;
 
 const canonicalAliasArtifact = "file:vendor/bitwarden-sdk-internal-0.2.0-alias-platform.2.tgz";
 const canonicalAliasArtifactSha256 =
   "bc9106926f418fbc139e4bb29031e2d27cf59e503abcd08455cc29ea8f79af47";
 const sdkVersion = sdkInternal === canonicalAliasArtifact ? "0.2.0-main.950" : sdkInternal;
+
+if (
+  packageJson.dependencies["@bitwarden/commercial-sdk-internal"] !== undefined ||
+  packageJson.devDependencies?.["@bitwarden/commercial-sdk-internal"] !== undefined
+) {
+  console.error("The default dependency graph must not include the commercial SDK overlay.");
+  process.exit(1);
+}
+
+if (
+  commercialOverlay.schemaVersion !== 1 ||
+  commercialOverlay.graph !== "commercial-overlay" ||
+  commercialOverlay.package?.name !== "@bitwarden/commercial-sdk-internal"
+) {
+  console.error("The commercial SDK overlay is invalid.");
+  process.exit(1);
+}
 
 if (aliasSdkInternal !== canonicalAliasArtifact) {
   console.error(
@@ -28,7 +51,7 @@ if (aliasSdkInternal !== canonicalAliasArtifact) {
 
 if (sdkVersion !== commercialSdkInternal) {
   console.error(
-    `Version mismatch between @bitwarden/sdk-internal (${sdkInternal}) and @bitwarden/commercial-sdk-internal (${commercialSdkInternal}), must be an exact match.`,
+    `Version mismatch between @bitwarden/sdk-internal (${sdkInternal}) and the explicit commercial overlay (${commercialSdkInternal}), must be an exact match.`,
   );
   process.exit(1);
 }

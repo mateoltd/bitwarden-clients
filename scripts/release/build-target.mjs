@@ -148,7 +148,7 @@ writeJson(`${artifact}.build.json`, {
     ? fs.readFileSync(sourceCommitFile, "utf8").trim()
     : (process.env.GITHUB_SHA ?? git(["rev-parse", "HEAD"])),
   sourceDateEpoch: Number(process.env.SOURCE_DATE_EPOCH),
-  toolchains: manifest.toolchains,
+  clientToolchain: manifest.clientToolchain,
   environment: {
     runnerOS: process.env.RUNNER_OS ?? process.platform,
     runnerArchitecture: process.env.RUNNER_ARCH ?? process.arch,
