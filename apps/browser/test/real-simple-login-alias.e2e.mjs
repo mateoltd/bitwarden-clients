@@ -81,18 +81,23 @@ try {
   popup = await context.newPage();
 
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html`);
+  const clickOnboardingButton = (label) =>
+    popup.evaluate((exactLabel) => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent?.trim() === exactLabel,
+      );
+      if (!(button instanceof HTMLButtonElement)) {
+        return false;
+      }
+      button.click();
+      return true;
+    }, label);
   for (let step = 0; step < 8 && !(await popup.locator("#email").isVisible()); step++) {
-    const skip = popup.getByRole("button", { name: "Skip", exact: true });
-    const logIn = popup.getByRole("button", { name: "Log in", exact: true });
-    if (await skip.isVisible().catch(() => false)) {
-      // Fresh-install state can replace this prompt while Chrome's default-manager check settles.
-      // Dispatch immediately so Playwright does not wait for actionability on a transient element.
-      await skip.dispatchEvent("click");
-    } else if (await logIn.isVisible().catch(() => false)) {
-      await logIn.dispatchEvent("click");
-    } else {
-      await popup.waitForTimeout(500);
-    }
+    // Fresh-install state can replace either prompt while Chrome's default-manager check settles.
+    // Resolve and click in one page evaluation so a detached locator cannot consume the timeout.
+    const progressed =
+      (await clickOnboardingButton("Skip")) || (await clickOnboardingButton("Log in"));
+    await popup.waitForTimeout(progressed ? 250 : 500);
   }
   try {
     await popup.locator("#email").waitFor({ timeout: 30_000 });
