@@ -164,13 +164,13 @@ try {
 
   const registration = await context.newPage();
   await registration.addInitScript(() => {
-    if (!globalThis.location.pathname.endsWith("/overlay/menu.html")) {
+    if (!globalThis.location.pathname.endsWith("/overlay/menu-list.html")) {
       return;
     }
     globalThis.addEventListener("message", (event) => {
       const message = event.data;
       if (
-        event.source === globalThis.parent ||
+        event.source !== globalThis.parent ||
         !message ||
         typeof message !== "object" ||
         typeof message.portKey !== "string" ||
