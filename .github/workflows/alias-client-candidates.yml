@@ -2,7 +2,7 @@ name: Alias client OSS candidates
 
 on:
   push:
-    branches: [integration/public-alias-clients]
+    branches: [fix/public-alias-review-findings, integration/public-alias-clients]
   workflow_dispatch:
 
 permissions:

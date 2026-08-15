@@ -2,7 +2,7 @@ name: Alias client clean-room rebuilds
 
 on:
   push:
-    branches: [integration/public-alias-clients]
+    branches: [fix/public-alias-review-findings, integration/public-alias-clients]
   workflow_dispatch:
 
 permissions:
@@ -45,9 +45,17 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Apply release lane name to dispatched checkout
-        if: github.event_name == 'workflow_dispatch' && github.ref_name != 'integration/public-alias-clients'
-        run: git branch -m integration/public-alias-clients
+      - name: Apply declared release lane name to dispatched checkout
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          release_branch="$(node -p "require('./release/alias-client-release.json').releaseLane.branch")"
+          current_branch="$(git branch --show-current)"
+          if [[ -z "$current_branch" ]]; then
+            git checkout -B "$release_branch"
+          elif [[ "$current_branch" != "$release_branch" ]]; then
+            git branch -m "$release_branch"
+          fi
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: ${{ matrix.node }}
