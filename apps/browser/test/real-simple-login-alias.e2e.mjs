@@ -247,11 +247,15 @@ try {
   await popup.locator("bit-toggle").filter({ hasText: "Password" }).click();
   const loginPassword = (await popup.locator("bit-color-password").textContent())?.trim() ?? "";
   assert.ok(loginPassword.length >= 12, "the extension must render a generated password");
+  await registration.bringToFront();
   await registration.locator("#password").fill(loginPassword);
   let saveLoginFrame;
   const saveLoginDeadline = Date.now() + 15_000;
   while (!saveLoginFrame && Date.now() < saveLoginDeadline) {
+    await registration.locator("#email").focus();
+    await registration.waitForTimeout(100);
     await registration.locator("#password").focus();
+    await registration.waitForTimeout(250);
     await registration.locator("#password").press("ArrowDown");
     await registration.waitForTimeout(250);
     for (const frame of registration
