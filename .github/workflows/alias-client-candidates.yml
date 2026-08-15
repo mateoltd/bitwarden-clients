@@ -181,6 +181,10 @@ jobs:
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then root="$(cygpath -u "$RUNNER_TEMP")"; else root="$RUNNER_TEMP"; fi
           cd "$root/source"
+          rust_source="$PWD"
+          if command -v cygpath >/dev/null 2>&1; then rust_source="$(cygpath -w "$rust_source")"; fi
+          export CARGO_INCREMENTAL=0
+          export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }--remap-path-prefix=${rust_source}=/workspace/bitwarden-clients"
           OSS_CLEAN_ROOM=1 npm run release:build -- ${{ matrix.id }} --output release-out
       - name: Install and launch candidate
         shell: bash

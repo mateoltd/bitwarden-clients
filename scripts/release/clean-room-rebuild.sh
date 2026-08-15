@@ -6,7 +6,20 @@ repository_root="$(git rev-parse --show-toplevel)"
 first_root="$(mktemp -d "/tmp/alias-clean-room-first.XXXXXX")"
 second_root="$(mktemp -d "/tmp/alias-clean-room-second.XXXXXX")"
 safe_target="${target//[^a-zA-Z0-9_.-]/-}"
-workspace_root="/tmp/alias-clean-room-${safe_target}-workspace"
+if [[ -n "${RUNNER_TEMP:-}" ]]; then
+  runner_temp="$RUNNER_TEMP"
+  if command -v cygpath >/dev/null 2>&1; then
+    runner_temp="$(cygpath -u "$runner_temp")"
+  fi
+  workspace_root="$runner_temp/source"
+else
+  workspace_root="/tmp/alias-clean-room-${safe_target}-workspace/source"
+fi
+if [[ "$workspace_root" != /* || "$workspace_root" == "/" || "$workspace_root" != */source ]]; then
+  rm -rf -- "$first_root" "$second_root"
+  echo "invalid clean-room source path: $workspace_root" >&2
+  exit 1
+fi
 if [[ -e "$workspace_root" ]]; then
   rm -rf -- "$first_root" "$second_root"
   echo "clean-room workspace is already in use: $workspace_root" >&2
@@ -22,7 +35,7 @@ trap cleanup EXIT
 build_once() {
   local label="$1"
   local clean_root="$2"
-  local source="$workspace_root/source"
+  local source="$workspace_root"
   local output="$clean_root/output"
   local log="$clean_root/build.log"
   local rust_source="$source"
