@@ -11,7 +11,11 @@ import {
   createAutofillOverlayCipherDataMock,
   createInitAutofillInlineMenuListMessageMock,
 } from "../../../../spec/autofill-mocks";
-import { flushPromises, postWindowMessage } from "../../../../spec/testing-utils";
+import {
+  flushPromises,
+  installTestMessageChannel,
+  postWindowMessage,
+} from "../../../../spec/testing-utils";
 import { EventSecurity } from "../../../../utils/event-security";
 
 import { AutofillInlineMenuList } from "./autofill-inline-menu-list";
@@ -40,6 +44,10 @@ describe("AutofillInlineMenuList", () => {
   const portKey: string = "inlineMenuListPortKey";
   const expectedOrigin = BrowserApi.getRuntimeURL("")?.slice(0, -1) || "chrome-extension://id";
   const events: { eventName: any; callback: any }[] = [];
+
+  beforeAll(() => {
+    installTestMessageChannel();
+  });
 
   beforeEach(() => {
     jest.spyOn(EventSecurity, "isEventTrusted").mockReturnValue(true);
@@ -1430,6 +1438,70 @@ describe("AutofillInlineMenuList", () => {
       await flushPromises();
 
       expect(autofillInlineMenuList["inlineMenuListContainer"]).toMatchSnapshot();
+    });
+  });
+
+  describe("email alias user activation", () => {
+    let userActionChannel: MessageChannel;
+
+    beforeEach(async () => {
+      postWindowMessage(
+        createInitAutofillInlineMenuListMessageMock({
+          authStatus: AuthenticationStatus.Unlocked,
+          ciphers: [],
+          portKey,
+          emailAliasRecommendation: {
+            hostname: "registration.example",
+            canCreate: true,
+          },
+        }),
+      );
+      await flushPromises();
+      userActionChannel = new MessageChannel();
+      const userActionChannelEvent = new MessageEvent("message", {
+        data: {
+          command: "initAutofillInlineMenuUserActionChannel",
+          token: "test-token",
+        },
+        origin: expectedOrigin,
+        source: globalThis.parent,
+      });
+      Object.defineProperty(userActionChannelEvent, "ports", {
+        value: [userActionChannel.port1],
+      });
+      globalThis.dispatchEvent(userActionChannelEvent);
+    });
+
+    afterEach(() => {
+      userActionChannel.port1.close();
+      userActionChannel.port2.close();
+    });
+
+    it("sends a trusted keyboard or pointer activation only over the private channel", () => {
+      const privatePostMessage = jest.spyOn(userActionChannel.port1, "postMessage");
+      const action = autofillInlineMenuList["inlineMenuListContainer"].querySelector(
+        "[data-email-alias-action]",
+      );
+
+      action.dispatchEvent(new MouseEvent("click"));
+
+      expect(privatePostMessage).toHaveBeenCalledWith({ command: "fillEmailAlias" });
+      expect(globalThis.parent.postMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ command: "fillEmailAlias" }),
+        expect.anything(),
+      );
+    });
+
+    it("rejects synthetic alias activation", () => {
+      jest.spyOn(EventSecurity, "isEventTrusted").mockReturnValue(false);
+      const privatePostMessage = jest.spyOn(userActionChannel.port1, "postMessage");
+      const action = autofillInlineMenuList["inlineMenuListContainer"].querySelector(
+        "[data-email-alias-action]",
+      );
+
+      action.dispatchEvent(new MouseEvent("click"));
+
+      expect(privatePostMessage).not.toHaveBeenCalled();
     });
   });
 

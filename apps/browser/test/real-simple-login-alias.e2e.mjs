@@ -81,16 +81,23 @@ try {
   popup = await context.newPage();
 
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html`);
+  const clickOnboardingButton = (label) =>
+    popup.evaluate((exactLabel) => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent?.trim() === exactLabel,
+      );
+      if (!(button instanceof HTMLButtonElement)) {
+        return false;
+      }
+      button.click();
+      return true;
+    }, label);
   for (let step = 0; step < 8 && !(await popup.locator("#email").isVisible()); step++) {
-    const skip = popup.getByRole("button", { name: "Skip", exact: true });
-    const logIn = popup.getByRole("button", { name: "Log in", exact: true });
-    if (await skip.isVisible().catch(() => false)) {
-      await skip.click();
-    } else if (await logIn.isVisible().catch(() => false)) {
-      await logIn.click();
-    } else {
-      await popup.waitForTimeout(500);
-    }
+    // Fresh-install state can replace either prompt while Chrome's default-manager check settles.
+    // Resolve and click in one page evaluation so a detached locator cannot consume the timeout.
+    const progressed =
+      (await clickOnboardingButton("Skip")) || (await clickOnboardingButton("Log in"));
+    await popup.waitForTimeout(progressed ? 250 : 500);
   }
   try {
     await popup.locator("#email").waitFor({ timeout: 30_000 });
@@ -164,7 +171,57 @@ try {
   await registration.goto(registrationUrl.toString());
   await registration.locator("#email").focus();
   await registration.waitForTimeout(1_500);
+  const menuContainerFrame = registration
+    .frames()
+    .find((frame) => frame.url().includes("/overlay/menu.html"));
+  assert.ok(menuContainerFrame, "the extension menu container must be injected");
+  await menuContainerFrame.evaluate(() => {
+    globalThis.addEventListener("message", (event) => {
+      const message = event.data;
+      if (
+        event.source === globalThis.parent ||
+        !message ||
+        typeof message !== "object" ||
+        typeof message.portKey !== "string" ||
+        typeof message.token !== "string"
+      ) {
+        return;
+      }
+      globalThis.top.postMessage(
+        {
+          command: "observedAliasSession",
+          portKey: message.portKey,
+          token: message.token,
+        },
+        "*",
+      );
+    });
+  });
+  await registration.locator("#email").press("ArrowDown");
+  await registration.waitForTimeout(300);
+  await registration.keyboard.press("Escape");
+  await registration.waitForFunction(() => window.observedAliasSessionCount() > 0);
   await registration.screenshot({ path: "/tmp/alias-registration.png" });
+  const hostileReplay = await registration.evaluate(() => window.attemptAliasReplay());
+  assert.ok(
+    hostileReplay.frameCount > 0 && hostileReplay.observedCount > 0,
+    "the hostile page must replay observed session material into an injected extension frame",
+  );
+  await registration.waitForTimeout(750);
+  assert.equal(await registration.locator("#email").inputValue(), "");
+  assert.equal(simpleLoginCreateRequests, 0, "host-parent replay must not mutate the provider");
+  const confusedDeputy = await registration.evaluate(() => window.attemptAliasConfusedDeputy());
+  assert.ok(
+    confusedDeputy.frameCount > 0,
+    "the hostile page must target an injected extension frame for the deputy attempt",
+  );
+  await registration.waitForTimeout(750);
+  assert.equal(await registration.locator("#email").inputValue(), "");
+  assert.equal(
+    simpleLoginCreateRequests,
+    0,
+    "confused-deputy messages must not mutate the provider",
+  );
   await registration.locator("#email").press("ArrowDown");
   await registration.waitForTimeout(300);
   await registration.keyboard.press("Enter");
@@ -347,6 +404,8 @@ try {
   assertServiceLogsDoNotContain(simpleLoginToken);
 
   console.log("REAL_ALIAS_CREATED_WITH_STABLE_ID");
+  console.log("HOSTILE_PARENT_REPLAY_REJECTED");
+  console.log("CONFUSED_DEPUTY_REJECTED");
   console.log("REAL_LOGIN_BOUND_AND_ENCRYPTED");
   console.log("REAL_ALIAS_REUSED");
   console.log("REAL_EXTENSION_RESTART_UNLOCKED");

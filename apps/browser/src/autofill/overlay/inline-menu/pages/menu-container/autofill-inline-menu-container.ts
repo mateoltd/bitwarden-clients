@@ -19,7 +19,6 @@ const ALLOWED_BG_COMMANDS = new Set<string>([
   "checkAutofillInlineMenuButtonFocused",
   "checkInlineMenuButtonFocused",
   "fillAutofillInlineMenuCipher",
-  "fillEmailAlias",
   "fillGeneratedPassword",
   "redirectAutofillInlineMenuFocusOut",
   "refreshGeneratedPassword",
@@ -43,6 +42,8 @@ export class AutofillInlineMenuContainer {
   private readonly pendingInlineMenuMessages: AutofillInlineMenuContainerWindowMessage[] = [];
   private token: string;
   private isInitialized: boolean = false;
+  private userActionPort?: MessagePort;
+  private portKey?: string;
   private readonly extensionOrigin: string;
   private readonly iframeStyles: Partial<CSSStyleDeclaration> = {
     all: "initial",
@@ -106,6 +107,7 @@ export class AutofillInlineMenuContainer {
     this.defaultIframeAttributes.src = message.iframeUrl;
     this.defaultIframeAttributes.title = message.pageTitle;
     this.portName = message.portName;
+    this.portKey = message.portKey;
     this.isInitialized = true;
 
     this.inlineMenuPageIframe = globalThis.document.createElement("iframe");
@@ -162,6 +164,9 @@ export class AutofillInlineMenuContainer {
     this.port.onMessage.addListener(this.handleBackgroundPortMessage);
     const initMessage = { ...message, token: this.token };
     this.postMessageToInlineMenuPageUnsafe(initMessage);
+    if (message.command === "initAutofillInlineMenuList") {
+      this.setupUserActionChannel();
+    }
     this.inlineMenuPageLoaded = true;
     for (const pendingMessage of this.pendingInlineMenuMessages.splice(0)) {
       this.postMessageToInlineMenuPage(pendingMessage);
@@ -205,11 +210,63 @@ export class AutofillInlineMenuContainer {
    *
    * @param message - The message to post.
    */
-  private postMessageToInlineMenuPageUnsafe(message: Record<string, unknown>) {
+  private postMessageToInlineMenuPageUnsafe(
+    message: Record<string, unknown>,
+    transfer: Transferable[] = [],
+  ) {
     if (this.inlineMenuPageIframe?.contentWindow) {
+      if (transfer.length) {
+        this.inlineMenuPageIframe.contentWindow.postMessage(message, "*", transfer);
+        return;
+      }
       this.inlineMenuPageIframe.contentWindow.postMessage(message, "*");
     }
   }
+
+  /** Establishes a capability channel that is transferred only to the rendered extension page. */
+  private setupUserActionChannel() {
+    if (!this.inlineMenuPageIframe?.contentWindow || this.userActionPort) {
+      return;
+    }
+    const channel = new MessageChannel();
+    this.userActionPort = channel.port1;
+    this.userActionPort.addEventListener("message", this.handleUserActionMessage);
+    this.userActionPort.start();
+    this.postMessageToInlineMenuPageUnsafe(
+      {
+        command: "initAutofillInlineMenuUserActionChannel",
+        portKey: this.portKey,
+        token: this.token,
+      },
+      [channel.port2],
+    );
+  }
+
+  /** Converts a private, trusted UI action into a one-use background capability. */
+  private handleUserActionMessage = (event: MessageEvent<unknown>) => {
+    const message = event.data;
+    if (
+      !message ||
+      typeof message !== "object" ||
+      !("command" in message) ||
+      message.command !== "fillEmailAlias" ||
+      !this.port ||
+      !this.portKey
+    ) {
+      return;
+    }
+    const emailAliasFillCapability = generateRandomChars(32);
+    this.port.postMessage({
+      command: "registerEmailAliasFillCapability",
+      portKey: this.portKey,
+      emailAliasFillCapability,
+    });
+    this.port.postMessage({
+      command: "fillEmailAlias",
+      portKey: this.portKey,
+      emailAliasFillCapability,
+    });
+  };
 
   /**
    * Posts a message from the inline menu iframe to the background script.

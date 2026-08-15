@@ -158,6 +158,7 @@ export class OverlayBackground implements OverlayBackgroundInterface {
   private generatedEmailAliases = new Map<number, GeneratedCredential>();
   private emailAliasFillInFlight = new Map<number, symbol>();
   private emailAliasRecommendationInFlight = new Map<number, symbol>();
+  private emailAliasFillCapabilities = new Map<chrome.runtime.Port, string>();
   private emailAliasStateGeneration = 0;
   private credentialPipelineSubscription: Subscription | undefined;
   private pageDetailsForTab: PageDetailsForTab = {};
@@ -266,7 +267,9 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     updateAutofillInlineMenuListHeight: ({ message }) => this.updateInlineMenuListHeight(message),
     refreshGeneratedPassword: () => this.updateGeneratedPassword(true),
     fillGeneratedPassword: ({ port }) => this.fillGeneratedPassword(port),
-    fillEmailAlias: ({ port }) => this.fillEmailAlias(port),
+    registerEmailAliasFillCapability: ({ message, port }) =>
+      this.registerEmailAliasFillCapability(message, port),
+    fillEmailAlias: ({ message, port }) => this.fillEmailAlias(message, port),
     refreshEmailAliasRecommendation: ({ port }) => this.refreshEmailAliasRecommendation(port),
     refreshOverlayCiphers: () => this.updateOverlayCiphers(false),
   };
@@ -481,6 +484,7 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     this.generatedEmailAliases.clear();
     this.emailAliasFillInFlight.clear();
     this.emailAliasRecommendationInFlight.clear();
+    this.emailAliasFillCapabilities.clear();
   }
 
   /**
@@ -2379,8 +2383,33 @@ export class OverlayBackground implements OverlayBackgroundInterface {
    * email field. The full generated credential stays in background memory until the login-save
    * handoff so its stable public identity can be bound to the cipher.
    */
-  private async fillEmailAlias(port: chrome.runtime.Port) {
+  private registerEmailAliasFillCapability(
+    message: OverlayBackgroundExtensionMessage,
+    port: chrome.runtime.Port,
+  ) {
+    const capability = message.emailAliasFillCapability;
+    if (typeof capability !== "string" || !/^[a-z]{32}$/.test(capability)) {
+      return;
+    }
+    this.emailAliasFillCapabilities.set(port, capability);
+  }
+
+  /** Consumes the one-use capability before any provider-side mutation is attempted. */
+  private consumeEmailAliasFillCapability(
+    message: OverlayBackgroundExtensionMessage,
+    port: chrome.runtime.Port,
+  ): boolean {
+    const expected = this.emailAliasFillCapabilities.get(port);
+    this.emailAliasFillCapabilities.delete(port);
+    return !!expected && message.emailAliasFillCapability === expected;
+  }
+
+  private async fillEmailAlias(
+    message: OverlayBackgroundExtensionMessage,
+    port: chrome.runtime.Port,
+  ) {
     if (
+      !this.consumeEmailAliasFillCapability(message, port) ||
       !port.sender ||
       !this.senderHasValidTab(port.sender) ||
       !this.shouldShowEmailAliasAction()
@@ -4000,6 +4029,7 @@ export class OverlayBackground implements OverlayBackgroundInterface {
    * @param port - The port that was disconnected
    */
   private handlePortOnDisconnect = (port: chrome.runtime.Port) => {
+    this.emailAliasFillCapabilities.delete(port);
     const updateVisibilityDefaults = { isVisible: false, forceUpdate: true };
 
     if (port.name === AutofillOverlayPort.List) {
