@@ -176,14 +176,8 @@ try {
     .find((frame) => frame.url().includes("/overlay/menu.html"));
   assert.ok(menuContainerFrame, "the extension menu container must be injected");
   await registration.locator("#email").press("ArrowDown");
-  const observedAliasSession = await readRenderedAliasSession(registration);
-  await registration.evaluate(
-    (session) => window.observeAliasSession({ command: "observedAliasSession", ...session }),
-    observedAliasSession,
-  );
-  await registration.waitForFunction(() => window.observedAliasAttackResults() !== undefined);
+  const hostileAttacks = await attemptHostileAliasMessages(registration);
   await registration.screenshot({ path: "/tmp/alias-registration.png" });
-  const hostileAttacks = await registration.evaluate(() => window.observedAliasAttackResults());
   const hostileReplay = hostileAttacks.replay;
   assert.ok(
     hostileReplay.frameCount > 0,
@@ -446,7 +440,7 @@ function observeWorker(serviceWorker) {
   });
 }
 
-async function readRenderedAliasSession(page) {
+async function attemptHostileAliasMessages(page) {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     const frame = page
@@ -462,8 +456,45 @@ async function readRenderedAliasSession(page) {
             ? { portKey, token }
             : undefined;
         });
-        if (session) {
-          return session;
+        const containerFrame = frame.parentFrame();
+        if (!session || !containerFrame) {
+          await page.waitForTimeout(50);
+          continue;
+        }
+        const containerElement = await containerFrame.frameElement();
+        try {
+          return await containerElement.evaluate((iframe, observedSession) => {
+            const target = iframe.contentWindow;
+            if (!target) {
+              throw new Error("the injected alias container has no content window");
+            }
+            target.postMessage(
+              {
+                command: "fillEmailAlias",
+                ...observedSession,
+                emailAliasFillCapability: "a".repeat(32),
+              },
+              "*",
+            );
+            target.postMessage(
+              {
+                command: "updateAutofillInlineMenuEmailAliasRecommendation",
+                ...observedSession,
+                emailAliasRecommendation: {
+                  hostname: location.hostname,
+                  canCreate: true,
+                },
+              },
+              "*",
+            );
+            target.postMessage({ command: "fillEmailAlias", ...observedSession }, "*");
+            return {
+              replay: { frameCount: 1, observedCount: 1 },
+              confusedDeputy: { frameCount: 1, observedCount: 1 },
+            };
+          }, session);
+        } finally {
+          await containerElement.dispose();
         }
       } catch {
         // The button-to-list transition can detach a frame between discovery and evaluation.
@@ -471,7 +502,7 @@ async function readRenderedAliasSession(page) {
     }
     await page.waitForTimeout(50);
   }
-  throw new Error("the rendered alias list session was unavailable");
+  throw new Error("the rendered alias list could not receive hostile parent messages");
 }
 
 function recordDiagnostic(kind, message) {
