@@ -15,5 +15,23 @@
 - Handoff manifest SHA-256: `69e35520d0b5cfa1e321b4bcbcbd6a2d0283aa430c6cdb3ae46540b9a538a184`
 - Published checksum index: `vendor/bitwarden-sdk-internal-0.2.0-alias-platform.2.candidate.SHA256SUMS`
 - Checksum index SHA-256: `f1198ebb3d5b9e47204aca6d7c0d2a934e9dae5c6135f5df3e4be4814b763709`
+- Raw SDK producer environment: `vendor/bitwarden-sdk-internal-0.2.0-alias-platform.2.build-environment.txt`
+- Raw SDK producer environment SHA-256: `3e2855d9d38968721caed7d2cba92e89b64cb4fa81f3ec43002a01021f99df0e`
+- Client SDK toolchain handoff: `vendor/bitwarden-sdk-internal-0.2.0-alias-platform.2.toolchain-handoff.json`
+- Toolchain handoff SHA-256: `b7aaf9cd8ed2e5135cfb12662affc13f6cf5540a4fbaf1af96f810bc3d1b16a3`
+
+## SDK producer toolchain
+
+- Runner image: `ubuntu24-20260720.247.2`
+- Node: `24.17.0`
+- npm: `11.13.0`
+- Rust: `1.96.0`
+- wasm-opt: `131`
+
+These values describe the separately produced SDK artifact. They are validated independently from
+the alias client release toolchain, whose npm version is `11.18.0`. The toolchain handoff names
+values that the producer's immutable text evidence emitted without field labels, and separately
+records the client consumer toolchain. It does not alter the producer evidence or imply that the
+npm versions match.
 
 This archive is an explicit, checksum-enforced build input for the public OSS clients.

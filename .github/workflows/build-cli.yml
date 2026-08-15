@@ -144,9 +144,9 @@ jobs:
         run: npm ci
         working-directory: ./
 
-      - name: Remove commercial packages
-        if: ${{ matrix.license_type.type == 'oss' }}
-        run: rm -rf node_modules/@bitwarden/commercial-sdk-internal
+      - name: Install commercial SDK overlay
+        if: ${{ matrix.license_type.type == 'commercial' }}
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
         working-directory: ./
 
       - name: Download SDK Artifacts
@@ -446,9 +446,9 @@ jobs:
         run: npm ci
         working-directory: ./
 
-      - name: Remove commercial packages
-        if: ${{ matrix.license_type.type == 'oss' }}
-        run: Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "node_modules/@bitwarden/commercial-sdk-internal"
+      - name: Install commercial SDK overlay
+        if: ${{ matrix.license_type.type == 'commercial' }}
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
         working-directory: ./
 
       - name: Download SDK Artifacts

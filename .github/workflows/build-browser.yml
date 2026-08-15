@@ -188,6 +188,12 @@ jobs:
           FILES=$(find . -maxdepth 1 -type f)
           for FILE in $FILES; do cp "$FILE" browser-source/; done
 
+          # Include the explicit commercial dependency overlay without adding it to the public
+          # default install graph.
+          mkdir -p browser-source/release browser-source/scripts/release
+          cp release/commercial-sdk-overlay.json browser-source/release/
+          cp scripts/release/commercial-sdk-overlay.mjs scripts/release/lib.mjs browser-source/scripts/release/
+
           # Copy apps/browser to the Browser source directory
           mkdir -p browser-source/apps/browser
           cp -r apps/browser/* browser-source/apps/browser
@@ -305,9 +311,9 @@ jobs:
         run: npm ci
         working-directory: browser-source/
 
-      - name: Remove commercial packages
-        if: ${{ matrix.license_type.type == 'oss' }}
-        run: rm -rf node_modules/@bitwarden/commercial-sdk-internal
+      - name: Install commercial SDK overlay
+        if: ${{ matrix.license_type.type == 'commercial' }}
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
         working-directory: browser-source/
 
       - name: Download SDK artifacts
@@ -516,9 +522,9 @@ jobs:
         run: npm ci
         working-directory: ./
 
-      - name: Remove commercial packages
-        if: ${{ matrix.license_type.type == 'oss' }}
-        run: rm -rf node_modules/@bitwarden/commercial-sdk-internal
+      - name: Install commercial SDK overlay
+        if: ${{ matrix.license_type.type == 'commercial' }}
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
         working-directory: ./
 
       - name: Download SDK Artifacts

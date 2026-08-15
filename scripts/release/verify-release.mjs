@@ -8,6 +8,32 @@ run(process.execPath, ["scripts/release/verify-sdk.mjs"]);
 run(process.execPath, ["scripts/release/scope-audit.mjs"]);
 
 const manifest = readManifest();
+const headedWorkflow = fs.readFileSync(
+  path.join(repositoryRoot, ".github/workflows/alias-headed-e2e.yml"),
+  "utf8",
+);
+const providerRepositoryUrl = new URL(manifest.testInfrastructure.simpleLogin.repository);
+const providerRepository = providerRepositoryUrl.pathname.replace(/^\//, "").replace(/\.git$/, "");
+assert(
+  providerRepositoryUrl.protocol === "https:" && providerRepository.split("/").length === 2,
+  "Provider test repository must be an exact public HTTPS repository",
+);
+for (const expected of [
+  `default: ${providerRepository}`,
+  `default: ${manifest.testInfrastructure.simpleLogin.operationsCommit}`,
+  `default: ${manifest.testInfrastructure.simpleLogin.upstreamCommit}`,
+]) {
+  assert(
+    headedWorkflow.includes(expected),
+    `Headed provider workflow default is missing: ${expected}`,
+  );
+}
+assert(
+  headedWorkflow.includes("provider_repository:") &&
+    headedWorkflow.includes("provider_operations_ref:") &&
+    headedWorkflow.includes("provider_upstream_ref:"),
+  "Headed provider repository and refs are not parameterizable",
+);
 const sourceCommitFile = path.join(repositoryRoot, ".release-source-commit");
 let head;
 let branch;
@@ -70,28 +96,86 @@ for (const lock of [
 
 const rootPackage = readJson(path.join(repositoryRoot, "package.json"));
 const packageLock = readJson(path.join(repositoryRoot, "package-lock.json"));
+const commercialOverlay = readJson(
+  path.join(repositoryRoot, "release/commercial-sdk-overlay.json"),
+);
 assert(
-  rootPackage.packageManager === `npm@${manifest.toolchains.npm}`,
+  !rootPackage.dependencies?.["@bitwarden/commercial-sdk-internal"] &&
+    !rootPackage.devDependencies?.["@bitwarden/commercial-sdk-internal"],
+  "Commercial SDK dependency entered the public default package manifest",
+);
+assert(
+  !packageLock.packages?.[""]?.dependencies?.["@bitwarden/commercial-sdk-internal"] &&
+    !packageLock.packages?.[""]?.devDependencies?.["@bitwarden/commercial-sdk-internal"] &&
+    !Object.keys(packageLock.packages ?? {}).some((key) =>
+      key.startsWith("node_modules/@bitwarden/commercial-sdk-internal"),
+    ),
+  "Commercial SDK dependency entered the public default lockfile",
+);
+assert(
+  commercialOverlay.schemaVersion === 1 &&
+    commercialOverlay.graph === "commercial-overlay" &&
+    commercialOverlay.package?.name === "@bitwarden/commercial-sdk-internal" &&
+    commercialOverlay.package?.version === "0.2.0-main.950" &&
+    commercialOverlay.package?.license === "BITWARDEN SOFTWARE DEVELOPMENT KIT LICENSE AGREEMENT" &&
+    commercialOverlay.package?.repository === "https://github.com/bitwarden/sdk-internal.git" &&
+    commercialOverlay.package?.registryTarball ===
+      "https://registry.npmjs.org/@bitwarden/commercial-sdk-internal/-/commercial-sdk-internal-0.2.0-main.950.tgz" &&
+    /^sha512-[A-Za-z0-9+/]+={0,2}$/.test(commercialOverlay.package?.integrity ?? ""),
+  "Commercial SDK overlay evidence is invalid",
+);
+assert(
+  commercialOverlay.installCommand === "node scripts/release/commercial-sdk-overlay.mjs --install",
+  "Commercial SDK overlay is not explicitly installable",
+);
+const publicCommercialImports = ["apps", "libs"].flatMap((directory) =>
+  fs
+    .readdirSync(path.join(repositoryRoot, directory), { recursive: true })
+    .filter((entry) => /\.(?:[cm]?[jt]sx?|json)$/.test(entry))
+    .filter((entry) => fs.statSync(path.join(repositoryRoot, directory, entry)).isFile())
+    .filter((entry) =>
+      fs
+        .readFileSync(path.join(repositoryRoot, directory, entry), "utf8")
+        .includes("@bitwarden/commercial-sdk-internal"),
+    )
+    .map((entry) => `${directory}/${entry}`),
+);
+assert(
+  publicCommercialImports.length === 0,
+  `Public source imports the commercial SDK: ${publicCommercialImports.join(", ")}`,
+);
+if (fs.existsSync(path.join(repositoryRoot, "bitwarden_license"))) {
+  for (const consumer of commercialOverlay.consumers ?? []) {
+    const consumerFile = path.join(repositoryRoot, consumer);
+    assert(
+      fs.existsSync(consumerFile) &&
+        fs.readFileSync(consumerFile, "utf8").includes("@bitwarden/commercial-sdk-internal"),
+      `Commercial overlay consumer is missing: ${consumer}`,
+    );
+  }
+}
+assert(
+  rootPackage.packageManager === `npm@${manifest.clientToolchain.npm}`,
   "packageManager does not match the release manifest",
 );
 assert(
   fs.readFileSync(path.join(repositoryRoot, ".nvmrc"), "utf8").trim() ===
-    `v${manifest.toolchains.node}`,
+    `v${manifest.clientToolchain.node}`,
   "Root Node pin does not match the release manifest",
 );
 assert(
   fs.readFileSync(path.join(repositoryRoot, "apps/cli/.nvmrc"), "utf8").trim() ===
-    `v${manifest.toolchains.cliNode}`,
+    `v${manifest.clientToolchain.cliNode}`,
   "CLI Node pin does not match the release manifest",
 );
 assert(
   fs.readFileSync(path.join(repositoryRoot, ".python-version"), "utf8").trim() ===
-    manifest.toolchains.python,
+    manifest.clientToolchain.python,
   "Python pin does not match the release manifest",
 );
 assert(
   readJson(path.join(repositoryRoot, "release/tooling/package.json")).packageManager ===
-    `npm@${manifest.toolchains.npm}`,
+    `npm@${manifest.clientToolchain.npm}`,
   "Release tooling npm pin does not match the release manifest",
 );
 const rustToolchain = fs.readFileSync(
@@ -99,25 +183,25 @@ const rustToolchain = fs.readFileSync(
   "utf8",
 );
 assert(
-  rustToolchain.includes(`channel = "${manifest.toolchains.rust}"`),
+  rustToolchain.includes(`channel = "${manifest.clientToolchain.rust}"`),
   "Rust pin does not match the release manifest",
 );
 const electronBuilder = readJson(path.join(repositoryRoot, "apps/desktop/electron-builder.json"));
 assert(
-  electronBuilder.electronVersion === manifest.toolchains.electron,
+  electronBuilder.electronVersion === manifest.clientToolchain.electron,
   "Electron pin does not match the release manifest",
 );
 assert(
-  rootPackage.devDependencies["electron-builder"] === manifest.toolchains.electronBuilder,
+  rootPackage.devDependencies["electron-builder"] === manifest.clientToolchain.electronBuilder,
   "electron-builder pin does not match the release manifest",
 );
 assert(
-  rootPackage.devDependencies.playwright === manifest.toolchains.playwright,
+  rootPackage.devDependencies.playwright === manifest.clientToolchain.playwright,
   "Playwright pin does not match the release manifest",
 );
 const chromiumRuntime = manifest.testInfrastructure.chromium;
 assert(
-  chromiumRuntime.playwrightVersion === manifest.toolchains.playwright,
+  chromiumRuntime.playwrightVersion === manifest.clientToolchain.playwright,
   "Chromium runtime Playwright version does not match the toolchain pin",
 );
 assert(/^\d+$/.test(chromiumRuntime.revision), "Chromium runtime revision is invalid");
@@ -141,21 +225,6 @@ if (process.env.OSS_CLEAN_ROOM === "1") {
   assert(
     !fs.existsSync(path.join(repositoryRoot, "node_modules/@bitwarden/commercial-sdk-internal")),
     "Commercial SDK package entered OSS clean room",
-  );
-  assert(
-    !rootPackage.dependencies?.["@bitwarden/commercial-sdk-internal"] &&
-      !rootPackage.devDependencies?.["@bitwarden/commercial-sdk-internal"],
-    "Commercial SDK dependency entered OSS clean-room package manifest",
-  );
-  assert(
-    !packageLock.packages?.[""]?.dependencies?.["@bitwarden/commercial-sdk-internal"] &&
-      !packageLock.packages?.[""]?.devDependencies?.["@bitwarden/commercial-sdk-internal"] &&
-      !Object.keys(packageLock.packages ?? {}).some(
-        (key) =>
-          key === "node_modules/@bitwarden/commercial-sdk-internal" ||
-          key.startsWith("node_modules/@bitwarden/commercial-sdk-internal/"),
-      ),
-    "Commercial SDK dependency entered OSS clean-room lockfile",
   );
 }
 

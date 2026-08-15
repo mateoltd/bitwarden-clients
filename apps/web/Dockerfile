@@ -7,7 +7,11 @@ FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS node-build
 WORKDIR /source
 COPY package*.json ./
 COPY . .
-RUN npm ci
+ARG LICENSE_TYPE=oss
+RUN npm ci && \
+    if [ "${LICENSE_TYPE}" = "commercial" ] ; then \
+      node scripts/release/commercial-sdk-overlay.mjs --install ; \
+    fi
 
 # Override SDK if custom artifacts are present
 RUN if [ -d "sdk-internal" ]; then \
@@ -18,12 +22,6 @@ RUN if [ -d "sdk-internal" ]; then \
 RUN if [ -d "commercial-sdk-internal" ]; then \
       echo "Overriding Commercial SDK with custom artifacts from commercial-sdk-internal" ; \
       npm link ./commercial-sdk-internal ; \
-    fi
-
-# Remove commercial packages if LICENSE_TYPE is not 'commercial'
-ARG LICENSE_TYPE=oss
-RUN if [ "${LICENSE_TYPE}" != "commercial" ] ; then \
-      rm -rf node_modules/@bitwarden/commercial-sdk-internal ; \
     fi
 
 WORKDIR /source/apps/web

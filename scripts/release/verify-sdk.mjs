@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   assert,
   hashFile,
+  parseSdkProducerToolchainEvidence,
   readJson,
   readManifest,
   repositoryRoot,
@@ -17,6 +18,7 @@ const artifact = path.join(repositoryRoot, sdk.artifact);
 const provenanceFile = path.join(repositoryRoot, sdk.provenance);
 const candidateChecksumsFile = path.join(repositoryRoot, sdk.candidateChecksums);
 const buildEnvironmentFile = path.join(repositoryRoot, sdk.buildEnvironment);
+const toolchainHandoffFile = path.join(repositoryRoot, sdk.toolchainHandoff);
 const packageJson = readJson(path.join(repositoryRoot, "package.json"));
 const packageLock = readJson(path.join(repositoryRoot, "package-lock.json"));
 
@@ -30,6 +32,10 @@ assert(
   fs.existsSync(buildEnvironmentFile),
   `Pinned SDK build environment is missing: ${sdk.buildEnvironment}`,
 );
+assert(
+  fs.existsSync(toolchainHandoffFile),
+  `Pinned SDK toolchain handoff is missing: ${sdk.toolchainHandoff}`,
+);
 assert(hashFile(artifact) === sdk.sha256, "Pinned SDK SHA-256 does not match the manifest");
 assert(
   hashFile(provenanceFile) === sdk.provenanceSha256,
@@ -38,6 +44,14 @@ assert(
 assert(
   hashFile(candidateChecksumsFile) === sdk.candidateChecksumsSha256,
   "Pinned SDK checksum index SHA-256 does not match the manifest",
+);
+assert(
+  hashFile(buildEnvironmentFile) === sdk.buildEnvironmentSha256,
+  "Pinned SDK raw build environment SHA-256 does not match the manifest",
+);
+assert(
+  hashFile(toolchainHandoffFile) === sdk.toolchainHandoffSha256,
+  "Pinned SDK toolchain handoff SHA-256 does not match the manifest",
 );
 assert(
   sha512Integrity(artifact) === sdk.integrity,
@@ -51,6 +65,14 @@ assert(
   `Unexpected SDK package name: ${embeddedPackage.name}`,
 );
 assert(embeddedPackage.version === sdk.version, "Embedded SDK version does not match the manifest");
+assert(
+  embeddedPackage.license === "GPL-3.0-only",
+  `Pinned public SDK is not GPL-3.0-only: ${embeddedPackage.license ?? "missing license"}`,
+);
+assert(
+  embeddedPackage.repository?.url === "git+https://github.com/bitwarden/sdk-internal.git",
+  "Pinned public SDK package metadata names an unexpected source repository",
+);
 assert(
   embeddedCommit === sdk.sourceCommit,
   "Embedded SDK source commit does not match the manifest",
@@ -95,9 +117,35 @@ assert(
   checksumLines.includes(checksumLine),
   "SDK candidate checksum index does not contain the pinned package",
 );
+const rawBuildEnvironment = fs.readFileSync(buildEnvironmentFile, "utf8");
+const parsedProducerEvidence = parseSdkProducerToolchainEvidence(rawBuildEnvironment);
+const { sourceCommit: producerSourceCommit, ...parsedProducerToolchain } = parsedProducerEvidence;
+assert(producerSourceCommit === sdk.sourceCommit, "SDK build environment source commit differs");
 assert(
-  fs.readFileSync(buildEnvironmentFile, "utf8").includes(`source_commit=${sdk.sourceCommit}`),
-  "SDK build environment source commit differs",
+  JSON.stringify(parsedProducerToolchain) === JSON.stringify(sdk.producerToolchain),
+  "SDK producer toolchain does not match the named manifest fields",
+);
+const toolchainHandoff = readJson(toolchainHandoffFile);
+assert(
+  toolchainHandoff.schemaVersion === 1 &&
+    toolchainHandoff.evidenceType === "client-sdk-toolchain-handoff",
+  "SDK toolchain handoff has an unsupported schema",
+);
+assert(
+  toolchainHandoff.sdkProducer?.evidence?.path === sdk.buildEnvironment &&
+    toolchainHandoff.sdkProducer?.evidence?.sha256 === sdk.buildEnvironmentSha256,
+  "SDK toolchain handoff does not identify the raw producer evidence",
+);
+assert(
+  JSON.stringify(toolchainHandoff.sdkProducer?.toolchain) === JSON.stringify(sdk.producerToolchain),
+  "SDK toolchain handoff differs from the manifest producer toolchain",
+);
+assert(
+  toolchainHandoff.clientConsumer?.manifestPath ===
+    "release/alias-client-release.json#/clientToolchain" &&
+    JSON.stringify(toolchainHandoff.clientConsumer?.toolchain) ===
+      JSON.stringify(manifest.clientToolchain),
+  "SDK toolchain handoff differs from the manifest client consumer toolchain",
 );
 
 const dependency = `file:${sdk.artifact}`;
@@ -141,6 +189,14 @@ for (const value of [
   sdk.provenanceSha256,
   sdk.candidateChecksums,
   sdk.candidateChecksumsSha256,
+  sdk.buildEnvironment,
+  sdk.buildEnvironmentSha256,
+  sdk.toolchainHandoff,
+  sdk.toolchainHandoffSha256,
+  sdk.producerToolchain.node,
+  sdk.producerToolchain.npm,
+  sdk.producerToolchain.rust,
+  sdk.producerToolchain.wasmOpt,
   String(sdk.workflow.runId),
   String(sdk.workflow.artifactId),
   sdk.workflow.artifactName,
