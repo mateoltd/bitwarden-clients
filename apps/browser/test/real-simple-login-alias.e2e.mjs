@@ -163,19 +163,10 @@ try {
   assert.equal(browserStorage.includes(simpleLoginToken), false);
 
   const registration = await context.newPage();
-  registration.on("console", (message) => {
-    if (message.type() === "error") {
-      recordDiagnostic("REGISTRATION_CONSOLE_ERROR", message.text());
+  await registration.addInitScript(() => {
+    if (!globalThis.location.pathname.endsWith("/overlay/menu.html")) {
+      return;
     }
-  });
-  await registration.goto(registrationUrl.toString());
-  await registration.locator("#email").focus();
-  await registration.waitForTimeout(1_500);
-  const menuContainerFrame = registration
-    .frames()
-    .find((frame) => frame.url().includes("/overlay/menu.html"));
-  assert.ok(menuContainerFrame, "the extension menu container must be injected");
-  await menuContainerFrame.evaluate(() => {
     globalThis.addEventListener("message", (event) => {
       const message = event.data;
       if (
@@ -197,6 +188,18 @@ try {
       );
     });
   });
+  registration.on("console", (message) => {
+    if (message.type() === "error") {
+      recordDiagnostic("REGISTRATION_CONSOLE_ERROR", message.text());
+    }
+  });
+  await registration.goto(registrationUrl.toString());
+  await registration.locator("#email").focus();
+  await registration.waitForTimeout(1_500);
+  const menuContainerFrame = registration
+    .frames()
+    .find((frame) => frame.url().includes("/overlay/menu.html"));
+  assert.ok(menuContainerFrame, "the extension menu container must be injected");
   await registration.locator("#email").press("ArrowDown");
   await registration.waitForTimeout(300);
   await registration.waitForFunction(() => window.observedAliasSessionCount() > 0);
