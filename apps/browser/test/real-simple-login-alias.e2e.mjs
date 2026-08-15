@@ -257,8 +257,15 @@ try {
     await registration.waitForTimeout(100);
     await registration.locator("#email").focus();
     await registration.waitForTimeout(250);
-    await registration.locator("#email").press("ArrowDown");
-    await registration.waitForTimeout(250);
+    const inlineMenuButtonFrame = registration
+      .frames()
+      .find((candidate) => candidate.url().includes("/overlay/menu-button.html"));
+    const inlineMenuButton = inlineMenuButtonFrame?.locator(".inline-menu-button");
+    if (!(await inlineMenuButton?.isVisible().catch(() => false))) {
+      continue;
+    }
+    await inlineMenuButton.click();
+    await registration.waitForTimeout(500);
     for (const frame of registration
       .frames()
       .filter((candidate) => candidate.url().includes("/overlay/menu-list.html"))) {
