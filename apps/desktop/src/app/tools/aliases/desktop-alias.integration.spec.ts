@@ -167,7 +167,7 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
 
     expect(fixture.nativeElement.textContent).toContain(created.address);
     expect(fixture.nativeElement.textContent).toContain(boundLogin.name);
-    expect(fixture.nativeElement.textContent).toContain(`ID ${created.id}`);
+    expect(fixture.nativeElement.textContent).toContain(`aliasIdentifier ${created.id}`);
 
     (fixture.componentInstance as any).editName.set(`Desktop ${marker}`);
     await (fixture.componentInstance as any).saveAlias();
