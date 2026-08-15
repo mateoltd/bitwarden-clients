@@ -38,6 +38,21 @@ export function normalizeEmailAliasAddress(address: string | null | undefined): 
   return address?.trim().toLowerCase() ?? "";
 }
 
+/** Compare every field in the canonical v1 connection-scoped identity. */
+export function emailAliasIdentitiesEqual(
+  left: EmailAliasIdentity,
+  right: EmailAliasIdentity,
+): boolean {
+  return (
+    left.version === right.version &&
+    left.provider === right.provider &&
+    left.providerInstance === right.providerInstance &&
+    left.connectionId === right.connectionId &&
+    left.aliasId === right.aliasId &&
+    normalizeEmailAliasAddress(left.address) === normalizeEmailAliasAddress(right.address)
+  );
+}
+
 /** Parse an untrusted alias identity while retaining only the public, versioned fields. */
 export function parseEmailAliasIdentity(value: unknown): EmailAliasIdentity | undefined {
   if (value == null || typeof value !== "object") {

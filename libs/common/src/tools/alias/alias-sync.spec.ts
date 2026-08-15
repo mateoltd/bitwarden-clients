@@ -8,6 +8,7 @@ import {
   emailAliasKey,
   mergeAliasSyncDocuments,
   parseAliasSyncDocument,
+  pendingAliasReferenceTransactions,
   projectAliasSync,
 } from "./alias-sync";
 
@@ -278,6 +279,108 @@ describe("alias synchronization state machine", () => {
       alias: thirdAlias,
       conflicted: false,
     });
+  });
+
+  it("keeps a prepared reference inert until a causally valid commit", () => {
+    const replacement = { ...alias, aliasId: "42", address: "replacement@sl.test" };
+    let document = createAliasSyncDocument(replicaA);
+    document = append(
+      document,
+      {
+        kind: "reference-prepare",
+        cipherId: "cipher-transaction",
+        expectedAlias: alias,
+        alias: replacement,
+      },
+      260,
+    );
+    const transactionId = document.events.at(-1)?.id ?? "";
+    expect(transactionId).toBeDefined();
+    expect(projectAliasSync(document).references["cipher-transaction"]).toBeUndefined();
+    expect(pendingAliasReferenceTransactions(document)).toEqual([
+      expect.objectContaining({ transactionId, status: "pending" }),
+    ]);
+
+    document = append(document, { kind: "reference-commit", transactionId: transactionId }, 261);
+
+    expect(projectAliasSync(document).references["cipher-transaction"]).toMatchObject({
+      alias: replacement,
+      conflicted: false,
+    });
+    expect(pendingAliasReferenceTransactions(document)).toEqual([]);
+  });
+
+  it("keeps an aborted reference transaction out of the committed projection", () => {
+    let document = createAliasSyncDocument(replicaA);
+    document = append(
+      document,
+      {
+        kind: "reference-prepare",
+        cipherId: "cipher-aborted",
+        expectedAlias: null,
+        alias,
+      },
+      262,
+    );
+    const transactionId = document.events.at(-1)?.id ?? "";
+    expect(transactionId).toBeDefined();
+    document = append(document, { kind: "reference-abort", transactionId: transactionId }, 263);
+
+    expect(projectAliasSync(document).references["cipher-aborted"]).toBeUndefined();
+    expect(projectAliasSync(document).referenceTransactions[transactionId].status).toBe("aborted");
+  });
+
+  it("projects pending and committed reference transactions safely across devices", () => {
+    let source = createAliasSyncDocument(replicaA);
+    source = append(
+      source,
+      {
+        kind: "reference-prepare",
+        cipherId: "cipher-cross-device",
+        expectedAlias: null,
+        alias,
+      },
+      264,
+    );
+    const transactionId = source.events.at(-1)?.id ?? "";
+    expect(transactionId).toBeDefined();
+    let remote = mergeAliasSyncDocuments(createAliasSyncDocument(replicaB), source);
+
+    expect(pendingAliasReferenceTransactions(remote)).toEqual([]);
+    expect(projectAliasSync(remote).references["cipher-cross-device"]).toBeUndefined();
+
+    source = append(source, { kind: "reference-commit", transactionId: transactionId }, 265);
+    remote = mergeAliasSyncDocuments(remote, source);
+
+    expect(projectAliasSync(remote).references["cipher-cross-device"]).toMatchObject({
+      alias,
+      conflicted: false,
+    });
+  });
+
+  it("rejects a confused deputy settling another replica's reference transaction", () => {
+    let owner = createAliasSyncDocument(replicaA);
+    owner = append(
+      owner,
+      {
+        kind: "reference-prepare",
+        cipherId: "cipher-confused-deputy",
+        expectedAlias: null,
+        alias,
+      },
+      266,
+    );
+    const transactionId = owner.events.at(-1)?.id ?? "";
+    expect(transactionId).toBeDefined();
+    let deputy = mergeAliasSyncDocuments(createAliasSyncDocument(replicaB), owner);
+    deputy = append(deputy, { kind: "reference-commit", transactionId: transactionId }, 267);
+
+    const projection = projectAliasSync(deputy);
+    expect(projection.references["cipher-confused-deputy"]).toBeUndefined();
+    expect(projection.referenceTransactions[transactionId].status).toBe("conflicted");
+    expect(projection.conflicts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "event-integrity" })]),
+    );
   });
 
   it("retains concurrent conflicting conflict resolutions", () => {

@@ -73,6 +73,14 @@ export type AliasSyncEvent = AliasSyncEventBase &
         alias: EmailAliasIdentity;
       }
     | { kind: "reference-clear"; cipherId: string; expectedAliasKey: string | null }
+    | {
+        kind: "reference-prepare";
+        cipherId: string;
+        expectedAlias: EmailAliasIdentity | null;
+        alias: EmailAliasIdentity;
+      }
+    | { kind: "reference-commit"; transactionId: string }
+    | { kind: "reference-abort"; transactionId: string }
     | { kind: "conflict-resolve"; conflictId: string; chosenEventId: string }
   );
 
@@ -132,10 +140,23 @@ export type AliasProjectedReference = {
   conflicted: boolean;
 };
 
+export type AliasReferenceTransactionStatus = "pending" | "committed" | "aborted" | "conflicted";
+
+export type AliasProjectedReferenceTransaction = {
+  transactionId: string;
+  ownerReplicaId: string;
+  cipherId: string;
+  expectedAlias: EmailAliasIdentity | null;
+  expectedAliasKey: string | null;
+  alias: EmailAliasIdentity;
+  status: AliasReferenceTransactionStatus;
+};
+
 export type AliasSyncProjection = {
   connections: Record<string, AliasProjectedConnection>;
   aliases: Record<string, AliasProjectedAlias>;
   references: Record<string, AliasProjectedReference>;
+  referenceTransactions: Record<string, AliasProjectedReferenceTransaction>;
   operations: Record<string, AliasProjectedOperation>;
   conflicts: AliasSyncConflict[];
 };
@@ -418,6 +439,13 @@ function sanitizeInput(input: AliasSyncEventInput): AliasSyncEventInput {
             : nonEmptyString(input.expectedAliasKey, "reference precondition"),
         alias: sanitizeIdentity(input.alias),
       };
+    case "reference-prepare":
+      return {
+        kind: "reference-prepare",
+        cipherId: nonEmptyString(input.cipherId, "cipher id"),
+        expectedAlias: input.expectedAlias === null ? null : sanitizeIdentity(input.expectedAlias),
+        alias: sanitizeIdentity(input.alias),
+      };
     case "reference-clear":
       return {
         kind: "reference-clear",
@@ -427,6 +455,10 @@ function sanitizeInput(input: AliasSyncEventInput): AliasSyncEventInput {
             ? null
             : nonEmptyString(input.expectedAliasKey, "reference precondition"),
       };
+    case "reference-commit":
+    case "reference-abort":
+      assertUuid(input.transactionId, "reference transaction id");
+      return { kind: input.kind, transactionId: input.transactionId.toLowerCase() };
     case "conflict-resolve":
       assertUuid(input.chosenEventId, "chosen event id");
       return {
@@ -680,6 +712,7 @@ export function projectAliasSync(document: AliasSyncDocument): AliasSyncProjecti
   const connections: Record<string, AliasProjectedConnection> = {};
   const aliases: Record<string, AliasProjectedAlias> = {};
   const references: Record<string, AliasProjectedReference> = {};
+  const referenceTransactions: Record<string, AliasProjectedReferenceTransaction> = {};
   const operations: Record<string, AliasProjectedOperation> = {};
 
   const resolutionGroups = new Map<
@@ -907,8 +940,84 @@ export function projectAliasSync(document: AliasSyncDocument): AliasSyncProjecti
   }
 
   type ReferenceEvent = Extract<AliasSyncEvent, { kind: "reference-set" | "reference-clear" }>;
-  const referenceEvents = new Map<string, ReferenceEvent[]>();
+  type ReferencePrepareEvent = Extract<AliasSyncEvent, { kind: "reference-prepare" }>;
+  type ReferenceTerminalEvent = Extract<
+    AliasSyncEvent,
+    { kind: "reference-commit" | "reference-abort" }
+  >;
+  const transactionEvents = new Map<
+    string,
+    { prepares: ReferencePrepareEvent[]; terminals: ReferenceTerminalEvent[] }
+  >();
   for (const event of parsed.events) {
+    const transactionId =
+      event.kind === "reference-prepare"
+        ? event.id
+        : event.kind === "reference-commit" || event.kind === "reference-abort"
+          ? event.transactionId
+          : undefined;
+    if (!transactionId) {
+      continue;
+    }
+    const group = transactionEvents.get(transactionId) ?? { prepares: [], terminals: [] };
+    if (event.kind === "reference-prepare") {
+      group.prepares.push(event);
+    } else if (event.kind === "reference-commit" || event.kind === "reference-abort") {
+      group.terminals.push(event);
+    }
+    transactionEvents.set(transactionId, group);
+  }
+
+  const committedReferenceEvents: ReferenceEvent[] = [];
+  for (const [transactionId, group] of transactionEvents) {
+    const prepare = group.prepares[0];
+    if (!prepare || group.prepares.length !== 1) {
+      conflicts.push(
+        conflict("event-integrity", transactionId, [...group.prepares, ...group.terminals]),
+      );
+      continue;
+    }
+    const validTerminals = group.terminals.filter(
+      (terminal) =>
+        terminal.replicaId === prepare.replicaId &&
+        compareAliasVectorClocks(prepare.clock, terminal.clock) === "before",
+    );
+    const invalidTerminals = group.terminals.filter(
+      (terminal) => !validTerminals.includes(terminal),
+    );
+    let status: AliasReferenceTransactionStatus = "pending";
+    if (invalidTerminals.length > 0 || validTerminals.length > 1) {
+      status = "conflicted";
+      conflicts.push(conflict("event-integrity", transactionId, [prepare, ...group.terminals]));
+    } else if (validTerminals[0]?.kind === "reference-commit") {
+      status = "committed";
+      const commit = validTerminals[0];
+      committedReferenceEvents.push({
+        version: commit.version,
+        id: commit.id,
+        replicaId: commit.replicaId,
+        clock: commit.clock,
+        kind: "reference-set",
+        cipherId: prepare.cipherId,
+        expectedAliasKey: prepare.expectedAlias ? emailAliasKey(prepare.expectedAlias) : null,
+        alias: prepare.alias,
+      });
+    } else if (validTerminals[0]?.kind === "reference-abort") {
+      status = "aborted";
+    }
+    referenceTransactions[transactionId] = {
+      transactionId,
+      ownerReplicaId: prepare.replicaId,
+      cipherId: prepare.cipherId,
+      expectedAlias: prepare.expectedAlias,
+      expectedAliasKey: prepare.expectedAlias ? emailAliasKey(prepare.expectedAlias) : null,
+      alias: prepare.alias,
+      status,
+    };
+  }
+
+  const referenceEvents = new Map<string, ReferenceEvent[]>();
+  for (const event of [...parsed.events, ...committedReferenceEvents]) {
     if (event.kind === "reference-set" || event.kind === "reference-clear") {
       referenceEvents.set(event.cipherId, [...(referenceEvents.get(event.cipherId) ?? []), event]);
     }
@@ -1004,6 +1113,7 @@ export function projectAliasSync(document: AliasSyncDocument): AliasSyncProjecti
     connections,
     aliases,
     references,
+    referenceTransactions,
     operations,
     conflicts: [...unique.values()].sort((left, right) => left.id.localeCompare(right.id)),
   };
@@ -1012,6 +1122,17 @@ export function projectAliasSync(document: AliasSyncDocument): AliasSyncProjecti
 export function pendingAliasOperations(document: AliasSyncDocument): AliasProjectedOperation[] {
   return Object.values(projectAliasSync(document).operations).filter(
     (operation) => operation.status === "prepared" || operation.status === "dispatched",
+  );
+}
+
+/** Pending reference transactions owned by this document's replica and safe to recover locally. */
+export function pendingAliasReferenceTransactions(
+  document: AliasSyncDocument,
+): AliasProjectedReferenceTransaction[] {
+  const parsed = parseAliasSyncDocument(document);
+  return Object.values(projectAliasSync(parsed).referenceTransactions).filter(
+    (transaction) =>
+      transaction.ownerReplicaId === parsed.replicaId && transaction.status === "pending",
   );
 }
 

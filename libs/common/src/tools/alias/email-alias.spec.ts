@@ -1,5 +1,6 @@
 import {
   EMAIL_ALIAS_IDENTITY_VERSION,
+  emailAliasIdentitiesEqual,
   parseEmailAliasIdentity,
   parseGeneratedCredentialMetadata,
 } from "./email-alias";
@@ -40,5 +41,21 @@ describe("email alias schema v1", () => {
     expect(parseEmailAliasIdentity({ ...validIdentity, connectionId: "invalid" })).toBeUndefined();
     expect(parseEmailAliasIdentity({ ...validIdentity, aliasId: "0" })).toBeUndefined();
     expect(parseEmailAliasIdentity({ ...validIdentity, address: "" })).toBeUndefined();
+  });
+
+  it("compares the complete connection-scoped identity", () => {
+    expect(emailAliasIdentitiesEqual(validIdentity, { ...validIdentity })).toBe(true);
+    expect(
+      emailAliasIdentitiesEqual(validIdentity, {
+        ...validIdentity,
+        providerInstance: "https://other.simplelogin.example/",
+      }),
+    ).toBe(false);
+    expect(
+      emailAliasIdentitiesEqual(validIdentity, {
+        ...validIdentity,
+        connectionId: "22222222-2222-4222-8222-222222222222",
+      }),
+    ).toBe(false);
   });
 });

@@ -119,4 +119,71 @@ describe("SimpleLoginAliasService", () => {
     await expect(service.create()).rejects.toMatchObject({ code: "conflict" });
     expect(persisted.events.some((event) => event.kind === "provider-dispatched")).toBe(false);
   });
+
+  it("persists reference prepare and commit as separate durable states across restart", async () => {
+    let persisted = createAliasSyncDocument("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    const syncStore = {
+      load: async () => persisted,
+      save: async (document: AliasSyncDocument) => {
+        persisted = document;
+      },
+    };
+    const settings = { token: "provider-secret", connectionId, syncStore };
+    const identity = {
+      version: 1 as const,
+      provider: "simplelogin" as const,
+      providerInstance: "https://app.simplelogin.io/",
+      connectionId,
+      aliasId: "41",
+      address: "first@sl.test",
+    };
+    const firstProcess = createSimpleLoginAliasService(settings);
+
+    const transactionId = await firstProcess.prepareReference("cipher-1", undefined, identity);
+
+    expect(transactionId).toBeDefined();
+    expect(projectAliasSync(persisted).references["cipher-1"]).toBeUndefined();
+    expect(await firstProcess.pendingReferenceTransactions()).toEqual([
+      expect.objectContaining({ transactionId, status: "pending" }),
+    ]);
+
+    const restarted = createSimpleLoginAliasService(settings);
+    await restarted.commitReference(transactionId ?? "");
+
+    expect(projectAliasSync(persisted).references["cipher-1"]).toMatchObject({
+      alias: identity,
+      conflicted: false,
+    });
+    await expect(restarted.commitReference(transactionId ?? "")).resolves.toBeUndefined();
+  });
+
+  it("compensates a prepared reference without ever projecting it as committed", async () => {
+    let persisted = createAliasSyncDocument("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    const service = createSimpleLoginAliasService({
+      token: "provider-secret",
+      connectionId,
+      syncStore: {
+        load: async () => persisted,
+        save: async (document) => {
+          persisted = document;
+        },
+      },
+    });
+    const identity = {
+      version: 1 as const,
+      provider: "simplelogin" as const,
+      providerInstance: "https://app.simplelogin.io/",
+      connectionId,
+      aliasId: "42",
+      address: "second@sl.test",
+    };
+
+    const transactionId = await service.prepareReference("cipher-2", undefined, identity);
+    await service.abortReference(transactionId ?? "");
+
+    expect(projectAliasSync(persisted).references["cipher-2"]).toBeUndefined();
+    expect(projectAliasSync(persisted).referenceTransactions[transactionId ?? ""]).toMatchObject({
+      status: "aborted",
+    });
+  });
 });
