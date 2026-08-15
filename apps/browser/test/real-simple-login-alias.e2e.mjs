@@ -248,17 +248,30 @@ try {
   const loginPassword = (await popup.locator("bit-color-password").textContent())?.trim() ?? "";
   assert.ok(loginPassword.length >= 12, "the extension must render a generated password");
   await registration.locator("#password").fill(loginPassword);
-  await registration.locator("#email").focus();
-  await registration.locator("#email").press("ArrowDown");
-  await registration.waitForTimeout(500);
+  let saveLoginFrame;
+  const saveLoginDeadline = Date.now() + 15_000;
+  while (!saveLoginFrame && Date.now() < saveLoginDeadline) {
+    await registration.locator("#password").focus();
+    await registration.locator("#password").press("ArrowDown");
+    await registration.waitForTimeout(250);
+    for (const frame of registration
+      .frames()
+      .filter((candidate) => candidate.url().includes("/overlay/menu-list.html"))) {
+      if (
+        await frame
+          .locator(".save-login")
+          .isVisible()
+          .catch(() => false)
+      ) {
+        saveLoginFrame = frame;
+        break;
+      }
+    }
+  }
+  assert.ok(saveLoginFrame, "the save-login inline menu must be visible");
   await registration.screenshot({ path: "/tmp/alias-registration-save.png" });
   const addEditPagePromise = context.waitForEvent("page");
-  const passwordBox = await registration.locator("#password").boundingBox();
-  assert.ok(passwordBox);
-  await registration.mouse.click(
-    passwordBox.x + Math.min(100, passwordBox.width / 2),
-    passwordBox.y + passwordBox.height + 20,
-  );
+  await saveLoginFrame.locator(".save-login").click();
   const addEditPage = await addEditPagePromise;
   await addEditPage.waitForLoadState();
   await addEditPage.waitForTimeout(1_000);
