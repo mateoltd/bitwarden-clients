@@ -23,11 +23,7 @@
         const observed = [];
         let attackResults;
         let attackScheduled = false;
-        window.addEventListener("message", (event) => {
-          const message = event.data;
-          if (!message || typeof message !== "object") {
-            return;
-          }
+        const observeAliasSession = (message) => {
           observed.push({
             command: typeof message.command === "string" ? message.command : undefined,
             portKey: typeof message.portKey === "string" ? message.portKey : undefined,
@@ -37,6 +33,14 @@
             attackScheduled = true;
             attemptObservedSessionAttacks();
           }
+        };
+        window.observeAliasSession = observeAliasSession;
+        window.addEventListener("message", (event) => {
+          const message = event.data;
+          if (!message || typeof message !== "object") {
+            return;
+          }
+          observeAliasSession(message);
         });
 
         const sendToExtensionFrames = (messages) => {
