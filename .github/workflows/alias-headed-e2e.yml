@@ -56,9 +56,9 @@ jobs:
           scripts/release/export-oss-source.sh "$RUNNER_TEMP/source"
           cd "$RUNNER_TEMP/source"
           HUSKY=0 npm ci
-          chromium_path="$(command -v google-chrome)"
+          npx playwright install chromium --no-shell
+          chromium_path="$(node --input-type=module -e 'import { chromium } from "playwright"; process.stdout.write(chromium.executablePath())')"
           test -x "$chromium_path"
-          echo "CHROMIUM_PATH=$chromium_path" >> "$GITHUB_ENV"
           "$chromium_path" --version
           sudo apt-get update
           audio_package=libasound2
