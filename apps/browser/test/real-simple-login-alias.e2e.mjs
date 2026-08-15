@@ -202,7 +202,13 @@ try {
     0,
     "confused-deputy messages must not mutate the provider",
   );
-  await registration.keyboard.press("Escape");
+  await registration.goto(registrationUrl.toString());
+  await registration.locator("#email").focus();
+  await registration.waitForTimeout(1_500);
+  assert.ok(
+    registration.frames().some((frame) => frame.url().includes("/overlay/menu.html")),
+    "the extension menu container must be reinjected after hostile-message isolation",
+  );
   await registration.locator("#email").press("ArrowDown");
   await registration.waitForTimeout(300);
   await registration.keyboard.press("Enter");
