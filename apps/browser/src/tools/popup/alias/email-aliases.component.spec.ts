@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { MockProxy, mock } from "jest-mock-extended";
 
 import { BrowserApi } from "@bitwarden/browser/platform/browser/browser-api";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { DialogService } from "@bitwarden/components";
 import { SimpleLoginAlias, SimpleLoginContact } from "@bitwarden/generator-core";
 
@@ -14,11 +15,14 @@ describe("EmailAliasesComponent", () => {
   let aliasesService: MockProxy<BrowserSimpleLoginAliasService>;
   let dialogService: MockProxy<DialogService>;
   let router: MockProxy<Router>;
+  let i18nService: MockProxy<I18nService>;
 
   beforeEach(() => {
     aliasesService = mock<BrowserSimpleLoginAliasService>();
     dialogService = mock<DialogService>();
     router = mock<Router>();
+    i18nService = mock<I18nService>();
+    i18nService.t.mockImplementation((key) => key);
     jest.spyOn(BrowserApi, "getTabFromCurrentWindowId").mockResolvedValue({
       id: 1,
       url: "https://signup.example.com/register",
@@ -133,6 +137,7 @@ describe("EmailAliasesComponent", () => {
       new FormBuilder(),
       route,
       router,
+      i18nService,
     );
   }
 });

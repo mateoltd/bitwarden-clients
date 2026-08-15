@@ -60,7 +60,7 @@
       } @else if (aliases().length === 0) {
         <p class="tw-text-muted">{{ "noAliasesFound" | i18n }}</p>
       } @else {
-        <ul class="tw-divide-y tw-rounded tw-border" aria-label="Email aliases">
+        <ul class="tw-divide-y tw-rounded tw-border" [attr.aria-label]="'emailAliases' | i18n">
           @for (alias of aliases(); track alias.id) {
             <li>
               <button
@@ -209,7 +209,9 @@
                 {{ alias.address }}
               </h2>
               <p class="tw-text-sm tw-text-muted">
-                ID {{ alias.id }} · {{ (alias.enabled ? "enabled" : "disabled") | i18n }}
+                <span>{{ "aliasIdentifier" | i18n: alias.id }}</span>
+                <span class="tw-sr-only">, </span>
+                <span>{{ (alias.enabled ? "enabled" : "disabled") | i18n }}</span>
               </p>
             </div>
             <div class="tw-flex tw-gap-2">
@@ -380,7 +382,7 @@
 
           <section
             class="tw-grid tw-grid-cols-2 tw-gap-3 tw-rounded tw-border tw-p-4 @md:tw-grid-cols-4"
-            aria-label="Alias activity"
+            [attr.aria-label]="'aliasActivity' | i18n"
           >
             <div>
               <strong>{{ alias.forwardedCount }}</strong
