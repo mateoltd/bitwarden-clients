@@ -2,7 +2,7 @@
   "$schema": "./alias-client-release.schema.json",
   "schemaVersion": 1,
   "releaseLane": {
-    "branch": "integration/public-alias-clients",
+    "branch": "fix/public-alias-review-findings",
     "baseRef": "origin/main",
     "baseCommit": "1f881babc15eb7d3a88cad41730ce167d8e49a41",
     "sourceRepository": "https://github.com/mateoltd/bitwarden-clients.git",
@@ -43,7 +43,17 @@
     "provenanceSha256": "69e35520d0b5cfa1e321b4bcbcbd6a2d0283aa430c6cdb3ae46540b9a538a184",
     "candidateChecksums": "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.2.candidate.SHA256SUMS",
     "candidateChecksumsSha256": "f1198ebb3d5b9e47204aca6d7c0d2a934e9dae5c6135f5df3e4be4814b763709",
-    "buildEnvironment": "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.2.build-environment.txt"
+    "buildEnvironment": "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.2.build-environment.txt",
+    "buildEnvironmentSha256": "3e2855d9d38968721caed7d2cba92e89b64cb4fa81f3ec43002a01021f99df0e",
+    "toolchainHandoff": "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.2.toolchain-handoff.json",
+    "toolchainHandoffSha256": "b7aaf9cd8ed2e5135cfb12662affc13f6cf5540a4fbaf1af96f810bc3d1b16a3",
+    "producerToolchain": {
+      "runnerImage": "ubuntu24-20260720.247.2",
+      "node": "24.17.0",
+      "npm": "11.13.0",
+      "rust": "1.96.0",
+      "wasmOpt": "131"
+    }
   },
   "testInfrastructure": {
     "chromium": {
@@ -67,7 +77,7 @@
       "containerName": "alias-client-release-vault"
     }
   },
-  "toolchains": {
+  "clientToolchain": {
     "node": "24.17.0",
     "cliNode": "22.22.0",
     "npm": "11.18.0",

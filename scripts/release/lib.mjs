@@ -103,6 +103,27 @@ export function assert(condition, message) {
   }
 }
 
+/** Parse the SDK producer's legacy text evidence by named keys and value shape, never line order. */
+export function parseSdkProducerToolchainEvidence(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const exactlyOne = (pattern, label, value = (match) => match[1]) => {
+    const matches = lines.map((line) => pattern.exec(line)).filter(Boolean);
+    assert(matches.length === 1, `SDK producer evidence must contain exactly one ${label}`);
+    return value(matches[0]);
+  };
+  return {
+    sourceCommit: exactlyOne(/^source_commit=([0-9a-f]{40})$/, "source commit"),
+    runnerImage: exactlyOne(/^runner_image=(.+)$/, "runner image"),
+    node: exactlyOne(/^v(\d+\.\d+\.\d+)$/, "Node version"),
+    npm: exactlyOne(/^(\d+\.\d+\.\d+)$/, "npm version"),
+    rust: exactlyOne(/^rustc (\d+\.\d+\.\d+) \(.+\)$/, "Rust version"),
+    wasmOpt: exactlyOne(/^wasm-opt version (\d+) \(.+\)$/, "wasm-opt version"),
+  };
+}
+
 export function targetById(manifest, id) {
   const target = manifest.targets.find((candidate) => candidate.id === id);
   assert(target, `Unknown release target: ${id}`);

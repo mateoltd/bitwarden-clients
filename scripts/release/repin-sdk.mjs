@@ -5,6 +5,7 @@ import {
   assert,
   hashFile,
   parseArgs,
+  parseSdkProducerToolchainEvidence,
   readJson,
   readManifest,
   repositoryRoot,
@@ -148,10 +149,19 @@ assert(
   fs.readFileSync(packageVersionFile, "utf8").trim() === provenance.releaseVersion,
   "Published SDK PACKAGE_VERSION differs",
 );
+const rawBuildEnvironment = fs.readFileSync(buildEnvironmentFile, "utf8");
+const parsedProducerEvidence = parseSdkProducerToolchainEvidence(rawBuildEnvironment);
 assert(
-  fs.readFileSync(buildEnvironmentFile, "utf8").includes(`source_commit=${sourceCommit}`),
+  parsedProducerEvidence.sourceCommit === sourceCommit,
   "Published SDK build environment lacks the exact source commit",
 );
+const producerToolchain = {
+  runnerImage: parsedProducerEvidence.runnerImage,
+  node: parsedProducerEvidence.node,
+  npm: parsedProducerEvidence.npm,
+  rust: parsedProducerEvidence.rust,
+  wasmOpt: parsedProducerEvidence.wasmOpt,
+};
 
 const embeddedPackage = JSON.parse(tarText(artifact, "package/package.json"));
 const embeddedCommit = tarText(artifact, "package/VERSION");
@@ -187,6 +197,14 @@ if (args.check) {
     candidateChecksumsSha256 === sdk.candidateChecksumsSha256,
     "Checked candidate checksum index differs from the release manifest",
   );
+  assert(
+    hashFile(buildEnvironmentFile) === sdk.buildEnvironmentSha256,
+    "Checked SDK producer environment differs from the release manifest",
+  );
+  assert(
+    JSON.stringify(producerToolchain) === JSON.stringify(sdk.producerToolchain),
+    "Checked SDK producer toolchain differs from the release manifest",
+  );
   assert(workflowRunId === sdk.workflow.runId, "Checked workflow run differs");
   assert(artifactId === sdk.workflow.artifactId, "Checked artifact ID differs");
   assert(artifactName === sdk.workflow.artifactName, "Checked artifact name differs");
@@ -207,10 +225,28 @@ const relativeMetadata = `vendor/${fileName.replace(/\.tgz$/, ".md")}`;
 const relativeProvenance = `vendor/${fileName.replace(/\.tgz$/, ".handoff.json")}`;
 const relativeChecksums = `vendor/${fileName.replace(/\.tgz$/, ".candidate.SHA256SUMS")}`;
 const relativeBuildEnvironment = `vendor/${fileName.replace(/\.tgz$/, ".build-environment.txt")}`;
+const relativeToolchainHandoff = `vendor/${fileName.replace(/\.tgz$/, ".toolchain-handoff.json")}`;
 fs.copyFileSync(artifact, path.join(repositoryRoot, relativeArtifact));
 fs.copyFileSync(provenanceFile, path.join(repositoryRoot, relativeProvenance));
 fs.copyFileSync(sumsFile, path.join(repositoryRoot, relativeChecksums));
 fs.copyFileSync(buildEnvironmentFile, path.join(repositoryRoot, relativeBuildEnvironment));
+const buildEnvironmentSha256 = hashFile(buildEnvironmentFile);
+writeJson(path.join(repositoryRoot, relativeToolchainHandoff), {
+  schemaVersion: 1,
+  evidenceType: "client-sdk-toolchain-handoff",
+  sdkProducer: {
+    evidence: {
+      path: relativeBuildEnvironment,
+      sha256: buildEnvironmentSha256,
+    },
+    toolchain: producerToolchain,
+  },
+  clientConsumer: {
+    manifestPath: "release/alias-client-release.json#/clientToolchain",
+    toolchain: manifest.clientToolchain,
+  },
+});
+const toolchainHandoffSha256 = hashFile(path.join(repositoryRoot, relativeToolchainHandoff));
 
 Object.assign(manifest.canonicalSdk, {
   version,
@@ -221,6 +257,10 @@ Object.assign(manifest.canonicalSdk, {
   candidateChecksums: relativeChecksums,
   candidateChecksumsSha256,
   buildEnvironment: relativeBuildEnvironment,
+  buildEnvironmentSha256,
+  toolchainHandoff: relativeToolchainHandoff,
+  toolchainHandoffSha256,
+  producerToolchain,
   sha256,
   integrity,
   sourceCommit,
@@ -263,6 +303,21 @@ fs.writeFileSync(
     `- Handoff manifest SHA-256: \`${provenanceSha256}\``,
     `- Published checksum index: \`${relativeChecksums}\``,
     `- Checksum index SHA-256: \`${candidateChecksumsSha256}\``,
+    `- Raw SDK producer environment: \`${relativeBuildEnvironment}\``,
+    `- Raw SDK producer environment SHA-256: \`${buildEnvironmentSha256}\``,
+    `- Client SDK toolchain handoff: \`${relativeToolchainHandoff}\``,
+    `- Toolchain handoff SHA-256: \`${toolchainHandoffSha256}\``,
+    "",
+    "## SDK producer toolchain",
+    "",
+    `- Runner image: \`${producerToolchain.runnerImage}\``,
+    `- Node: \`${producerToolchain.node}\``,
+    `- npm: \`${producerToolchain.npm}\``,
+    `- Rust: \`${producerToolchain.rust}\``,
+    `- wasm-opt: \`${producerToolchain.wasmOpt}\``,
+    "",
+    "These values describe the separately produced SDK artifact and are validated independently",
+    `from the alias client release toolchain, whose npm version is \`${manifest.clientToolchain.npm}\`.`,
     "",
     "This archive is an explicit, checksum-enforced build input for the public OSS clients.",
     "",
@@ -271,8 +326,8 @@ fs.writeFileSync(
 
 const npmVersion = run("npm", ["--version"], { capture: true });
 assert(
-  npmVersion === manifest.toolchains.npm,
-  `npm ${manifest.toolchains.npm} is required; found ${npmVersion}`,
+  npmVersion === manifest.clientToolchain.npm,
+  `npm ${manifest.clientToolchain.npm} is required; found ${npmVersion}`,
 );
 
 // npm retains the previous integrity when a local tarball is replaced without
@@ -292,6 +347,7 @@ for (const oldPath of [
   oldSdk.provenance,
   oldSdk.candidateChecksums,
   oldSdk.buildEnvironment,
+  oldSdk.toolchainHandoff,
 ]) {
   if (
     typeof oldPath !== "string" ||
@@ -301,6 +357,7 @@ for (const oldPath of [
       relativeProvenance,
       relativeChecksums,
       relativeBuildEnvironment,
+      relativeToolchainHandoff,
     ].includes(oldPath)
   )
     continue;

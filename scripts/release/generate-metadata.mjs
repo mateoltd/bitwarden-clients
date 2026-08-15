@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+  assert,
   git,
   hashFile,
   parseArgs,
@@ -28,6 +29,17 @@ const sourceCommit = fs.existsSync(sourceCommitFile)
   ? fs.readFileSync(sourceCommitFile, "utf8").trim()
   : (process.env.GITHUB_SHA ?? git(["rev-parse", "HEAD"]));
 const baseSbom = readJson(sbomFile);
+assert(
+  !(baseSbom.components ?? []).some(isCommercial) &&
+    !(baseSbom.dependencies ?? []).some(
+      (dependency) =>
+        String(dependency.ref).includes("commercial-sdk-internal") ||
+        (dependency.dependsOn ?? []).some((reference) =>
+          String(reference).includes("commercial-sdk-internal"),
+        ),
+    ),
+  "The OSS SBOM input contains the commercial SDK; refusing to conceal it",
+);
 fs.mkdirSync(outputDirectory, { recursive: true });
 
 function isCommercial(component) {
@@ -56,7 +68,7 @@ for (const artifact of artifacts) {
         target: "source",
         sourceCommit,
         sourceDateEpoch: manifest.releaseLane.sourceDateEpoch,
-        toolchains: manifest.toolchains,
+        clientToolchain: manifest.clientToolchain,
         environment: {
           runnerOS: process.env.RUNNER_OS ?? process.platform,
           runnerArchitecture: process.env.RUNNER_ARCH ?? process.arch,
@@ -86,18 +98,9 @@ for (const artifact of artifacts) {
       },
     ],
   };
-  sbom.components = (sbom.components ?? []).filter((component) => !isCommercial(component));
-  const componentRefs = new Set(sbom.components.map((component) => component["bom-ref"]));
-  sbom.dependencies = (sbom.dependencies ?? [])
-    .filter((dependency) => !String(dependency.ref).includes("commercial-sdk-internal"))
-    .map((dependency) => ({
-      ...dependency,
-      dependsOn: (dependency.dependsOn ?? []).filter(
-        (reference) =>
-          !String(reference).includes("commercial-sdk-internal") && componentRefs.has(reference),
-      ),
-    }));
   writeJson(`${prefix}.cdx.json`, sbom);
+
+  const sourceRepository = manifest.releaseLane.sourceRepository.replace(/\.git$/, "");
 
   const statement = {
     _type: "https://in-toto.io/Statement/v1",
@@ -105,12 +108,12 @@ for (const artifact of artifacts) {
     predicateType: "https://slsa.dev/provenance/v1",
     predicate: {
       buildDefinition: {
-        buildType:
-          "https://github.com/mateoltd/bitwarden-clients/release/alias-client-candidate/v1",
+        buildType: `${sourceRepository}/release/alias-client-candidate/v1`,
         externalParameters: { target: name },
         internalParameters: {
           sourceDateEpoch: manifest.releaseLane.sourceDateEpoch,
-          toolchains: manifest.toolchains,
+          clientToolchain: manifest.clientToolchain,
+          sdkProducerToolchain: manifest.canonicalSdk.producerToolchain,
           buildEnvironment,
         },
         resolvedDependencies: [
@@ -125,7 +128,7 @@ for (const artifact of artifacts) {
         ],
       },
       runDetails: {
-        builder: { id: "https://github.com/mateoltd/bitwarden-clients/actions" },
+        builder: { id: `${sourceRepository}/actions` },
         metadata: { invocationId: process.env.GITHUB_RUN_ID ?? "local" },
       },
     },
