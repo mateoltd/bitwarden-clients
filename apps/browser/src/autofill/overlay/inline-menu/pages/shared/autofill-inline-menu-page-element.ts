@@ -5,6 +5,7 @@ import { EventSecurity } from "../../../../utils/event-security";
 import {
   AutofillInlineMenuPageElementWindowMessage,
   AutofillInlineMenuPageElementWindowMessageHandlers,
+  AutofillInlineMenuUserActionMessage,
 } from "../../abstractions/autofill-inline-menu-page-element";
 
 export class AutofillInlineMenuPageElement extends HTMLElement {
@@ -18,6 +19,7 @@ export class AutofillInlineMenuPageElement extends HTMLElement {
   /** Non-null asserted. */
   protected windowMessageHandlers!: AutofillInlineMenuPageElementWindowMessageHandlers;
   private token?: string;
+  private userActionPort?: MessagePort;
 
   constructor() {
     super();
@@ -73,6 +75,14 @@ export class AutofillInlineMenuPageElement extends HTMLElement {
   }
 
   /**
+   * Sends a side-effecting action over the private channel transferred by the extension page.
+   * The host page cannot observe, synthesize, or replay messages on this channel.
+   */
+  protected postUserAction(message: AutofillInlineMenuUserActionMessage) {
+    this.userActionPort?.postMessage(message);
+  }
+
+  /**
    * Gets a translation from the translations object.
    *
    * @param key - The key of the translation to get
@@ -122,6 +132,21 @@ export class AutofillInlineMenuPageElement extends HTMLElement {
     const message = event?.data;
 
     if (!message?.command) {
+      return;
+    }
+
+    if (message.command === "initAutofillInlineMenuUserActionChannel") {
+      if (
+        this.userActionPort ||
+        !this.token ||
+        !message?.token ||
+        message.token !== this.token ||
+        event.ports.length !== 1
+      ) {
+        return;
+      }
+      this.userActionPort = event.ports[0];
+      this.userActionPort.start();
       return;
     }
 

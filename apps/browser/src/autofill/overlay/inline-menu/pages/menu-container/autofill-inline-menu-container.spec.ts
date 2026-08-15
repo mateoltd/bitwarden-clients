@@ -1,6 +1,6 @@
 import { AutofillOverlayPort } from "../../../../enums/autofill-overlay.enum";
 import { createPortSpyMock } from "../../../../spec/autofill-mocks";
-import { postWindowMessage } from "../../../../spec/testing-utils";
+import { installTestMessageChannel, postWindowMessage } from "../../../../spec/testing-utils";
 
 import { AutofillInlineMenuContainer } from "./autofill-inline-menu-container";
 
@@ -11,6 +11,10 @@ describe("AutofillInlineMenuContainer", () => {
   const pageTitle = "Example";
   let autofillInlineMenuContainer: AutofillInlineMenuContainer;
 
+  beforeAll(() => {
+    installTestMessageChannel();
+  });
+
   beforeEach(() => {
     jest.spyOn(chrome.runtime, "getURL").mockReturnValue(`${extensionOrigin}/`);
     autofillInlineMenuContainer = new AutofillInlineMenuContainer();
@@ -18,6 +22,7 @@ describe("AutofillInlineMenuContainer", () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    installTestMessageChannel();
   });
 
   describe("initializing the inline menu iframe", () => {
@@ -250,6 +255,102 @@ describe("AutofillInlineMenuContainer", () => {
       const message = { command: "maliciousCommand", portKey, token };
 
       postWindowMessage(message, "null", iframe.contentWindow as any);
+
+      expect(port.postMessage).not.toHaveBeenCalled();
+    });
+
+    it("does not forward a hostile parent alias-fill command to the background", () => {
+      postWindowMessage({
+        command: "fillEmailAlias",
+        portKey,
+        token: autofillInlineMenuContainer["token"],
+        emailAliasFillCapability: "a".repeat(32),
+      });
+
+      expect(port.postMessage).not.toHaveBeenCalled();
+    });
+
+    it("does not accept alias-fill over the observable window-message session", () => {
+      postWindowMessage(
+        {
+          command: "fillEmailAlias",
+          portKey,
+          token: autofillInlineMenuContainer["token"],
+          emailAliasFillCapability: "a".repeat(32),
+        },
+        "null",
+        iframe.contentWindow as Window,
+      );
+
+      expect(port.postMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("private alias user-action channel", () => {
+    it("turns a private action into a matching one-use runtime capability", async () => {
+      const port = createPortSpyMock(AutofillOverlayPort.ListMessageConnector);
+      const userActionChannel = new MessageChannel();
+      Object.defineProperty(globalThis, "MessageChannel", {
+        configurable: true,
+        value: class FixedMessageChannel {
+          readonly port1 = userActionChannel.port1;
+          readonly port2 = userActionChannel.port2;
+        },
+      });
+      jest.mocked(chrome.runtime.connect).mockReturnValue(port);
+      postWindowMessage(
+        {
+          command: "initAutofillInlineMenuList",
+          iframeUrl,
+          pageTitle,
+          portKey,
+          portName: AutofillOverlayPort.ListMessageConnector,
+        },
+        extensionOrigin,
+      );
+      const iframe = autofillInlineMenuContainer["inlineMenuPageIframe"];
+      const postMessage = jest.spyOn(iframe.contentWindow, "postMessage");
+
+      iframe.dispatchEvent(new Event("load"));
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ command: "initAutofillInlineMenuUserActionChannel" }),
+        "*",
+        [userActionChannel.port2],
+      );
+
+      userActionChannel.port2.postMessage({ command: "fillEmailAlias" });
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+
+      const runtimeMessages = jest.mocked(port.postMessage).mock.calls.map(([message]) => message);
+      expect(runtimeMessages).toHaveLength(2);
+      expect(runtimeMessages[0]).toEqual({
+        command: "registerEmailAliasFillCapability",
+        portKey,
+        emailAliasFillCapability: expect.stringMatching(/^[a-z]{32}$/),
+      });
+      expect(runtimeMessages[1]).toEqual({
+        command: "fillEmailAlias",
+        portKey,
+        emailAliasFillCapability: runtimeMessages[0].emailAliasFillCapability,
+      });
+      expect(
+        postMessage.mock.calls.some(([message]) => "emailAliasFillCapability" in message),
+      ).toBe(false);
+
+      userActionChannel.port2.close();
+      autofillInlineMenuContainer["userActionPort"]?.close();
+    });
+
+    it("rejects confused-deputy commands on the private channel", async () => {
+      const port = createPortSpyMock(AutofillOverlayPort.ListMessageConnector);
+      autofillInlineMenuContainer["port"] = port;
+      autofillInlineMenuContainer["portKey"] = portKey;
+
+      autofillInlineMenuContainer["handleUserActionMessage"](
+        new MessageEvent("message", {
+          data: { command: "refreshEmailAliasRecommendation" },
+        }),
+      );
 
       expect(port.postMessage).not.toHaveBeenCalled();
     });

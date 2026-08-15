@@ -153,6 +153,7 @@ export type OverlayBackgroundExtensionMessage = {
   focusedFieldData?: FocusedFieldData;
   allFieldsRect?: AutofillField[];
   isOpeningFullInlineMenu?: boolean;
+  emailAliasFillCapability?: string;
   styles?: Partial<CSSStyleDeclaration>;
   iframeSrc?: string;
   iframeTargetedFields?: { selector: string; fieldType: string; formCategory?: string }[];
@@ -171,6 +172,7 @@ export type OverlayPortCommand =
   | "blurred"
   | "updateColorScheme"
   | "unlockVault"
+  | "registerEmailAliasFillCapability"
   | "fillEmailAlias"
   | "refreshEmailAliasRecommendation"
   | "refreshGeneratedPassword"
@@ -322,7 +324,8 @@ export type InlineMenuListPortMessageHandlers = {
   updateAutofillInlineMenuListHeight: ({ message, port }: PortOnMessageHandlerParams) => void;
   refreshGeneratedPassword: () => Promise<void>;
   fillGeneratedPassword: ({ port }: PortConnectionParam) => Promise<void>;
-  fillEmailAlias: ({ port }: PortConnectionParam) => Promise<void>;
+  registerEmailAliasFillCapability: ({ message, port }: PortOnMessageHandlerParams) => void;
+  fillEmailAlias: ({ message, port }: PortOnMessageHandlerParams) => Promise<void>;
   refreshEmailAliasRecommendation: ({ port }: PortConnectionParam) => Promise<void>;
   refreshOverlayCiphers: () => Promise<void>;
 };
