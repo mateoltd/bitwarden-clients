@@ -13,6 +13,34 @@ export function flushPromises() {
   });
 }
 
+class TestMessagePort extends EventTarget {
+  peer?: TestMessagePort;
+
+  postMessage(message: unknown) {
+    this.peer?.dispatchEvent(new MessageEvent("message", { data: message }));
+  }
+
+  start() {}
+
+  close() {}
+}
+
+/** Installs a synchronous, handle-free MessageChannel for JSDOM tests. */
+export function installTestMessageChannel() {
+  Object.defineProperty(globalThis, "MessageChannel", {
+    configurable: true,
+    value: class TestMessageChannel {
+      readonly port1 = new TestMessagePort();
+      readonly port2 = new TestMessagePort();
+
+      constructor() {
+        this.port1.peer = this.port2;
+        this.port2.peer = this.port1;
+      }
+    },
+  });
+}
+
 export function postWindowMessage(
   data: any,
   origin: string = BrowserApi.getRuntimeURL("")?.slice(0, -1),

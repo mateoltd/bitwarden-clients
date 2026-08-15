@@ -497,6 +497,84 @@ describe("OverlayBackground", () => {
       expect(logged).toContain("invalid-credentials (401)");
       expect(logged).not.toContain(secret);
     });
+
+    describe("email alias fill capabilities", () => {
+      const capability = "a".repeat(32);
+
+      function prepareAliasFill(port: chrome.runtime.Port) {
+        const tab = createChromeTabMock({ id: 1, url: "https://registration.test/signup" });
+        port.sender = mock<chrome.runtime.MessageSender>({ tab });
+        overlayBackground["focusedFieldData"] = createFocusedFieldDataMock({
+          tabId: tab.id,
+          frameId: 0,
+          focusedFieldOpid: "registration-email",
+        });
+        pageDetailsForTabSpy[tab.id] = new Map([[0, createPageDetailMock({ tab })]]);
+        jest.spyOn(overlayBackground as any, "shouldShowEmailAliasAction").mockReturnValue(true);
+        emailAliasService.recommendOrCreate.mockResolvedValue(
+          new CoreGeneratedCredential("private@sl.test", "email", new Date()),
+        );
+      }
+
+      it("rejects missing, incorrect, and replayed capabilities before provider mutation", async () => {
+        const port = createPortSpyMock(AutofillOverlayPort.ListMessageConnector);
+        prepareAliasFill(port);
+
+        await overlayBackground["fillEmailAlias"]({ command: "fillEmailAlias" }, port);
+        overlayBackground["registerEmailAliasFillCapability"](
+          { command: "registerEmailAliasFillCapability", emailAliasFillCapability: capability },
+          port,
+        );
+        await overlayBackground["fillEmailAlias"](
+          { command: "fillEmailAlias", emailAliasFillCapability: "b".repeat(32) },
+          port,
+        );
+        await overlayBackground["fillEmailAlias"](
+          { command: "fillEmailAlias", emailAliasFillCapability: capability },
+          port,
+        );
+
+        expect(emailAliasService.recommendOrCreate).not.toHaveBeenCalled();
+      });
+
+      it("consumes a matching capability at the provider mutation boundary", async () => {
+        const port = createPortSpyMock(AutofillOverlayPort.ListMessageConnector);
+        prepareAliasFill(port);
+        overlayBackground["registerEmailAliasFillCapability"](
+          { command: "registerEmailAliasFillCapability", emailAliasFillCapability: capability },
+          port,
+        );
+
+        await overlayBackground["fillEmailAlias"](
+          { command: "fillEmailAlias", emailAliasFillCapability: capability },
+          port,
+        );
+        await overlayBackground["fillEmailAlias"](
+          { command: "fillEmailAlias", emailAliasFillCapability: capability },
+          port,
+        );
+
+        expect(emailAliasService.recommendOrCreate).toHaveBeenCalledTimes(1);
+      });
+
+      it("binds capabilities to the extension runtime port that registered them", async () => {
+        const authorizedPort = createPortSpyMock(AutofillOverlayPort.ListMessageConnector);
+        const deputyPort = createPortSpyMock(AutofillOverlayPort.ListMessageConnector);
+        prepareAliasFill(authorizedPort);
+        prepareAliasFill(deputyPort);
+        overlayBackground["registerEmailAliasFillCapability"](
+          { command: "registerEmailAliasFillCapability", emailAliasFillCapability: capability },
+          authorizedPort,
+        );
+
+        await overlayBackground["fillEmailAlias"](
+          { command: "fillEmailAlias", emailAliasFillCapability: capability },
+          deputyPort,
+        );
+
+        expect(emailAliasService.recommendOrCreate).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("when enableFillAssist is turned off", () => {

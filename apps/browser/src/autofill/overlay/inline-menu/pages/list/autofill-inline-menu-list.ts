@@ -217,7 +217,7 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
     if (!EventSecurity.isEventTrusted(event)) {
       return;
     }
-    this.postMessageToParent({ command: "fillEmailAlias" });
+    this.postUserAction({ command: "fillEmailAlias" });
   };
 
   /**
