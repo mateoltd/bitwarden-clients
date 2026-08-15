@@ -7767,5 +7767,130 @@
   "deleteReverseAliasConfirmation": {
     "message": "Delete this reverse alias? This cannot be undone.",
     "description": "Confirmation shown before deleting a SimpleLogin reverse alias"
+  },
+  "aliasIdentifier": {
+    "message": "SimpleLogin alias $ID$",
+    "description": "Provider and stable identifier shown on an email alias detail page",
+    "placeholders": {
+      "id": {
+        "content": "$1",
+        "example": "42"
+      }
+    }
+  },
+  "saveAlias": {
+    "message": "Save alias"
+  },
+  "enableAlias": {
+    "message": "Enable alias"
+  },
+  "disableAlias": {
+    "message": "Disable alias"
+  },
+  "reverseAliases": {
+    "message": "Reverse aliases"
+  },
+  "contactEmail": {
+    "message": "Contact email"
+  },
+  "blockContact": {
+    "message": "Block contact"
+  },
+  "unblockContact": {
+    "message": "Unblock contact"
+  },
+  "noReverseAliases": {
+    "message": "No reverse aliases yet."
+  },
+  "previous": {
+    "message": "Previous"
+  },
+  "emailAliasForSite": {
+    "message": "Email alias for this site"
+  },
+  "reuseAliasForSite": {
+    "message": "Reuse $ADDRESS$ for $HOSTNAME$.",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "alias@example.com"
+      },
+      "hostname": {
+        "content": "$2",
+        "example": "example.com"
+      }
+    }
+  },
+  "createAliasForSite": {
+    "message": "Create an alias for $HOSTNAME$.",
+    "placeholders": {
+      "hostname": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "createAliasForCurrentSite": {
+    "message": "Create an alias for the current site."
+  },
+  "reuseAlias": {
+    "message": "Reuse alias"
+  },
+  "searchAliases": {
+    "message": "Search aliases"
+  },
+  "status": {
+    "message": "Status"
+  },
+  "enabled": {
+    "message": "Enabled"
+  },
+  "pinned": {
+    "message": "Pinned"
+  },
+  "createRandomAlias": {
+    "message": "Create random alias"
+  },
+  "aliasForwardedCount": {
+    "message": "$COUNT$ forwarded",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "noAliasesMatchSearch": {
+    "message": "No aliases match this search."
+  },
+  "pageNumber": {
+    "message": "Page $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1",
+        "example": "1"
+      }
+    }
+  },
+  "availableAliasDomains": {
+    "message": "Available domains"
+  },
+  "noneAvailable": {
+    "message": "None available"
+  },
+  "aliasConfigureSimpleLogin": {
+    "message": "Configure your SimpleLogin API token in the username generator before managing aliases."
+  },
+  "aliasRateLimited": {
+    "message": "SimpleLogin rate limited this request. Try again in $SECONDS$ seconds.",
+    "placeholders": {
+      "seconds": {
+        "content": "$1",
+        "example": "60"
+      }
+    }
+  },
+  "aliasUnknownError": {
+    "message": "The alias operation failed. Try again after unlocking your vault and checking SimpleLogin settings."
   }
 }

@@ -6546,6 +6546,18 @@
   "aliasUnknownError": {
     "message": "The alias operation failed. Try again after unlocking your vault and checking SimpleLogin settings."
   },
+  "aliasIdentifier": {
+    "message": "Alias ID $ID$",
+    "placeholders": {
+      "id": {
+        "content": "$1",
+        "example": "42"
+      }
+    }
+  },
+  "aliasActivity": {
+    "message": "Alias activity"
+  },
   "aliasCreated": {
     "message": "Alias created"
   },

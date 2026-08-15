@@ -8,6 +8,7 @@ const args = parseArgs(process.argv.slice(2));
 const manifest = readManifest();
 const findings = [];
 const forbiddenPublicScope = [
+  ["middle-dot textual separator", /\s·\s/],
   ["personal recovery service", /\bpassmail\.net\b/i],
   ["personal recovery assumption", /\bpersonal[-_ ]recovery\b/i],
   ["personal-domain configuration", /\bpersonal[-_ ]domain\b/i],
