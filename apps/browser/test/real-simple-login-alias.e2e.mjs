@@ -240,7 +240,6 @@ try {
   );
   assert.equal(await reuse.locator("#email").inputValue(), aliasAddress);
   assert.equal(simpleLoginCreateRequests, 1, "hostname reuse must not create a second alias");
-  await reuse.close();
 
   const marker = `Alias browser e2e ${Date.now()}`;
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/generator`);
@@ -250,44 +249,43 @@ try {
   await registration.bringToFront();
   await registration.locator("#password").fill(loginPassword);
   const addLoginSelector = ".save-login, #new-item-button";
-  let addLoginFrame;
+  let addLoginPoint;
+  let inlineMenuButtonClicks = 0;
   const addLoginDeadline = Date.now() + 15_000;
-  while (!addLoginFrame && Date.now() < addLoginDeadline) {
+  while (!addLoginPoint && Date.now() < addLoginDeadline) {
     await registration.locator("#password").focus();
     await registration.waitForTimeout(100);
     await registration.locator("#email").focus();
     await registration.waitForTimeout(250);
-    const inlineMenuButtonFrame = registration
-      .frames()
-      .find((candidate) => candidate.url().includes("/overlay/menu-button.html"));
-    const inlineMenuButton = inlineMenuButtonFrame?.locator(".inline-menu-button");
-    if (!(await inlineMenuButton?.isVisible().catch(() => false))) {
+    const inlineMenuButtonPoint = await getInlineMenuTargetPoint(registration, {
+      framePath: "/overlay/menu-button.html",
+      hostSelector: "autofill-inline-menu-button",
+      targetProperty: "buttonElement",
+    });
+    if (!inlineMenuButtonPoint) {
       continue;
     }
-    await inlineMenuButton.click();
+    await registration.mouse.click(inlineMenuButtonPoint.x, inlineMenuButtonPoint.y);
+    inlineMenuButtonClicks += 1;
     await registration.waitForTimeout(500);
-    for (const frame of registration
-      .frames()
-      .filter((candidate) => candidate.url().includes("/overlay/menu-list.html"))) {
-      if (
-        await frame
-          .locator(addLoginSelector)
-          .first()
-          .isVisible()
-          .catch(() => false)
-      ) {
-        addLoginFrame = frame;
-        break;
-      }
-    }
+    addLoginPoint = await getInlineMenuTargetPoint(registration, {
+      framePath: "/overlay/menu-list.html",
+      hostSelector: "autofill-inline-menu-list",
+      targetProperty: "inlineMenuListContainer",
+      descendantSelector: addLoginSelector,
+    });
   }
-  assert.ok(addLoginFrame, "an inline add-login action must be visible");
+  assert.ok(
+    addLoginPoint,
+    `an inline add-login action must be visible after ${inlineMenuButtonClicks} button clicks`,
+  );
   await registration.screenshot({ path: "/tmp/alias-registration-save.png" });
   const addEditPagePromise = context.waitForEvent("page");
-  await addLoginFrame.locator(addLoginSelector).first().click();
+  await registration.mouse.click(addLoginPoint.x, addLoginPoint.y);
   const addEditPage = await addEditPagePromise;
   await addEditPage.waitForLoadState();
   await addEditPage.waitForTimeout(1_000);
+  await reuse.close();
 
   assert.equal(
     await addEditPage.getByLabel("Username", { exact: true }).inputValue(),
@@ -472,6 +470,66 @@ function observeWorker(serviceWorker) {
   });
 }
 
+async function getInlineMenuTargetPoint(
+  page,
+  { framePath, hostSelector, targetProperty, descendantSelector },
+) {
+  for (const frame of page.frames().filter((candidate) => candidate.url().includes(framePath))) {
+    try {
+      const target = await frame.evaluate(
+        (options) => {
+          const host = document.querySelector(options.hostSelector);
+          const root = host?.[options.targetProperty];
+          const element = options.descendantSelector
+            ? root?.querySelector(options.descendantSelector)
+            : root;
+          if (!(element instanceof HTMLElement)) {
+            return undefined;
+          }
+          const rect = element.getBoundingClientRect();
+          return {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            viewportWidth: globalThis.innerWidth,
+            viewportHeight: globalThis.innerHeight,
+          };
+        },
+        { hostSelector, targetProperty, descendantSelector },
+      );
+      if (
+        !target ||
+        target.width <= 0 ||
+        target.height <= 0 ||
+        target.viewportWidth <= 0 ||
+        target.viewportHeight <= 0
+      ) {
+        continue;
+      }
+      const frameElement = await frame.frameElement();
+      try {
+        const frameBox = await frameElement.boundingBox();
+        if (!frameBox || frameBox.width <= 0 || frameBox.height <= 0) {
+          continue;
+        }
+        return {
+          x:
+            frameBox.x + (target.left + target.width / 2) * (frameBox.width / target.viewportWidth),
+          y:
+            frameBox.y +
+            (target.top + target.height / 2) * (frameBox.height / target.viewportHeight),
+        };
+      } finally {
+        await frameElement.dispose();
+      }
+    } catch {
+      // Field and button transitions can replace an inline-menu frame during inspection.
+    }
+  }
+  return undefined;
+}
+
 async function attemptHostileAliasMessages(page) {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
@@ -558,7 +616,7 @@ function assertServiceLogsDoNotContain(secret) {
   const logs = spawnSync(
     "docker",
     ["logs", process.env.SIMPLELOGIN_APP_CONTAINER ?? "alias-core-sl-app"],
-    { encoding: "utf8" },
+    { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
   );
   assert.equal(logs.status, 0, "SimpleLogin logs must be readable for leakage checks");
   assert.equal(`${logs.stdout}${logs.stderr}`.includes(secret), false);
