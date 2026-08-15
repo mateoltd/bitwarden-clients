@@ -22,6 +22,7 @@
       (() => {
         const observed = [];
         let attackResults;
+        let attackScheduled = false;
         window.addEventListener("message", (event) => {
           const message = event.data;
           if (!message || typeof message !== "object") {
@@ -32,11 +33,9 @@
             portKey: typeof message.portKey === "string" ? message.portKey : undefined,
             token: typeof message.token === "string" ? message.token : undefined,
           });
-          if (message.command === "observedAliasSession" && attackResults === undefined) {
-            attackResults = {
-              replay: window.attemptAliasReplay(),
-              confusedDeputy: window.attemptAliasConfusedDeputy(),
-            };
+          if (message.command === "observedAliasSession" && !attackScheduled) {
+            attackScheduled = true;
+            attemptObservedSessionAttacks();
           }
         });
 
@@ -86,6 +85,16 @@
               token: observed.at(-1)?.token ?? "observed-session-token",
             },
           ]);
+
+        const attemptObservedSessionAttacks = () => {
+          const replay = window.attemptAliasReplay();
+          const confusedDeputy = window.attemptAliasConfusedDeputy();
+          if (replay.frameCount === 0 || confusedDeputy.frameCount === 0) {
+            setTimeout(attemptObservedSessionAttacks, 50);
+            return;
+          }
+          attackResults = { replay, confusedDeputy };
+        };
       })();
     </script>
   </body>
