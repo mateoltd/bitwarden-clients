@@ -202,9 +202,10 @@ try {
   assert.ok(menuContainerFrame, "the extension menu container must be injected");
   await registration.locator("#email").press("ArrowDown");
   await registration.waitForTimeout(300);
-  await registration.waitForFunction(() => window.observedAliasSessionCount() > 0);
+  await registration.waitForFunction(() => window.observedAliasAttackResults() !== undefined);
   await registration.screenshot({ path: "/tmp/alias-registration.png" });
-  const hostileReplay = await registration.evaluate(() => window.attemptAliasReplay());
+  const hostileAttacks = await registration.evaluate(() => window.observedAliasAttackResults());
+  const hostileReplay = hostileAttacks.replay;
   assert.ok(
     hostileReplay.frameCount > 0 && hostileReplay.observedCount > 0,
     "the hostile page must replay observed session material into an injected extension frame",
@@ -212,7 +213,7 @@ try {
   await registration.waitForTimeout(750);
   assert.equal(await registration.locator("#email").inputValue(), "");
   assert.equal(simpleLoginCreateRequests, 0, "host-parent replay must not mutate the provider");
-  const confusedDeputy = await registration.evaluate(() => window.attemptAliasConfusedDeputy());
+  const confusedDeputy = hostileAttacks.confusedDeputy;
   assert.ok(
     confusedDeputy.frameCount > 0,
     "the hostile page must target an injected extension frame for the deputy attempt",
