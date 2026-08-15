@@ -249,33 +249,35 @@ try {
   assert.ok(loginPassword.length >= 12, "the extension must render a generated password");
   await registration.bringToFront();
   await registration.locator("#password").fill(loginPassword);
-  let saveLoginFrame;
-  const saveLoginDeadline = Date.now() + 15_000;
-  while (!saveLoginFrame && Date.now() < saveLoginDeadline) {
-    await registration.locator("#email").focus();
-    await registration.waitForTimeout(100);
+  const addLoginSelector = ".save-login, #new-item-button";
+  let addLoginFrame;
+  const addLoginDeadline = Date.now() + 15_000;
+  while (!addLoginFrame && Date.now() < addLoginDeadline) {
     await registration.locator("#password").focus();
+    await registration.waitForTimeout(100);
+    await registration.locator("#email").focus();
     await registration.waitForTimeout(250);
-    await registration.locator("#password").press("ArrowDown");
+    await registration.locator("#email").press("ArrowDown");
     await registration.waitForTimeout(250);
     for (const frame of registration
       .frames()
       .filter((candidate) => candidate.url().includes("/overlay/menu-list.html"))) {
       if (
         await frame
-          .locator(".save-login")
+          .locator(addLoginSelector)
+          .first()
           .isVisible()
           .catch(() => false)
       ) {
-        saveLoginFrame = frame;
+        addLoginFrame = frame;
         break;
       }
     }
   }
-  assert.ok(saveLoginFrame, "the save-login inline menu must be visible");
+  assert.ok(addLoginFrame, "an inline add-login action must be visible");
   await registration.screenshot({ path: "/tmp/alias-registration-save.png" });
   const addEditPagePromise = context.waitForEvent("page");
-  await saveLoginFrame.locator(".save-login").click();
+  await addLoginFrame.locator(addLoginSelector).first().click();
   const addEditPage = await addEditPagePromise;
   await addEditPage.waitForLoadState();
   await addEditPage.waitForTimeout(1_000);
