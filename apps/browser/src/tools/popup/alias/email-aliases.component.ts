@@ -7,6 +7,7 @@ import { BrowserApi } from "@bitwarden/browser/platform/browser/browser-api";
 import { PopOutComponent } from "@bitwarden/browser/platform/popup/components/pop-out.component";
 import { PopupHeaderComponent } from "@bitwarden/browser/platform/popup/layout/popup-header.component";
 import { PopupPageComponent } from "@bitwarden/browser/platform/popup/layout/popup-page.component";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import {
   ButtonModule,
   CalloutModule,
@@ -17,6 +18,7 @@ import {
 import {
   SimpleLoginAlias,
   SimpleLoginAliasDomain,
+  SimpleLoginAliasError,
   SimpleLoginAliasFilter,
   SimpleLoginAliasRecommendation,
   SimpleLoginContact,
@@ -76,6 +78,7 @@ export class EmailAliasesComponent implements OnInit {
     private readonly formBuilder: FormBuilder,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
+    private readonly i18nService: I18nService,
   ) {}
 
   async ngOnInit() {
@@ -280,7 +283,17 @@ export class EmailAliasesComponent implements OnInit {
     try {
       await operation();
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : "SimpleLogin request failed");
+      if (error instanceof SimpleLoginAliasError && error.code === "invalid-credentials") {
+        this.error.set(this.i18nService.t("aliasConfigureSimpleLogin"));
+      } else if (
+        error instanceof SimpleLoginAliasError &&
+        error.code === "rate-limited" &&
+        error.retryAfterSeconds !== undefined
+      ) {
+        this.error.set(this.i18nService.t("aliasRateLimited", error.retryAfterSeconds.toString()));
+      } else {
+        this.error.set(this.i18nService.t("aliasUnknownError"));
+      }
     } finally {
       this.loading.set(false);
       this.working.set(false);
