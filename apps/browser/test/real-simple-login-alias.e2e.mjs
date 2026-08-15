@@ -85,9 +85,11 @@ try {
     const skip = popup.getByRole("button", { name: "Skip", exact: true });
     const logIn = popup.getByRole("button", { name: "Log in", exact: true });
     if (await skip.isVisible().catch(() => false)) {
-      await skip.click();
+      // Fresh-install state can replace this prompt while Chrome's default-manager check settles.
+      // Dispatch immediately so Playwright does not wait for actionability on a transient element.
+      await skip.dispatchEvent("click");
     } else if (await logIn.isVisible().catch(() => false)) {
-      await logIn.click();
+      await logIn.dispatchEvent("click");
     } else {
       await popup.waitForTimeout(500);
     }
