@@ -7,10 +7,11 @@ store, registry, release, signing, or notarization operation is part of the lane
 ## Trust inputs
 
 `alias-client-release.json` is the single release manifest. It pins the starting client commit,
-toolchains, canonical SDK artifact and source commit, real provider test deployment, vault test
-backend, supported targets, and explicit handoffs. `npm run release:verify` fails if the checked-out
-branch does not descend from the pinned base, the SDK archive or lock entry differs, a target is
-duplicated, a lock is missing, or commercial source is present in an OSS clean room.
+toolchains, canonical SDK artifact and source commit, checksum-pinned extension test Chromium, real
+provider test deployment, vault test backend, supported targets, and explicit handoffs. `npm run
+release:verify` fails if the checked-out branch does not descend from the pinned base, the SDK
+archive or lock entry differs, a target is duplicated, a lock is missing, or commercial source is
+present in an OSS clean room.
 
 The build scripts consume the canonical SDK tarball only through the root lockfile. The archive
 SHA-256, npm integrity, embedded package version, embedded source commit, and the published SDK
@@ -34,6 +35,10 @@ Use a target ID from the manifest. Candidate archives have normalized ordering, 
 ownership, and permissions. The hosted workflow builds each target on its declared OS and
 architecture, installs or extracts it, launches it where the host can execute that architecture,
 and uploads it without publishing it.
+
+Chromium extension launch checks use the exact Chrome for Testing archive declared in the manifest.
+The runtime installer verifies Playwright's revision and browser version, the archive byte count,
+SHA-256, member paths, executable, and reported version before any extension test starts.
 
 The metadata job emits adjacent CycloneDX SBOMs, SLSA-format provenance statements,
 source-commit manifests, per-file SHA-256 files, and a combined `SHA256SUMS`. Candidates are
