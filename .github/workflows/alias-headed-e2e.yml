@@ -191,7 +191,13 @@ jobs:
             while IFS= read -r key; do
               docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
             done
-          npx jest --runInBand --runTestsByPath \
+          npx jest --runInBand \
+            --projects \
+              apps/cli/jest.config.js \
+              apps/desktop/jest.config.js \
+              apps/web/jest.config.js \
+              libs/tools/generator/core/jest.config.js \
+            --runTestsByPath \
             libs/tools/generator/core/src/alias/simple-login-alias.integration.spec.ts \
             libs/tools/generator/core/src/alias/alias-binding-server.integration.spec.ts \
             apps/web/src/app/tools/email-aliases/email-aliases.integration.spec.ts \
@@ -209,7 +215,9 @@ jobs:
             while IFS= read -r key; do
               docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
             done
-          npx jest --runInBand --runTestsByPath \
+          npx jest --runInBand \
+            --projects libs/tools/generator/core/jest.config.js \
+            --runTestsByPath \
             libs/tools/generator/core/src/alias/simple-login-alias.integration.spec.ts
       - name: Capture diagnostics
         if: always()
