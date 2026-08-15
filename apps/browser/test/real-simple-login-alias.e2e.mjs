@@ -163,31 +163,6 @@ try {
   assert.equal(browserStorage.includes(simpleLoginToken), false);
 
   const registration = await context.newPage();
-  await registration.addInitScript(() => {
-    if (!globalThis.location.pathname.endsWith("/overlay/menu-list.html")) {
-      return;
-    }
-    globalThis.addEventListener("message", (event) => {
-      const message = event.data;
-      if (
-        event.source !== globalThis.parent ||
-        !message ||
-        typeof message !== "object" ||
-        typeof message.portKey !== "string" ||
-        typeof message.token !== "string"
-      ) {
-        return;
-      }
-      globalThis.top.postMessage(
-        {
-          command: "observedAliasSession",
-          portKey: message.portKey,
-          token: message.token,
-        },
-        "*",
-      );
-    });
-  });
   registration.on("console", (message) => {
     if (message.type() === "error") {
       recordDiagnostic("REGISTRATION_CONSOLE_ERROR", message.text());
@@ -201,7 +176,11 @@ try {
     .find((frame) => frame.url().includes("/overlay/menu.html"));
   assert.ok(menuContainerFrame, "the extension menu container must be injected");
   await registration.locator("#email").press("ArrowDown");
-  await registration.waitForTimeout(300);
+  const observedAliasSession = await readRenderedAliasSession(registration);
+  await registration.evaluate(
+    (session) => window.observeAliasSession({ command: "observedAliasSession", ...session }),
+    observedAliasSession,
+  );
   await registration.waitForFunction(() => window.observedAliasAttackResults() !== undefined);
   await registration.screenshot({ path: "/tmp/alias-registration.png" });
   const hostileAttacks = await registration.evaluate(() => window.observedAliasAttackResults());
@@ -465,6 +444,34 @@ function observeWorker(serviceWorker) {
       recordDiagnostic("WORKER_CONSOLE_ERROR", message.text());
     }
   });
+}
+
+async function readRenderedAliasSession(page) {
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    const frame = page
+      .frames()
+      .find((candidate) => candidate.url().includes("/overlay/menu-list.html"));
+    if (frame) {
+      try {
+        const session = await frame.evaluate(() => {
+          const list = document.querySelector("autofill-inline-menu-list");
+          const portKey = list?.portKey;
+          const token = list?.token;
+          return typeof portKey === "string" && typeof token === "string"
+            ? { portKey, token }
+            : undefined;
+        });
+        if (session) {
+          return session;
+        }
+      } catch {
+        // The button-to-list transition can detach a frame between discovery and evaluation.
+      }
+    }
+    await page.waitForTimeout(50);
+  }
+  throw new Error("the rendered alias list session was unavailable");
 }
 
 function recordDiagnostic(kind, message) {
