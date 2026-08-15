@@ -207,8 +207,12 @@ try {
   const hostileAttacks = await registration.evaluate(() => window.observedAliasAttackResults());
   const hostileReplay = hostileAttacks.replay;
   assert.ok(
-    hostileReplay.frameCount > 0 && hostileReplay.observedCount > 0,
-    "the hostile page must replay observed session material into an injected extension frame",
+    hostileReplay.frameCount > 0,
+    `the hostile page must target an injected extension frame: ${JSON.stringify(hostileReplay)}`,
+  );
+  assert.ok(
+    hostileReplay.observedCount > 0,
+    `the hostile page must replay observed session material: ${JSON.stringify(hostileReplay)}`,
   );
   await registration.waitForTimeout(750);
   assert.equal(await registration.locator("#email").inputValue(), "");
