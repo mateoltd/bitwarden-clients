@@ -21,6 +21,7 @@
     <script>
       (() => {
         const observed = [];
+        let attackResults;
         window.addEventListener("message", (event) => {
           const message = event.data;
           if (!message || typeof message !== "object") {
@@ -31,6 +32,12 @@
             portKey: typeof message.portKey === "string" ? message.portKey : undefined,
             token: typeof message.token === "string" ? message.token : undefined,
           });
+          if (message.command === "observedAliasSession" && attackResults === undefined) {
+            attackResults = {
+              replay: window.attemptAliasReplay(),
+              confusedDeputy: window.attemptAliasConfusedDeputy(),
+            };
+          }
         });
 
         const sendToExtensionFrames = (messages) => {
@@ -46,7 +53,7 @@
         const observedSessions = () =>
           observed.filter(({ portKey, token }) => portKey !== undefined && token !== undefined);
 
-        window.observedAliasSessionCount = () => observedSessions().length;
+        window.observedAliasAttackResults = () => attackResults;
 
         window.attemptAliasReplay = () => {
           const sessions = observedSessions().length
