@@ -199,7 +199,6 @@ try {
   });
   await registration.locator("#email").press("ArrowDown");
   await registration.waitForTimeout(300);
-  await registration.keyboard.press("Escape");
   await registration.waitForFunction(() => window.observedAliasSessionCount() > 0);
   await registration.screenshot({ path: "/tmp/alias-registration.png" });
   const hostileReplay = await registration.evaluate(() => window.attemptAliasReplay());
@@ -222,6 +221,7 @@ try {
     0,
     "confused-deputy messages must not mutate the provider",
   );
+  await registration.keyboard.press("Escape");
   await registration.locator("#email").press("ArrowDown");
   await registration.waitForTimeout(300);
   await registration.keyboard.press("Enter");
