@@ -104,8 +104,8 @@ jobs:
         run: |
           if [[ "${{ matrix.engine }}" == "chromium" ]]; then
             cd "$RUNNER_TEMP/source"
-            npx playwright install chromium --no-shell
-            browser_path="$(node --input-type=module -e 'import { chromium } from "playwright"; process.stdout.write(chromium.executablePath())')"
+            browser_path="$(node scripts/release/install-browser-runtime.mjs --output "$RUNNER_TEMP/playwright-chromium")"
+            echo "CHROMIUM_PATH=$browser_path" >> "$GITHUB_ENV"
           else
             browser_path="$(command -v firefox)"
             test -x "$browser_path"

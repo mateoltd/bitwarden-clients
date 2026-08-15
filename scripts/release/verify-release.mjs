@@ -115,6 +115,23 @@ assert(
   rootPackage.devDependencies.playwright === manifest.toolchains.playwright,
   "Playwright pin does not match the release manifest",
 );
+const chromiumRuntime = manifest.testInfrastructure.chromium;
+assert(
+  chromiumRuntime.playwrightVersion === manifest.toolchains.playwright,
+  "Chromium runtime Playwright version does not match the toolchain pin",
+);
+assert(/^\d+$/.test(chromiumRuntime.revision), "Chromium runtime revision is invalid");
+assert(/^\d+\.\d+\.\d+\.\d+$/.test(chromiumRuntime.version), "Chromium runtime version is invalid");
+assert(
+  chromiumRuntime.url ===
+    `https://cdn.playwright.dev/builds/cft/${chromiumRuntime.version}/linux64/chrome-linux64.zip`,
+  "Chromium runtime URL does not match its version pin",
+);
+assert(
+  Number.isSafeInteger(chromiumRuntime.bytes) && chromiumRuntime.bytes > 0,
+  "Chromium runtime size is invalid",
+);
+assert(/^[0-9a-f]{64}$/.test(chromiumRuntime.sha256), "Chromium runtime SHA-256 is invalid");
 
 if (process.env.OSS_CLEAN_ROOM === "1") {
   assert(
