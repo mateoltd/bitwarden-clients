@@ -22,7 +22,12 @@ const candidateDirectory = path.resolve(
   requireString(args.candidate, "--candidate is required"),
 );
 const sourceCommit = requireString(args["source-commit"], "--source-commit is required");
+const sourceRef = requireString(args["source-ref"], "--source-ref is required");
 assert(/^[0-9a-f]{40}$/.test(sourceCommit), "--source-commit must be a full lowercase Git commit");
+assert(
+  /^refs\/heads\/[a-z0-9][a-z0-9._/-]*$/.test(sourceRef),
+  "--source-ref must be a full branch ref",
+);
 const workflowRunId = Number(requireString(args["workflow-run"], "--workflow-run is required"));
 const artifactId = Number(requireString(args["artifact-id"], "--artifact-id is required"));
 const artifactName = requireString(args["artifact-name"], "--artifact-name is required");
@@ -65,7 +70,9 @@ function candidateArtifact(relative) {
       !relative.includes("\0"),
     `Unsafe SDK artifact path: ${relative}`,
   );
-  return resolveCandidate(path.posix.join("artifacts", relative));
+  return resolveCandidate(
+    relative.startsWith("artifacts/") ? relative : path.posix.join("artifacts", relative),
+  );
 }
 
 function parseSums(file) {
@@ -79,20 +86,140 @@ function parseSums(file) {
   return entries;
 }
 
+function parseAttestation(bundleFile, provenanceFile, sums, provenance) {
+  const bundle = readJson(bundleFile);
+  assert(
+    bundle.mediaType === "application/vnd.dev.sigstore.bundle.v0.3+json",
+    "Unsupported SDK Sigstore bundle",
+  );
+  assert(
+    typeof bundle.verificationMaterial?.certificate?.rawBytes === "string" &&
+      bundle.verificationMaterial.certificate.rawBytes.length > 0,
+    "SDK Sigstore signing certificate is missing",
+  );
+  const transparencyEntries = bundle.verificationMaterial?.tlogEntries;
+  assert(
+    Array.isArray(transparencyEntries) &&
+      transparencyEntries.length > 0 &&
+      transparencyEntries.every(
+        (entry) =>
+          entry.kindVersion?.kind === "dsse" &&
+          entry.inclusionPromise?.signedEntryTimestamp &&
+          entry.inclusionProof?.checkpoint?.envelope,
+      ),
+    "SDK Sigstore transparency evidence is incomplete",
+  );
+  const envelope = bundle.dsseEnvelope;
+  assert(envelope?.payloadType === "application/vnd.in-toto+json", "Invalid SDK DSSE payload");
+  assert(
+    Array.isArray(envelope.signatures) &&
+      envelope.signatures.length > 0 &&
+      envelope.signatures.every((signature) => typeof signature.sig === "string"),
+    "SDK DSSE signature is missing",
+  );
+
+  let statement;
+  try {
+    statement = JSON.parse(Buffer.from(envelope.payload, "base64").toString("utf8"));
+  } catch {
+    throw new Error("SDK DSSE statement is invalid");
+  }
+  const workflow = statement.predicate?.buildDefinition?.externalParameters?.workflow;
+  const github = statement.predicate?.buildDefinition?.internalParameters?.github;
+  const dependency = statement.predicate?.buildDefinition?.resolvedDependencies;
+  const runDetails = statement.predicate?.runDetails;
+  const expectedRepository = provenance.provenance?.sourceRepository;
+  const expectedWorkflowRef = `${expectedRepository}/.github/workflows/alias-sdk-release.yml@${sourceRef}`;
+  assert(statement._type === "https://in-toto.io/Statement/v1", "Invalid SDK statement type");
+  assert(
+    statement.predicateType === "https://slsa.dev/provenance/v1",
+    "Invalid SDK predicate type",
+  );
+  assert(
+    statement.predicate?.buildDefinition?.buildType ===
+      "https://actions.github.io/buildtypes/workflow/v1",
+    "Invalid SDK build type",
+  );
+  assert(
+    workflow?.repository === expectedRepository &&
+      workflow?.ref === sourceRef &&
+      workflow?.path === ".github/workflows/alias-sdk-release.yml",
+    "SDK attestation workflow differs",
+  );
+  assert(
+    github?.event_name === "push" && github?.runner_environment === "github-hosted",
+    "SDK attestation runner or trigger differs",
+  );
+  assert(
+    Array.isArray(dependency) &&
+      dependency.length === 1 &&
+      dependency[0]?.uri === `git+${expectedRepository}@${sourceRef}` &&
+      dependency[0]?.digest?.gitCommit === sourceCommit,
+    "SDK attestation source ref or commit differs",
+  );
+  assert(
+    runDetails?.builder?.id === expectedWorkflowRef &&
+      runDetails?.metadata?.invocationId ===
+        `${expectedRepository}/actions/runs/${workflowRunId}/attempts/1`,
+    "SDK attestation builder or invocation differs",
+  );
+  assert(
+    provenance.provenance?.workflowRef ===
+      `${expectedRepository.replace(/^https:\/\/github\.com\//, "")}/.github/workflows/alias-sdk-release.yml@${sourceRef}` &&
+      provenance.provenance?.builderId === runDetails.metadata.invocationId &&
+      provenance.provenance?.eventName === "push" &&
+      provenance.provenance?.keylessAttestation?.issuer ===
+        "https://token.actions.githubusercontent.com",
+    "SDK handoff attestation coordinates differ",
+  );
+
+  const subjects = new Set(
+    statement.subject?.map((subject) => `${subject.name}\0${subject.digest?.sha256}`) ?? [],
+  );
+  for (const [relative, digest] of sums) {
+    assert(
+      subjects.has(`${path.posix.basename(relative)}\0${digest}`),
+      `SDK candidate file is not attested: ${relative}`,
+    );
+  }
+  const provenanceSha256 = hashFile(provenanceFile);
+  assert(
+    subjects.has(`${path.basename(provenanceFile)}\0${provenanceSha256}`),
+    "SDK handoff manifest is not attested",
+  );
+
+  return {
+    issuer: provenance.provenance.keylessAttestation.issuer,
+    sourceRepository: expectedRepository,
+    sourceRef,
+    sourceCommit,
+    workflowRef: provenance.provenance.workflowRef,
+    builderId: provenance.provenance.builderId,
+    runnerEnvironment: github.runner_environment,
+  };
+}
+
 assert(
   fs.statSync(candidateDirectory, { throwIfNoEntry: false })?.isDirectory(),
   "SDK candidate directory is missing",
 );
 const provenanceFile = resolveCandidate("handoff-manifest.json");
 const sumsFile = resolveCandidate("SHA256SUMS");
+const sbomFile = resolveCandidate("SBOM.cdx.json");
+const sigstoreBundleFile = resolveCandidate("PROVENANCE.sigstore.json");
 assert(
   fs.statSync(provenanceFile, { throwIfNoEntry: false })?.isFile(),
   "SDK handoff manifest is missing",
 );
 assert(fs.statSync(sumsFile, { throwIfNoEntry: false })?.isFile(), "SDK SHA256SUMS is missing");
+assert(fs.statSync(sbomFile, { throwIfNoEntry: false })?.isFile(), "SDK SBOM is missing");
+assert(
+  fs.statSync(sigstoreBundleFile, { throwIfNoEntry: false })?.isFile(),
+  "SDK Sigstore bundle is missing",
+);
 
 const provenance = readJson(provenanceFile);
-assert(provenance.schemaVersion === 2, "Unsupported SDK handoff manifest schema");
+assert(provenance.schemaVersion === 3, "Unsupported SDK handoff manifest schema");
 assert(
   provenance.sourceCommit === sourceCommit,
   "SDK handoff source commit does not match --source-commit",
@@ -104,7 +231,10 @@ assert(
 assert(Array.isArray(provenance.artifacts), "SDK handoff artifact inventory is missing");
 
 const sums = parseSums(sumsFile);
-assert(sums.size === provenance.artifacts.length, "SDK checksum and artifact inventories differ");
+assert(
+  sums.size === provenance.artifacts.length + 1,
+  "SDK checksum and artifact inventories differ",
+);
 const artifactPaths = new Set();
 for (const entry of provenance.artifacts) {
   assert(!artifactPaths.has(entry.path), `Duplicate SDK artifact path: ${entry.path}`);
@@ -119,6 +249,12 @@ for (const entry of provenance.artifacts) {
   assert(hashFile(file) === entry.sha256, `SDK candidate digest differs: ${entry.path}`);
   assert(sums.get(entry.path) === entry.sha256, `SDK SHA256SUMS differs: ${entry.path}`);
 }
+const sbomEvidence = provenance.evidence?.sbom;
+assert(sbomEvidence?.path === "SBOM.cdx.json", "SDK SBOM path differs");
+assert(fs.statSync(sbomFile).size === sbomEvidence.bytes, "SDK SBOM size differs");
+assert(hashFile(sbomFile) === sbomEvidence.sha256, "SDK SBOM digest differs");
+assert(sums.get(sbomEvidence.path) === sbomEvidence.sha256, "SDK SBOM index entry differs");
+const attestation = parseAttestation(sigstoreBundleFile, provenanceFile, sums, provenance);
 
 const packageRecord = provenance.packages?.typescriptWasm;
 assert(packageRecord?.name === "@bitwarden/sdk-internal", "SDK handoff package name changed");
@@ -174,6 +310,8 @@ const sha256 = hashFile(artifact);
 const integrity = sha512Integrity(artifact);
 const provenanceSha256 = hashFile(provenanceFile);
 const candidateChecksumsSha256 = hashFile(sumsFile);
+const sbomSha256 = hashFile(sbomFile);
+const sigstoreBundleSha256 = hashFile(sigstoreBundleFile);
 assert(sha256 === packageRecord.artifact.sha256, "Published SDK package digest differs");
 
 const manifest = readManifest();
@@ -196,6 +334,15 @@ if (args.check) {
   assert(
     candidateChecksumsSha256 === sdk.candidateChecksumsSha256,
     "Checked candidate checksum index differs from the release manifest",
+  );
+  assert(sbomSha256 === sdk.sbomSha256, "Checked SDK SBOM differs from the release manifest");
+  assert(
+    sigstoreBundleSha256 === sdk.sigstoreBundleSha256,
+    "Checked SDK Sigstore bundle differs from the release manifest",
+  );
+  assert(
+    JSON.stringify(attestation) === JSON.stringify(sdk.attestation),
+    "Checked SDK attestation coordinates differ from the release manifest",
   );
   assert(
     hashFile(buildEnvironmentFile) === sdk.buildEnvironmentSha256,
@@ -224,11 +371,15 @@ const relativeArtifact = `vendor/${fileName}`;
 const relativeMetadata = `vendor/${fileName.replace(/\.tgz$/, ".md")}`;
 const relativeProvenance = `vendor/${fileName.replace(/\.tgz$/, ".handoff.json")}`;
 const relativeChecksums = `vendor/${fileName.replace(/\.tgz$/, ".candidate.SHA256SUMS")}`;
+const relativeSbom = `vendor/${fileName.replace(/\.tgz$/, ".sbom.cdx.json")}`;
+const relativeSigstoreBundle = `vendor/${fileName.replace(/\.tgz$/, ".provenance.sigstore.json")}`;
 const relativeBuildEnvironment = `vendor/${fileName.replace(/\.tgz$/, ".build-environment.txt")}`;
 const relativeToolchainHandoff = `vendor/${fileName.replace(/\.tgz$/, ".toolchain-handoff.json")}`;
 fs.copyFileSync(artifact, path.join(repositoryRoot, relativeArtifact));
 fs.copyFileSync(provenanceFile, path.join(repositoryRoot, relativeProvenance));
 fs.copyFileSync(sumsFile, path.join(repositoryRoot, relativeChecksums));
+fs.copyFileSync(sbomFile, path.join(repositoryRoot, relativeSbom));
+fs.copyFileSync(sigstoreBundleFile, path.join(repositoryRoot, relativeSigstoreBundle));
 fs.copyFileSync(buildEnvironmentFile, path.join(repositoryRoot, relativeBuildEnvironment));
 const buildEnvironmentSha256 = hashFile(buildEnvironmentFile);
 writeJson(path.join(repositoryRoot, relativeToolchainHandoff), {
@@ -256,6 +407,12 @@ Object.assign(manifest.canonicalSdk, {
   provenanceSha256,
   candidateChecksums: relativeChecksums,
   candidateChecksumsSha256,
+  sbom: relativeSbom,
+  sbomSha256,
+  sigstoreBundle: relativeSigstoreBundle,
+  sigstoreBundleSha256,
+  handoffSchemaVersion: provenance.schemaVersion,
+  attestation,
   buildEnvironment: relativeBuildEnvironment,
   buildEnvironmentSha256,
   toolchainHandoff: relativeToolchainHandoff,
@@ -264,6 +421,7 @@ Object.assign(manifest.canonicalSdk, {
   sha256,
   integrity,
   sourceCommit,
+  publicRef: sourceRef,
   aliasReferenceSchemaVersion: provenance.aliasReferenceSchemaVersion,
   workflow: {
     runId: workflowRunId,
@@ -303,6 +461,13 @@ fs.writeFileSync(
     `- Handoff manifest SHA-256: \`${provenanceSha256}\``,
     `- Published checksum index: \`${relativeChecksums}\``,
     `- Checksum index SHA-256: \`${candidateChecksumsSha256}\``,
+    `- Published CycloneDX SBOM: \`${relativeSbom}\``,
+    `- SBOM SHA-256: \`${sbomSha256}\``,
+    `- Published Sigstore bundle: \`${relativeSigstoreBundle}\``,
+    `- Sigstore bundle SHA-256: \`${sigstoreBundleSha256}\``,
+    `- Attested workflow: \`${attestation.workflowRef}\``,
+    `- Attested builder: ${attestation.builderId}`,
+    `- Attested runner: \`${attestation.runnerEnvironment}\``,
     `- Raw SDK producer environment: \`${relativeBuildEnvironment}\``,
     `- Raw SDK producer environment SHA-256: \`${buildEnvironmentSha256}\``,
     `- Client SDK toolchain handoff: \`${relativeToolchainHandoff}\``,
@@ -346,6 +511,8 @@ for (const oldPath of [
   oldSdk.metadata,
   oldSdk.provenance,
   oldSdk.candidateChecksums,
+  oldSdk.sbom,
+  oldSdk.sigstoreBundle,
   oldSdk.buildEnvironment,
   oldSdk.toolchainHandoff,
 ]) {
@@ -356,6 +523,8 @@ for (const oldPath of [
       relativeMetadata,
       relativeProvenance,
       relativeChecksums,
+      relativeSbom,
+      relativeSigstoreBundle,
       relativeBuildEnvironment,
       relativeToolchainHandoff,
     ].includes(oldPath)

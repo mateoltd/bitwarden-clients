@@ -51,14 +51,15 @@ Download and extract the complete SDK candidate produced by the canonical SDK re
 then run one command:
 
 ```sh
-npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --source-commit BUILD_COMMIT --workflow-run RUN_ID --artifact-id ARTIFACT_ID --artifact-name ARTIFACT_NAME --artifact-zip-sha256 ZIP_SHA256
+npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --source-ref refs/heads/BUILD_BRANCH --source-commit BUILD_COMMIT --workflow-run RUN_ID --artifact-id ARTIFACT_ID --artifact-name ARTIFACT_NAME --artifact-zip-sha256 ZIP_SHA256
 ```
 
-The command verifies every file against the candidate `SHA256SUMS`, requires a schema-2
-`handoff-manifest.json`, selects its single `typescriptWasm` package, and checks the published
-source commit, package version, archive size and digest, `VERSION`, `PACKAGE_VERSION`, and build
-environment. It then copies the archive and provenance into `vendor/`, updates the manifest and
-root dependency, refreshes the lockfile with the pinned npm version, writes human-readable vendor
+The command verifies every file against the candidate `SHA256SUMS`, requires a schema-3
+`handoff-manifest.json`, verifies the signed SBOM and Sigstore statement coordinates, selects its
+single `typescriptWasm` package, and checks the published source ref and commit, package version,
+archive size and digest, `VERSION`, `PACKAGE_VERSION`, and build environment. It then copies the
+archive, SBOM, Sigstore bundle, and provenance into `vendor/`, updates the manifest and root
+dependency, refreshes the lockfile with the pinned npm version, writes human-readable vendor
 metadata, removes the superseded SDK pin, and re-runs every release and public-scope verifier. It
 does not fetch a branch or infer compatibility from a branch name.
 
@@ -70,7 +71,7 @@ Its exact package metadata and opt-in install command live in `commercial-sdk-ov
 Validate the candidate against the committed pin without changing files:
 
 ```sh
-npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --source-commit BUILD_COMMIT --workflow-run RUN_ID --artifact-id ARTIFACT_ID --artifact-name ARTIFACT_NAME --artifact-zip-sha256 ZIP_SHA256 --check
+npm run release:sdk:repin -- --candidate /absolute/path/extracted-candidate --source-ref refs/heads/BUILD_BRANCH --source-commit BUILD_COMMIT --workflow-run RUN_ID --artifact-id ARTIFACT_ID --artifact-name ARTIFACT_NAME --artifact-zip-sha256 ZIP_SHA256 --check
 ```
 
 ## Clean-room rebuild

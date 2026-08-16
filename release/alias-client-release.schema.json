@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/mateoltd/bitwarden-clients/blob/fix/public-alias-review-findings/release/alias-client-release.schema.json",
+  "$id": "https://github.com/mateoltd/bitwarden-clients/blob/integration/provider-neutral-alias-clients/release/alias-client-release.schema.json",
   "title": "Alias client release manifest",
   "type": "object",
   "required": [
@@ -33,6 +33,12 @@
         "provenanceSha256",
         "candidateChecksums",
         "candidateChecksumsSha256",
+        "sbom",
+        "sbomSha256",
+        "sigstoreBundle",
+        "sigstoreBundleSha256",
+        "handoffSchemaVersion",
+        "attestation",
         "buildEnvironment",
         "buildEnvironmentSha256",
         "toolchainHandoff",
@@ -46,6 +52,19 @@
         "workflow"
       ],
       "properties": {
+        "handoffSchemaVersion": { "const": 3 },
+        "attestation": {
+          "type": "object",
+          "required": [
+            "issuer",
+            "sourceRepository",
+            "sourceRef",
+            "sourceCommit",
+            "workflowRef",
+            "builderId",
+            "runnerEnvironment"
+          ]
+        },
         "producerToolchain": {
           "type": "object",
           "required": ["runnerImage", "node", "npm", "rust", "wasmOpt"]
