@@ -4,10 +4,16 @@ The release manifest records the repositories that actually produced this client
 pinned SDK artifact:
 
 - Client source: [`mateoltd/bitwarden-clients`](https://github.com/mateoltd/bitwarden-clients),
-  with the exact release branch and commit verified at release time.
+  branch `refs/heads/integration/provider-neutral-alias-clients`, based exactly on
+  `refs/remotes/origin/fix/public-alias-review-findings` at
+  `dd217a8ce662b40dbd0b2465a97edb806a60c924`; the final source commit is verified at release
+  time.
 - SDK source: [`mateoltd/bitwarden-sdk-internal`](https://github.com/mateoltd/bitwarden-sdk-internal),
-  ref `refs/heads/integration/public-alias-sdk`, commit
-  `4a08b5fe81c363169d36f582cc13c03b59d212d8`.
+  ref `refs/heads/refactor/provider-neutral-alias-v1`, commit
+  `99c33ed26e51421224a4daecdf838057f1d66e75`, workflow run `31928076589`, artifact
+  `alias-sdk-release-candidate-99c33ed26e51421224a4daecdf838057f1d66e75`. The complete
+  candidate checksum index, schema-3 handoff manifest, CycloneDX SBOM, Sigstore bundle, and
+  GitHub-hosted SLSA attestations are pinned in the release manifest and vendor evidence.
 - Provider operations harness:
   [`mateoltd/simplelogin-owned-provider`](https://github.com/mateoltd/simplelogin-owned-provider),
   commit `e157b6804f7b1b60e149207cebe2d414f6e4a73f`, asserting SimpleLogin upstream commit
