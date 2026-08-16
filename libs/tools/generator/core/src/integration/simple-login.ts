@@ -1,11 +1,13 @@
 /* eslint-disable import/no-restricted-paths -- legacy forwarder state contract */
+import { Jsonify } from "type-fest";
+
 import {
   GENERATOR_DISK,
   GENERATOR_MEMORY,
   UserKeyDefinition,
 } from "@bitwarden/common/platform/state";
 /* eslint-enable import/no-restricted-paths */
-import { AliasSyncDocument } from "@bitwarden/common/tools/alias";
+import { AliasSyncDocument, parseAliasSyncDocument } from "@bitwarden/common/tools/alias";
 import { VendorId } from "@bitwarden/common/tools/extension";
 import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
 import { IntegrationContext, IntegrationId } from "@bitwarden/common/tools/integration";
@@ -39,6 +41,14 @@ const defaultSettings = Object.freeze({
   aliasSync: undefined,
 });
 
+function deserializeSimpleLoginSettings(value: Jsonify<SimpleLoginSettings>): SimpleLoginSettings {
+  const { aliasSync, ...settings } = value;
+  return {
+    ...settings,
+    ...(aliasSync === undefined ? {} : { aliasSync: parseAliasSyncDocument(aliasSync) }),
+  };
+}
+
 // forwarder configuration
 const forwarder = Object.freeze({
   defaultSettings,
@@ -59,7 +69,7 @@ const forwarder = Object.freeze({
       state: GENERATOR_DISK,
       initial: defaultSettings,
       options: {
-        deserializer: (value) => value,
+        deserializer: deserializeSimpleLoginSettings,
         clearOn: ["logout"],
       },
     } satisfies ObjectKey<SimpleLoginSettings>,
@@ -70,20 +80,20 @@ const forwarder = Object.freeze({
       classifier: new PublicClassifier<SimpleLoginSettings>(["token", "baseUrl"]),
       state: GENERATOR_MEMORY,
       options: {
-        deserializer: (value) => value,
+        deserializer: deserializeSimpleLoginSettings,
         clearOn: ["logout", "lock"],
       },
     } satisfies ObjectKey<SimpleLoginSettings, Record<string, never>, SimpleLoginSettings>,
   },
   settings: new UserKeyDefinition<SimpleLoginSettings>(GENERATOR_DISK, "simpleLoginForwarder", {
-    deserializer: (value) => value,
+    deserializer: deserializeSimpleLoginSettings,
     clearOn: [],
   }),
   importBuffer: new BufferedKeyDefinition<SimpleLoginSettings>(
     GENERATOR_DISK,
     "simpleLoginBuffer",
     {
-      deserializer: (value) => value,
+      deserializer: deserializeSimpleLoginSettings,
       clearOn: ["logout"],
     },
   ),

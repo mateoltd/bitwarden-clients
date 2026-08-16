@@ -1,3 +1,6 @@
+import { Jsonify } from "type-fest";
+
+import { parseAliasSyncDocument } from "@bitwarden/common/tools/alias";
 import { ExtensionMetadata, ExtensionStorageKey } from "@bitwarden/common/tools/extension/type";
 import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
 import { IdentityConstraint } from "@bitwarden/common/tools/state/identity-state-constraint";
@@ -10,6 +13,14 @@ import { ForwarderOptions } from "../../types";
 import { Profile, Type } from "../data";
 import { GeneratorMetadata } from "../generator-metadata";
 import { ForwarderProfileMetadata } from "../profile-metadata";
+
+function deserializeForwarderOptions(value: Jsonify<ForwarderOptions>): ForwarderOptions {
+  const { aliasSync, ...options } = value;
+  return {
+    ...options,
+    ...(aliasSync === undefined ? {} : { aliasSync: parseAliasSyncDocument(aliasSync) }),
+  };
+}
 
 // update the extension metadata
 export function toForwarderMetadata(
@@ -63,7 +74,7 @@ export function toForwarderMetadata(
             prefix: "",
           },
           options: {
-            deserializer: (value) => value,
+            deserializer: deserializeForwarderOptions,
             clearOn: ["logout"],
           },
         } satisfies ExtensionStorageKey<ForwarderOptions>,
