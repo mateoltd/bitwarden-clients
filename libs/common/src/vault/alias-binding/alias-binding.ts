@@ -80,6 +80,11 @@ export function reconcileAliasBinding(cipher: AliasBindableCipher): void {
     if (cipher.login) {
       cipher.login.aliasReference = undefined;
     }
+    return;
+  }
+
+  if (cipher.login) {
+    cipher.login.aliasReference = create_alias_reference(cipher.aliasBinding);
   }
 }
 
