@@ -16,6 +16,7 @@ import {
 
 import { mockFromJson, mockFromSdk } from "../../../../spec";
 import { asUuid } from "../../../platform/abstractions/sdk/sdk.service";
+import { bindGeneratedAlias } from "../../alias-binding";
 import { CipherRepromptType } from "../../enums";
 import { CipherType } from "../../enums/cipher-type";
 import { CipherPermissionsApi } from "../api/cipher-permissions.api";
@@ -368,6 +369,33 @@ describe("CipherView", () => {
   // at the top that mock LoginView, FieldView, etc. Those mocks are needed for other tests
   // but interfere with these tests which need the real implementations.
   describe("toSdkCreateCipherRequest", () => {
+    it("preserves the canonical SDK alias reference in the login variant", () => {
+      const { LoginView: RealLoginView } = jest.requireActual("./login.view");
+      const cipherView = new CipherView();
+      cipherView.name = "Alias login";
+      cipherView.type = CipherType.Login;
+      cipherView.login = new RealLoginView();
+      cipherView.login.username = "create@sl.test";
+      bindGeneratedAlias(cipherView, {
+        credential: "create@sl.test",
+        metadata: {
+          kind: "email-alias",
+          alias: {
+            version: 1,
+            connectionId: "11111111-1111-4111-8111-111111111111",
+            aliasId: "opaque:create",
+            address: "create@sl.test",
+          },
+        },
+      });
+
+      const result = cipherView.toSdkCreateCipherRequest(mockCiphersClient);
+
+      expect("login" in result.type && result.type.login?.aliasReference).toBe(
+        cipherView.login.aliasReference,
+      );
+    });
+
     it("maps all properties correctly for a login cipher", () => {
       const { FieldView: RealFieldView } = jest.requireActual("./field.view");
       const { LoginView: RealLoginView } = jest.requireActual("./login.view");
@@ -502,6 +530,35 @@ describe("CipherView", () => {
   });
 
   describe("toSdkUpdateCipherRequest", () => {
+    it("preserves the canonical SDK alias reference in the login variant", () => {
+      const { LoginView: RealLoginView } = jest.requireActual("./login.view");
+      const cipherView = new CipherView();
+      cipherView.id = "0a54d80c-14aa-4ef8-8c3a-7ea99ce5b602";
+      cipherView.name = "Alias login";
+      cipherView.type = CipherType.Login;
+      cipherView.revisionDate = new Date("2022-01-02T12:00:00.000Z");
+      cipherView.login = new RealLoginView();
+      cipherView.login.username = "update@sl.test";
+      bindGeneratedAlias(cipherView, {
+        credential: "update@sl.test",
+        metadata: {
+          kind: "email-alias",
+          alias: {
+            version: 1,
+            connectionId: "11111111-1111-4111-8111-111111111111",
+            aliasId: "opaque:update",
+            address: "update@sl.test",
+          },
+        },
+      });
+
+      const result = cipherView.toSdkUpdateCipherRequest(mockCiphersClient);
+
+      expect("login" in result.type && result.type.login?.aliasReference).toBe(
+        cipherView.login.aliasReference,
+      );
+    });
+
     it("maps all properties correctly for an update request", () => {
       const { FieldView: RealFieldView } = jest.requireActual("./field.view");
       const { LoginView: RealLoginView } = jest.requireActual("./login.view");
