@@ -2,6 +2,7 @@ import { mock, MockProxy, mockReset } from "jest-mock-extended";
 import { BehaviorSubject, of } from "rxjs";
 import { map } from "rxjs/operators";
 
+import { SensitiveString } from "@bitwarden/alias-sdk-internal";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
@@ -1945,7 +1946,7 @@ describe("OverlayBackground", () => {
                 version: 1,
                 connectionId: "11111111-1111-4111-8111-111111111111",
                 aliasId: "741",
-                address: aliasAddress,
+                address: aliasAddress as SensitiveString,
               },
             },
           ),
