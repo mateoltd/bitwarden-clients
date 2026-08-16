@@ -72,6 +72,16 @@ describe("alias binding", () => {
     expect(cipher.login.aliasReference).toBeUndefined();
   });
 
+  it("restores the first-class member after a form rebuild preserves the canonical identity", () => {
+    const cipher = login();
+    cipher.aliasBinding = firstAlias;
+    cipher.login.aliasReference = undefined;
+
+    reconcileAliasBinding(cipher);
+
+    expect(cipher.login.aliasReference).toBe(create_alias_reference(firstAlias));
+  });
+
   it.each([
     JSON.stringify({ ...firstAlias, token: "must-not-survive" }),
     JSON.stringify({ ...firstAlias, version: 2 }),

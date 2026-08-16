@@ -5,10 +5,12 @@ import { By } from "@angular/platform-browser";
 import { mock, MockProxy } from "jest-mock-extended";
 import { BehaviorSubject, of } from "rxjs";
 
+import { create_alias_reference } from "@bitwarden/alias-sdk-internal";
 import { AuditService } from "@bitwarden/common/abstractions/audit.service";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { parseEmailAliasIdentity } from "@bitwarden/common/tools/alias";
 import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
@@ -287,6 +289,25 @@ describe("LoginDetailsSectionComponent", () => {
 
       expect(cipher.aliasBinding).toBeUndefined();
     }));
+
+    it("restores the first-class reference when the form rebuilds a bound username", () => {
+      const alias = parseEmailAliasIdentity({
+        version: 1,
+        connectionId: "11111111-1111-4111-8111-111111111111",
+        aliasId: "opaque:form-rebuild",
+        address: "form-rebuild@sl.test",
+      })!;
+      const cipher = new CipherView();
+      cipher.aliasBinding = alias;
+      cipher.login.aliasReference = undefined;
+      cipherFormContainer.patchCipher.mockClear();
+
+      component.loginDetailsForm.controls.username.patchValue(alias.address);
+      const [patchCipher] = cipherFormContainer.patchCipher.mock.lastCall;
+      patchCipher(cipher);
+
+      expect(cipher.login.aliasReference).toBe(create_alias_reference(alias));
+    });
 
     it("should not replace an existing username if generation returns null", fakeAsync(() => {
       generationService.generateUsername.mockResolvedValue(null);
