@@ -5,48 +5,21 @@ export const ALIAS_SYNC_VERSION = 1 as const;
 export type AliasVectorClock = Record<string, number>;
 
 export type AliasProviderConnection = {
-  provider: "simplelogin";
-  providerInstance: string;
+  version: typeof ALIAS_SYNC_VERSION;
   connectionId: string;
 };
 
-export type AliasProviderPatch = {
-  name?: string | null;
-  note?: string | null;
-  mailboxIds?: number[];
-  pgpDisabled?: boolean;
-  pinned?: boolean;
-};
-
-export type AliasCreateIntent =
-  | {
-      kind: "random";
-      hostname?: string;
-      mode?: "uuid" | "word";
-      note?: string;
-    }
-  | {
-      kind: "custom";
-      hostname?: string;
-      /** Hash or opaque caller label only. A signed suffix must never be journaled. */
-      requestFingerprint: string;
-    };
+export type AliasCreateIntent = { hostname?: string };
 
 export type AliasProviderOperation =
   | { operation: "create"; connection: AliasProviderConnection; request: AliasCreateIntent }
-  | { operation: "update"; alias: EmailAliasIdentity; patch: AliasProviderPatch }
   | { operation: "enable"; alias: EmailAliasIdentity }
   | { operation: "disable"; alias: EmailAliasIdentity }
   | { operation: "delete"; alias: EmailAliasIdentity };
 
 export type AliasProviderSnapshot = {
   alias: EmailAliasIdentity;
-  enabled: boolean;
-  name?: string | null;
-  note?: string | null;
-  mailboxIds?: number[];
-  pgpDisabled?: boolean;
-  pinned?: boolean;
+  lifecycle: "enabled" | "disabled" | "deleted";
 };
 
 type AliasSyncEventBase = {
@@ -131,7 +104,6 @@ export type AliasProjectedConnection = {
 export type AliasProjectedAlias = {
   identity: EmailAliasIdentity;
   status: "enabled" | "disabled" | "deleted";
-  fields: AliasProviderPatch;
 };
 
 export type AliasProjectedReference = {
@@ -161,7 +133,7 @@ export type AliasSyncProjection = {
   conflicts: AliasSyncConflict[];
 };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FORBIDDEN_SECRET_KEYS = new Set([
   "authentication",
   "api_key",
@@ -180,6 +152,14 @@ const PROVIDER_FAILURE_REASONS = new Set<AliasProviderFailureReason>([
   "rate-limited",
   "invalid-response",
 ]);
+const ALIAS_LIFECYCLES = new Set(["enabled", "disabled", "deleted"]);
+
+function assertExactKeys(value: object, allowed: readonly string[], field: string): void {
+  const keys = new Set(allowed);
+  if (Object.keys(value).some((key) => !keys.has(key))) {
+    throw new Error(`Invalid alias sync ${field}`);
+  }
+}
 
 function uuid(): string {
   const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
@@ -195,26 +175,14 @@ function assertUuid(value: string, field: string): void {
   }
 }
 
-function canonicalProviderInstance(value: string): string {
-  const url = new URL(value);
-  if (!url.hostname || url.username || url.password || url.search || url.hash) {
-    throw new Error("Invalid alias provider instance");
-  }
-  if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "127.0.0.1")) {
-    throw new Error("Invalid alias provider instance");
-  }
-  url.pathname = url.pathname.replace(/\/*$/, "/");
-  return url.toString();
-}
-
 function sanitizeConnection(value: AliasProviderConnection): AliasProviderConnection {
-  if (!value || value.provider !== "simplelogin") {
+  if (!value || value.version !== ALIAS_SYNC_VERSION) {
     throw new Error("Invalid alias provider connection");
   }
+  assertExactKeys(value, ["version", "connectionId"], "connection");
   assertUuid(value.connectionId, "connection id");
   return {
-    provider: "simplelogin",
-    providerInstance: canonicalProviderInstance(value.providerInstance),
+    version: ALIAS_SYNC_VERSION,
     connectionId: value.connectionId.toLowerCase(),
   };
 }
@@ -271,8 +239,7 @@ function operationConnection(operation: AliasProviderOperation): AliasProviderCo
   }
   const alias = sanitizeIdentity(operation.alias);
   return {
-    provider: alias.provider,
-    providerInstance: alias.providerInstance,
+    version: ALIAS_SYNC_VERSION,
     connectionId: alias.connectionId,
   };
 }
@@ -294,52 +261,18 @@ function optionalString(value: unknown, field: string): string | undefined {
   return value;
 }
 
-function sanitizePatch(value: unknown): AliasProviderPatch {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Invalid alias provider patch");
-  }
-  const candidate = value as AliasProviderPatch;
-  const patch: AliasProviderPatch = {};
-  for (const field of ["name", "note"] as const) {
-    if (candidate[field] !== undefined) {
-      if (candidate[field] !== null && typeof candidate[field] !== "string") {
-        throw new Error(`Invalid alias provider ${field}`);
-      }
-      patch[field] = candidate[field];
-    }
-  }
-  if (candidate.mailboxIds !== undefined) {
-    if (
-      !Array.isArray(candidate.mailboxIds) ||
-      candidate.mailboxIds.some((id) => !Number.isSafeInteger(id) || id <= 0)
-    ) {
-      throw new Error("Invalid alias provider mailbox ids");
-    }
-    patch.mailboxIds = [...candidate.mailboxIds];
-  }
-  for (const field of ["pgpDisabled", "pinned"] as const) {
-    if (candidate[field] !== undefined) {
-      if (typeof candidate[field] !== "boolean") {
-        throw new Error(`Invalid alias provider ${field}`);
-      }
-      patch[field] = candidate[field];
-    }
-  }
-  return patch;
-}
-
 function sanitizeSnapshot(value: unknown): AliasProviderSnapshot {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Invalid alias provider snapshot");
   }
   const candidate = value as AliasProviderSnapshot;
-  if (typeof candidate.enabled !== "boolean") {
+  assertExactKeys(candidate, ["alias", "lifecycle"], "provider snapshot");
+  if (!ALIAS_LIFECYCLES.has(candidate.lifecycle)) {
     throw new Error("Invalid alias provider state");
   }
   return {
     alias: sanitizeIdentity(candidate.alias),
-    enabled: candidate.enabled,
-    ...sanitizePatch(candidate),
+    lifecycle: candidate.lifecycle,
   };
 }
 
@@ -350,49 +283,25 @@ function sanitizeOperation(value: unknown): AliasProviderOperation {
   const candidate = value as AliasProviderOperation;
   switch (candidate.operation) {
     case "create": {
+      assertExactKeys(candidate, ["operation", "connection", "request"], "create operation");
       const connection = sanitizeConnection(candidate.connection);
       const request = candidate.request;
       if (!request || typeof request !== "object" || Array.isArray(request)) {
         throw new Error("Invalid alias create request");
       }
-      if (request.kind === "random") {
-        if (request.mode !== undefined && request.mode !== "uuid" && request.mode !== "word") {
-          throw new Error("Invalid alias random mode");
-        }
-        return {
-          operation: "create",
-          connection,
-          request: {
-            kind: "random",
-            hostname: optionalString(request.hostname, "hostname"),
-            mode: request.mode,
-            note: optionalString(request.note, "note"),
-          },
-        };
-      }
-      if (request.kind === "custom") {
-        return {
-          operation: "create",
-          connection,
-          request: {
-            kind: "custom",
-            hostname: optionalString(request.hostname, "hostname"),
-            requestFingerprint: nonEmptyString(request.requestFingerprint, "request fingerprint"),
-          },
-        };
-      }
-      throw new Error("Invalid alias create request kind");
-    }
-    case "update":
+      assertExactKeys(request, ["hostname"], "create request");
       return {
-        operation: "update",
-        alias: sanitizeIdentity(candidate.alias),
-        patch: sanitizePatch(candidate.patch),
+        operation: "create",
+        connection,
+        request: { hostname: optionalString(request.hostname, "hostname") },
       };
+    }
     case "enable":
     case "disable":
-    case "delete":
+    case "delete": {
+      assertExactKeys(candidate, ["operation", "alias"], "provider operation");
       return { operation: candidate.operation, alias: sanitizeIdentity(candidate.alias) };
+    }
     default:
       throw new Error("Invalid alias provider operation kind");
   }
@@ -403,14 +312,18 @@ function sanitizeInput(input: AliasSyncEventInput): AliasSyncEventInput {
   switch (input.kind) {
     case "connection-upsert":
     case "connection-remove":
+      assertExactKeys(input, ["kind", "connection"], "connection event");
       return { kind: input.kind, connection: sanitizeConnection(input.connection) };
     case "provider-operation":
+      assertExactKeys(input, ["kind", "value"], "provider operation event");
       return { kind: "provider-operation", value: sanitizeOperation(input.value) };
     case "provider-dispatched":
     case "provider-unknown":
+      assertExactKeys(input, ["kind", "operationId"], "provider stage event");
       assertUuid(input.operationId, "operation id");
       return { kind: input.kind, operationId: input.operationId.toLowerCase() };
     case "provider-ack":
+      assertExactKeys(input, ["kind", "operationId", "snapshot"], "provider ack event");
       assertUuid(input.operationId, "operation id");
       return {
         kind: "provider-ack",
@@ -418,6 +331,7 @@ function sanitizeInput(input: AliasSyncEventInput): AliasSyncEventInput {
         snapshot: input.snapshot ? sanitizeSnapshot(input.snapshot) : undefined,
       };
     case "provider-failed":
+      assertExactKeys(input, ["kind", "operationId", "reason"], "provider failure event");
       assertUuid(input.operationId, "operation id");
       if (!PROVIDER_FAILURE_REASONS.has(input.reason)) {
         throw new Error("Invalid alias provider failure reason");
@@ -428,8 +342,10 @@ function sanitizeInput(input: AliasSyncEventInput): AliasSyncEventInput {
         reason: input.reason,
       };
     case "provider-observe":
+      assertExactKeys(input, ["kind", "snapshot"], "provider observation event");
       return { kind: "provider-observe", snapshot: sanitizeSnapshot(input.snapshot) };
     case "reference-set":
+      assertExactKeys(input, ["kind", "cipherId", "expectedAliasKey", "alias"], "reference event");
       return {
         kind: "reference-set",
         cipherId: nonEmptyString(input.cipherId, "cipher id"),
@@ -440,6 +356,11 @@ function sanitizeInput(input: AliasSyncEventInput): AliasSyncEventInput {
         alias: sanitizeIdentity(input.alias),
       };
     case "reference-prepare":
+      assertExactKeys(
+        input,
+        ["kind", "cipherId", "expectedAlias", "alias"],
+        "reference transaction",
+      );
       return {
         kind: "reference-prepare",
         cipherId: nonEmptyString(input.cipherId, "cipher id"),
@@ -447,6 +368,7 @@ function sanitizeInput(input: AliasSyncEventInput): AliasSyncEventInput {
         alias: sanitizeIdentity(input.alias),
       };
     case "reference-clear":
+      assertExactKeys(input, ["kind", "cipherId", "expectedAliasKey"], "reference event");
       return {
         kind: "reference-clear",
         cipherId: nonEmptyString(input.cipherId, "cipher id"),
@@ -457,9 +379,11 @@ function sanitizeInput(input: AliasSyncEventInput): AliasSyncEventInput {
       };
     case "reference-commit":
     case "reference-abort":
+      assertExactKeys(input, ["kind", "transactionId"], "reference transaction");
       assertUuid(input.transactionId, "reference transaction id");
       return { kind: input.kind, transactionId: input.transactionId.toLowerCase() };
     case "conflict-resolve":
+      assertExactKeys(input, ["kind", "conflictId", "chosenEventId"], "conflict resolution");
       assertUuid(input.chosenEventId, "chosen event id");
       return {
         kind: "conflict-resolve",
@@ -578,6 +502,7 @@ export function parseAliasSyncDocument(value: unknown): AliasSyncDocument {
     throw new Error("Invalid alias sync document");
   }
   const candidate = value as Partial<AliasSyncDocument>;
+  assertExactKeys(candidate, ["version", "replicaId", "clock", "events"], "document");
   if (candidate.version !== ALIAS_SYNC_VERSION || !Array.isArray(candidate.events)) {
     throw new Error("Unsupported alias sync document version");
   }
@@ -626,16 +551,12 @@ export function mergeAliasSyncDocuments(
 
 export function aliasConnectionKey(connection: AliasProviderConnection): string {
   const parsed = sanitizeConnection(connection);
-  return `${parsed.provider}\n${parsed.providerInstance}\n${parsed.connectionId}`;
+  return parsed.connectionId;
 }
 
 export function emailAliasKey(identity: EmailAliasIdentity): string {
   const parsed = sanitizeIdentity(identity);
-  return `${aliasConnectionKey({
-    provider: parsed.provider,
-    providerInstance: parsed.providerInstance,
-    connectionId: parsed.connectionId,
-  })}\n${parsed.aliasId}`;
+  return `${parsed.connectionId}\n${parsed.aliasId}`;
 }
 
 function maximal<Event extends AliasSyncEvent>(events: Event[]): Event[] {
@@ -684,14 +605,12 @@ function providerSnapshotFromOperation(
     return undefined;
   }
   switch (operation.operation) {
-    case "update":
-      return { alias: operation.alias, ...operation.patch };
     case "enable":
-      return { alias: operation.alias, enabled: true };
+      return { alias: operation.alias, lifecycle: "enabled" };
     case "disable":
-      return { alias: operation.alias, enabled: false };
+      return { alias: operation.alias, lifecycle: "disabled" };
     case "delete":
-      return { alias: operation.alias };
+      return { alias: operation.alias, lifecycle: "deleted" };
   }
 }
 
@@ -748,8 +667,7 @@ export function projectAliasSync(document: AliasSyncDocument): AliasSyncProjecti
       const snapshot = eventSnapshot(event);
       if (snapshot?.alias) {
         connection = {
-          provider: snapshot.alias.provider,
-          providerInstance: snapshot.alias.providerInstance,
+          version: ALIAS_SYNC_VERSION,
           connectionId: snapshot.alias.connectionId,
         };
       }
@@ -876,7 +794,6 @@ export function projectAliasSync(document: AliasSyncDocument): AliasSyncProjecti
       (event) => event.kind === "provider-operation" && event.value.operation === "delete",
     );
     let status: AliasProjectedAlias["status"] = "enabled";
-    const fields: AliasProviderPatch = {};
     if (deletes.length > 0) {
       status = "deleted";
       const competing = events.filter(
@@ -896,10 +813,10 @@ export function projectAliasSync(document: AliasSyncDocument): AliasSyncProjecti
       const stateEvents = maximal(
         events.filter((event) => {
           const snapshot = eventSnapshot(event);
-          return snapshot?.enabled !== undefined;
+          return snapshot?.lifecycle !== undefined;
         }),
       );
-      const states = new Set(stateEvents.map((event) => eventSnapshot(event)?.enabled));
+      const states = new Set(stateEvents.map((event) => eventSnapshot(event)?.lifecycle));
       if (states.size > 1) {
         const candidate = conflict("provider-state", key, stateEvents);
         const chosen = resolved.get(candidate.id);
@@ -909,34 +826,12 @@ export function projectAliasSync(document: AliasSyncDocument): AliasSyncProjecti
         const winner =
           stateEvents.find((event) => event.id === chosen) ??
           [...stateEvents].sort((left, right) => left.id.localeCompare(right.id))[0];
-        status = eventSnapshot(winner)?.enabled === false ? "disabled" : "enabled";
+        status = eventSnapshot(winner)?.lifecycle === "disabled" ? "disabled" : "enabled";
       } else if (stateEvents[0]) {
-        status = eventSnapshot(stateEvents[0])?.enabled === false ? "disabled" : "enabled";
-      }
-      for (const field of ["name", "note", "mailboxIds", "pgpDisabled", "pinned"] as const) {
-        const fieldEvents = maximal(
-          events.filter((event) => eventSnapshot(event)?.[field] !== undefined),
-        );
-        if (fieldEvents.length === 0) {
-          continue;
-        }
-        const values = new Set(fieldEvents.map((event) => stable(eventSnapshot(event)?.[field])));
-        if (values.size > 1) {
-          const candidate = conflict("provider-state", `${key}:${field}`, fieldEvents);
-          const chosen = resolved.get(candidate.id);
-          if (!chosen) {
-            conflicts.push(candidate);
-          }
-          const winner =
-            fieldEvents.find((event) => event.id === chosen) ??
-            [...fieldEvents].sort((left, right) => left.id.localeCompare(right.id))[0];
-          (fields as Record<string, unknown>)[field] = eventSnapshot(winner)?.[field];
-        } else {
-          (fields as Record<string, unknown>)[field] = eventSnapshot(fieldEvents[0])?.[field];
-        }
+        status = eventSnapshot(stateEvents[0])?.lifecycle === "disabled" ? "disabled" : "enabled";
       }
     }
-    aliases[key] = { identity, status, fields };
+    aliases[key] = { identity, status };
   }
 
   type ReferenceEvent = Extract<AliasSyncEvent, { kind: "reference-set" | "reference-clear" }>;

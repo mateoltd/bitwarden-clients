@@ -14,6 +14,7 @@ import {
   SimpleLoginAliasPage,
   SimpleLoginAliasRecommendation,
   SimpleLoginAliasService,
+  SimpleLoginContact,
   SimpleLoginContactPage,
   Type,
   UpdateSimpleLoginAliasRequest,
@@ -111,12 +112,12 @@ export class BrowserSimpleLoginAliasService {
     return (await this.lifecycle()).createReverseAlias(aliasId, contact);
   }
 
-  async toggleContactBlocked(contactId: number): Promise<boolean> {
-    return (await this.lifecycle()).toggleContactBlocked(contactId);
+  async toggleContactBlocked(contact: SimpleLoginContact): Promise<boolean> {
+    return (await this.lifecycle()).toggleContactBlocked(contact);
   }
 
-  async deleteContact(contactId: number): Promise<void> {
-    await (await this.lifecycle()).deleteContact(contactId);
+  async deleteContact(contact: SimpleLoginContact): Promise<void> {
+    await (await this.lifecycle()).deleteContact(contact);
   }
 
   private async lifecycle(): Promise<SimpleLoginAliasService> {

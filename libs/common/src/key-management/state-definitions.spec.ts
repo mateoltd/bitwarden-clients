@@ -19,7 +19,7 @@ describe("ACCOUNT_CRYPTOGRAPHIC_STATE", () => {
       },
     } as WrappedAccountCryptographicState;
 
-    const result = ACCOUNT_CRYPTOGRAPHIC_STATE.deserializer(mockState);
+    const result = ACCOUNT_CRYPTOGRAPHIC_STATE.deserializer(mockState as never);
 
     expect(result).toBe(mockState);
   });

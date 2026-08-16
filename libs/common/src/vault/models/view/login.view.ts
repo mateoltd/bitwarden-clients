@@ -19,6 +19,7 @@ export class LoginView extends ItemView {
 
   passwordRevisionDate?: Date;
   totp: string | undefined;
+  aliasReference: string | undefined;
   uris: LoginUriView[] = [];
   autofillOnPageLoad: boolean | undefined;
   fido2Credentials: Fido2CredentialView[] = [];
@@ -124,6 +125,7 @@ export class LoginView extends ItemView {
     loginView.passwordRevisionDate =
       obj.passwordRevisionDate == null ? undefined : new Date(obj.passwordRevisionDate);
     loginView.totp = obj.totp;
+    loginView.aliasReference = obj.aliasReference;
     loginView.autofillOnPageLoad = obj.autofillOnPageLoad;
     loginView.uris =
       obj.uris
@@ -146,6 +148,7 @@ export class LoginView extends ItemView {
       password: this.password || undefined,
       passwordRevisionDate: this.passwordRevisionDate?.toISOString(),
       totp: this.hasTotp ? this.totp : undefined,
+      aliasReference: this.aliasReference,
       autofillOnPageLoad: this.autofillOnPageLoad ?? undefined,
       uris: this.uris?.map((uri) => uri.toSdkLoginUriView()),
       fido2Credentials: undefined, // FIDO2 credentials are handled separately and remain encrypted

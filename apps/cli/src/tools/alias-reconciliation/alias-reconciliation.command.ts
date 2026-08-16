@@ -98,11 +98,13 @@ export class AliasReconciliationCommand {
           cipherService: this.cipherService,
           userId,
           connection: {
-            provider: provider.provider,
-            providerInstance: provider.instance,
+            version: 1,
             connectionId: provider.connectionId,
           },
-          credential: { token: settings.token, baseUrl: provider.instance },
+          credential: {
+            token: settings.token,
+            baseUrl: settings.baseUrl?.trim() || "https://app.simplelogin.io/",
+          },
           local,
           refresh: async () => {
             await this.syncService.fullSync(true, { allowThrowOnError: true });

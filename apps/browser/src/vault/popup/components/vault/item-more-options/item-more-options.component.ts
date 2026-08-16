@@ -287,7 +287,7 @@ export class ItemMoreOptionsComponent {
 
   protected async manageBoundAlias() {
     const cipher = await this.cipherService.getFullCipherView(this.cipher);
-    if (!cipher.aliasBinding || cipher.aliasBinding.provider !== "simplelogin") {
+    if (!cipher.aliasBinding) {
       return;
     }
     await this.router.navigate(["/email-aliases", cipher.aliasBinding.aliasId]);

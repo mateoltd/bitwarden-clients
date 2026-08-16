@@ -24,11 +24,37 @@ export function normalizeSimpleLoginAliasError(error: unknown): SimpleLoginAlias
   if (error instanceof SimpleLoginAliasError) {
     return error;
   }
-  if (!(error instanceof Error) || error.name !== "AliasError") {
+  if (!(error instanceof Error)) {
     return new SimpleLoginAliasError("SimpleLogin could not be reached", "remote-error");
   }
 
   const message = error.message;
+  const canonicalCode = /alias operation failed: ([a-z-]+)/.exec(message)?.[1];
+  switch (canonicalCode) {
+    case "authentication-rejected":
+    case "connection-missing":
+      return new SimpleLoginAliasError(message, "invalid-credentials");
+    case "permission-denied":
+      return new SimpleLoginAliasError(message, "forbidden");
+    case "not-found":
+      return new SimpleLoginAliasError(message, "not-found");
+    case "rate-limited":
+      return new SimpleLoginAliasError(message, "rate-limited");
+    case "sync-conflict":
+      return new SimpleLoginAliasError(message, "conflict");
+    case "invalid-input":
+    case "invalid-response":
+    case "capability-unsupported":
+    case "local-security-failure":
+      return new SimpleLoginAliasError(message, "invalid-response");
+    case "outcome-unknown":
+    case "offline":
+    case "timeout":
+    case "service-unavailable":
+    case "quota-exhausted":
+    case "vault-locked":
+      return new SimpleLoginAliasError(message, "remote-error");
+  }
   const statusMatch = /\(HTTP (\d{3})\)/.exec(message);
   const status = statusMatch ? Number(statusMatch[1]) : undefined;
   if (message === "alias provider authentication failed" || status === 401) {

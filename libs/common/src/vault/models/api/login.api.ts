@@ -13,6 +13,7 @@ export class LoginApi extends BaseResponse {
   password: string;
   passwordRevisionDate: string;
   totp: string;
+  aliasReference?: string;
   autofillOnPageLoad: boolean;
   fido2Credentials?: Fido2CredentialApi[];
 
@@ -25,6 +26,7 @@ export class LoginApi extends BaseResponse {
     this.password = this.getResponseProperty("Password");
     this.passwordRevisionDate = this.getResponseProperty("PasswordRevisionDate");
     this.totp = this.getResponseProperty("Totp");
+    this.aliasReference = this.getResponseProperty("AliasReference");
     this.autofillOnPageLoad = this.getResponseProperty("AutofillOnPageLoad");
 
     const uris = this.getResponseProperty("Uris");

@@ -29,10 +29,10 @@ import {
 const userId = "89d55fa7-395c-48a0-966a-3d412954082f";
 const replicaId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const connection = {
-  provider: "simplelogin" as const,
-  providerInstance: "https://app.simplelogin.io/",
+  version: 1 as const,
   connectionId: "11111111-1111-4111-8111-111111111111",
 };
+const baseUrl = "https://app.simplelogin.io/";
 const token = "provider-secret-must-remain-encrypted";
 
 class EmptyTokenProvider implements TokenProvider {
@@ -78,14 +78,14 @@ describe("alias connection vault carrier", () => {
     const view = createAliasConnectionCipher({
       version: ALIAS_CONNECTION_VERSION,
       connection,
-      credential: { token, baseUrl: connection.providerInstance },
+      credential: { token, baseUrl },
       sync,
     });
 
     expect(isAliasConnectionCipher(view)).toBe(true);
     expect(parseAliasConnectionCipher(view)).toMatchObject({
       connection,
-      credential: { token, baseUrl: connection.providerInstance },
+      credential: { token, baseUrl },
     });
 
     const encryption = await client.vault().ciphers().encrypt(view.toSdkCipherView());
@@ -106,7 +106,7 @@ describe("alias connection vault carrier", () => {
     const cipher = createAliasConnectionCipher({
       version: ALIAS_CONNECTION_VERSION,
       connection,
-      credential: { token, baseUrl: connection.providerInstance },
+      credential: { token, baseUrl },
       sync: createAliasSyncDocument(replicaId),
     });
     cipher.fields.find((field) => field.name?.startsWith(ALIAS_CONNECTION_PAYLOAD_FIELD))!.value =
@@ -124,6 +124,37 @@ describe("alias connection vault carrier", () => {
   });
 
   it.each([
+    ["payload", (payload: Record<string, unknown>) => ({ ...payload, provider: "simplelogin" })],
+    [
+      "connection",
+      (payload: Record<string, unknown>) => ({
+        ...payload,
+        connection: { ...(payload.connection as object), provider: "simplelogin" },
+      }),
+    ],
+    [
+      "credential",
+      (payload: Record<string, unknown>) => ({
+        ...payload,
+        credential: { ...(payload.credential as object), hostedDomain: "example.invalid" },
+      }),
+    ],
+  ])("quarantines unknown %s fields", (_name, mutate) => {
+    const cipher = createAliasConnectionCipher({
+      version: ALIAS_CONNECTION_VERSION,
+      connection,
+      credential: { token, baseUrl },
+      sync: createAliasSyncDocument(replicaId),
+    });
+    const payload = cipher.fields.find((field) =>
+      field.name?.startsWith(ALIAS_CONNECTION_PAYLOAD_FIELD),
+    )!;
+    payload.value = JSON.stringify(mutate(JSON.parse(payload.value!) as Record<string, unknown>));
+
+    expect(() => parseAliasConnectionCipher(cipher)).toThrow(AliasConnectionVaultConflictError);
+  });
+
+  it.each([
     ["missing", undefined],
     ["zero", 0],
     ["malformed", "1"],
@@ -133,7 +164,7 @@ describe("alias connection vault carrier", () => {
     const cipher = createAliasConnectionCipher({
       version: ALIAS_CONNECTION_VERSION,
       connection,
-      credential: { token, baseUrl: connection.providerInstance },
+      credential: { token, baseUrl },
       sync: createAliasSyncDocument(replicaId),
     });
     const payload = cipher.fields.find((field) =>
@@ -142,7 +173,7 @@ describe("alias connection vault carrier", () => {
     payload.value = JSON.stringify({
       version,
       connection,
-      credential: { token, baseUrl: connection.providerInstance },
+      credential: { token, baseUrl },
       sync: createAliasSyncDocument(replicaId),
     });
 
@@ -188,7 +219,7 @@ describe("alias connection vault carrier", () => {
         cipherService,
         userId: userId as never,
         connection,
-        credential: { token, baseUrl: connection.providerInstance },
+        credential: { token, baseUrl },
         local: local(profile),
       });
 
@@ -197,8 +228,6 @@ describe("alias connection vault carrier", () => {
 
     const firstAlias = {
       version: 1 as const,
-      provider: "simplelogin" as const,
-      providerInstance: connection.providerInstance,
       connectionId: connection.connectionId,
       aliasId: "41",
       address: "first@sl.test",
@@ -254,10 +283,9 @@ describe("alias connection vault carrier", () => {
     expect(recovered[0].credential).toBeUndefined();
     expect(projectAliasSync(recovered[0].sync).connections).toEqual(
       expect.objectContaining({
-        [`simplelogin\n${connection.providerInstance}\n${connection.connectionId}`]:
-          expect.objectContaining({
-            status: "removed",
-          }),
+        [connection.connectionId]: expect.objectContaining({
+          status: "removed",
+        }),
       }),
     );
   });
