@@ -2,7 +2,7 @@ name: Alias client OSS candidates
 
 on:
   push:
-    branches: [fix/public-alias-review-findings, integration/public-alias-clients]
+    branches: [integration/provider-neutral-alias-clients]
   workflow_dispatch:
 
 permissions:
@@ -17,7 +17,7 @@ env:
   CLI_NODE_VERSION: 22.22.0
   NPM_VERSION: 11.18.0
   PYTHON_VERSION: 3.14.2
-  SOURCE_DATE_EPOCH: 1786536436
+  SOURCE_DATE_EPOCH: 1786782435
 
 jobs:
   policy:

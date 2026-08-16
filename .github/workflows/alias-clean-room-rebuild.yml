@@ -2,7 +2,7 @@ name: Alias client clean-room rebuilds
 
 on:
   push:
-    branches: [fix/public-alias-review-findings, integration/public-alias-clients]
+    branches: [integration/provider-neutral-alias-clients]
   workflow_dispatch:
 
 permissions:

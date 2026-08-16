@@ -12,6 +12,22 @@ const headedWorkflow = fs.readFileSync(
   path.join(repositoryRoot, ".github/workflows/alias-headed-e2e.yml"),
   "utf8",
 );
+const releaseWorkflows = [
+  ".github/workflows/alias-client-candidates.yml",
+  ".github/workflows/alias-clean-room-rebuild.yml",
+  ".github/workflows/alias-headed-e2e.yml",
+  ".github/workflows/alias-upstream-drift.yml",
+].map((relative) => [relative, fs.readFileSync(path.join(repositoryRoot, relative), "utf8")]);
+for (const [relative, workflow] of releaseWorkflows) {
+  assert(
+    workflow.includes(`branches: [${manifest.releaseLane.branch}]`),
+    `${relative} does not run for ${manifest.releaseLane.branch}`,
+  );
+}
+assert(
+  releaseWorkflows[0][1].includes(`SOURCE_DATE_EPOCH: ${manifest.releaseLane.sourceDateEpoch}`),
+  "Candidate workflow source epoch does not match the release manifest",
+);
 const providerRepositoryUrl = new URL(manifest.testInfrastructure.simpleLogin.repository);
 const providerRepository = providerRepositoryUrl.pathname.replace(/^\//, "").replace(/\.git$/, "");
 assert(

@@ -2,7 +2,7 @@ name: Alias headed provider E2E
 
 on:
   push:
-    branches: [fix/public-alias-review-findings, integration/public-alias-clients]
+    branches: [integration/provider-neutral-alias-clients]
   workflow_dispatch:
     inputs:
       provider_repository:

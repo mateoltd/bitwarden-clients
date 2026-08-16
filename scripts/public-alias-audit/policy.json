@@ -1,6 +1,6 @@
 {
-  "branch": "integration/public-alias-clients",
-  "baseCommit": "1f881babc15eb7d3a88cad41730ce167d8e49a41",
+  "branch": "integration/provider-neutral-alias-clients",
+  "baseCommit": "dd217a8ce662b40dbd0b2465a97edb806a60c924",
   "snapshotCommit": "cd1f5cb4456a27e4c75d2206c7993c7b2c1ed038",
   "releaseCommit": "95c5655065172c7505d7f82428b8bf7b46792b82",
   "arm64FixCommit": "0c4906ee61d1a5fd13c4a95560b3f69b0a8d10f8",
@@ -9,11 +9,7 @@
     "95c5655065172c7505d7f82428b8bf7b46792b82",
     "0c4906ee61d1a5fd13c4a95560b3f69b0a8d10f8"
   ],
-  "portabilityCommits": [
-    "709dd6462823bcd82da30e1323d9656ecdcdd4af",
-    "6e242e66267140696d7a1201446fda8ba483a0ca",
-    "95c5655065172c7505d7f82428b8bf7b46792b82"
-  ],
+  "portabilityCommits": [],
   "protectedUpstreamPaths": [
     "apps/browser/src/tools/popup/settings/import",
     "apps/browser/src/tools/popup/settings/export",
@@ -53,7 +49,7 @@
     "^artifacts/"
   ],
   "allowedArtifacts": {
-    "vendor/bitwarden-sdk-internal-0.2.0-alias-platform.2.tgz": "bc9106926f418fbc139e4bb29031e2d27cf59e503abcd08455cc29ea8f79af47"
+    "vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.1.tgz": "4409765d564706980dc2b729cd447060c98af568b0dc9e7379bcb8f8ff007b43"
   },
   "allowedLicensePatterns": [
     "^0BSD$",
