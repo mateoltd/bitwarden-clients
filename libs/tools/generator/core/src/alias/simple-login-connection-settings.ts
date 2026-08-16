@@ -1,6 +1,5 @@
 import { ReplaySubject, filter, firstValueFrom, skip } from "rxjs";
 
-import { AliasClient, SensitiveString } from "@bitwarden/alias-sdk-internal";
 import { Account } from "@bitwarden/common/auth/abstractions/account.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import {
@@ -22,6 +21,7 @@ import {
 import { CredentialGeneratorService } from "../abstractions";
 import { ForwarderOptions } from "../types";
 
+import { validateSimpleLoginRuntimeSettings } from "./simple-login-alias.adapter";
 import { SimpleLoginAliasError } from "./simple-login-alias.error";
 import { SimpleLoginAliasSettings } from "./simple-login-alias.types";
 
@@ -111,26 +111,19 @@ export function attachSimpleLoginAliasSyncStore(
   const local = createSubjectSyncStore(subject, settings, account);
   let store: AliasSyncStore = local;
   if (cipherService && settings.token?.trim() && isSimpleLoginConnectionId(settings.connectionId)) {
-    const client = new AliasClient({
-      base_url: settings.baseUrl?.trim() || "https://app.simplelogin.io",
-      api_token: settings.token as SensitiveString,
-      connection_id: settings.connectionId,
-    });
-    let provider;
-    try {
-      provider = client.provider_identity();
-    } finally {
-      client.free();
-    }
+    const runtime = validateSimpleLoginRuntimeSettings(
+      settings.token,
+      settings.baseUrl,
+      settings.connectionId,
+    );
     store = new AliasConnectionVaultStore({
       cipherService,
       userId: account.id,
       connection: {
-        provider: provider.provider,
-        providerInstance: provider.instance,
-        connectionId: provider.connectionId,
+        version: 1,
+        connectionId: runtime.connectionId,
       },
-      credential: { token: settings.token, baseUrl: provider.instance },
+      credential: { token: settings.token, baseUrl: runtime.baseUrl },
       local,
       refresh: syncService
         ? async () => {
@@ -244,28 +237,21 @@ export async function readSimpleLoginAliasSettings(
     const local = createGeneratorSyncStore(generatorService, account);
     let syncStore: AliasSyncStore = local;
     if (cipherService) {
-      const client = new AliasClient({
-        base_url: settings.baseUrl?.trim() || "https://app.simplelogin.io",
-        api_token: settings.token as SensitiveString,
-        connection_id: settings.connectionId,
-      });
-      let provider;
-      try {
-        provider = client.provider_identity();
-      } finally {
-        client.free();
-      }
+      const runtime = validateSimpleLoginRuntimeSettings(
+        settings.token,
+        settings.baseUrl,
+        settings.connectionId,
+      );
       syncStore = new AliasConnectionVaultStore({
         cipherService,
         userId: account.id,
         connection: {
-          provider: provider.provider,
-          providerInstance: provider.instance,
-          connectionId: provider.connectionId,
+          version: 1,
+          connectionId: runtime.connectionId,
         },
         credential: {
           token: settings.token,
-          baseUrl: provider.instance,
+          baseUrl: runtime.baseUrl,
         },
         local,
         refresh: syncService

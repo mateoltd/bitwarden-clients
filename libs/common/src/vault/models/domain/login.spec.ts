@@ -28,12 +28,14 @@ describe("Login DTO", () => {
       username: undefined,
       password: undefined,
       totp: undefined,
+      aliasReference: undefined,
     });
 
     expect(data.username).toBeUndefined();
     expect(data.password).toBeUndefined();
     expect(data.passwordRevisionDate).toBeUndefined();
     expect(data.totp).toBeUndefined();
+    expect(data.aliasReference).toBeUndefined();
     expect(data.autofillOnPageLoad).toBeUndefined();
     expect(data.uris).toBeUndefined();
     expect(data.fido2Credentials).toBeUndefined();
@@ -47,6 +49,7 @@ describe("Login DTO", () => {
       password: "password",
       passwordRevisionDate: "2022-01-31T12:00:00.000Z",
       totp: "123",
+      aliasReference: "alias-reference",
       autofillOnPageLoad: false,
       fido2Credentials: [fido2CredentialData],
     };
@@ -58,6 +61,7 @@ describe("Login DTO", () => {
       username: { encryptedString: "username", encryptionType: 0 },
       password: { encryptedString: "password", encryptionType: 0 },
       totp: { encryptedString: "123", encryptionType: 0 },
+      aliasReference: { encryptedString: "alias-reference", encryptionType: 0 },
       uris: [
         {
           match: 0,
@@ -84,6 +88,7 @@ describe("Login DTO", () => {
       password: mockEnc("encrypted password"),
       passwordRevisionDate: new Date("2022-01-31T12:00:00.000Z"),
       totp: mockEnc("encrypted totp"),
+      aliasReference: mockEnc("encrypted alias reference"),
       autofillOnPageLoad: true,
       fido2Credentials: [{ decrypt: jest.fn().mockReturnValue(decryptedFido2Credential) } as any],
     });
@@ -92,6 +97,7 @@ describe("Login DTO", () => {
       password: "encrypted password",
       passwordRevisionDate: new Date("2022-01-31T12:00:00.000Z"),
       totp: "encrypted totp",
+      aliasReference: "encrypted alias reference",
       uris: [
         {
           _uri: "decrypted uri",
@@ -135,6 +141,7 @@ describe("Login DTO", () => {
       password: "password",
       passwordRevisionDate: "2022-01-31T12:00:00.000Z",
       totp: "123",
+      aliasReference: "alias-reference",
       autofillOnPageLoad: false,
       fido2Credentials: [initializeFido2Credential(new Fido2CredentialData())],
     };
@@ -158,6 +165,7 @@ describe("Login DTO", () => {
         password: "myPassword" as EncryptedString,
         passwordRevisionDate: passwordRevisionDate.toISOString(),
         totp: "myTotp" as EncryptedString,
+        aliasReference: "myAliasReference" as EncryptedString,
         // NOTE: `as any` is here until we migrate to Nx: https://bitwarden.atlassian.net/browse/PM-6493
         fido2Credentials: [
           {
@@ -184,6 +192,7 @@ describe("Login DTO", () => {
         password: "myPassword_fromJSON",
         passwordRevisionDate: passwordRevisionDate,
         totp: "myTotp_fromJSON",
+        aliasReference: "myAliasReference_fromJSON",
         fido2Credentials: [
           {
             credentialId: "keyId_fromJSON",
@@ -218,6 +227,7 @@ describe("Login DTO", () => {
         password: "password",
         passwordRevisionDate: "2022-01-31T12:00:00.000Z",
         totp: "123",
+        aliasReference: "alias-reference",
         autofillOnPageLoad: false,
         fido2Credentials: [initializeFido2Credential(new Fido2CredentialData())],
       };
@@ -236,6 +246,7 @@ describe("Login DTO", () => {
           },
         ],
         totp: "123",
+        aliasReference: "alias-reference",
         autofillOnPageLoad: false,
         fido2Credentials: [
           {

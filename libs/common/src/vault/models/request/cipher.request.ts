@@ -81,6 +81,9 @@ export class CipherRequest {
             ? cipher.login.passwordRevisionDate.toISOString()
             : null;
         this.login.totp = cipher.login.totp ? cipher.login.totp.encryptedString : null;
+        this.login.aliasReference = cipher.login.aliasReference
+          ? cipher.login.aliasReference.encryptedString
+          : null;
         this.login.autofillOnPageLoad = cipher.login.autofillOnPageLoad;
 
         if (cipher.login.fido2Credentials != null) {

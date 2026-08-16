@@ -3,19 +3,19 @@ import { randomBytes } from "crypto";
 import { PasswordManagerClient, TokenProvider } from "@bitwarden/sdk-internal";
 
 import { asUuid } from "../../platform/abstractions/sdk/sdk.service";
+import { UserId } from "../../types/guid";
 import { CipherType } from "../enums";
 import { Cipher } from "../models/domain/cipher";
+import { CipherRequest } from "../models/request/cipher.request";
 import { CipherView } from "../models/view/cipher.view";
 
-import { ALIAS_BINDING_FIELD_NAME } from "./alias-binding";
+import { bindGeneratedAlias } from "./alias-binding";
 
 const userId = "89d55fa7-395c-48a0-966a-3d412954082f";
 const alias = {
   version: 1 as const,
-  provider: "simplelogin" as const,
-  providerInstance: "https://app.simplelogin.io/",
   connectionId: "11111111-1111-4111-8111-111111111111",
-  aliasId: "314159",
+  aliasId: "opaque:314159",
   address: "sdk-round-trip@sl.test",
 };
 
@@ -32,7 +32,6 @@ describe("alias binding SDK encryption", () => {
     client = new PasswordManagerClient(new EmptyTokenProvider());
     const userKey = randomBytes(64).toString("base64");
     const keyPair = client.crypto().make_key_pair(userKey);
-
     await client.crypto().initialize_user_crypto({
       userId: asUuid(userId),
       email: "alias-binding@bitwarden.test",
@@ -45,21 +44,30 @@ describe("alias binding SDK encryption", () => {
 
   afterAll(() => client.free());
 
-  it("encrypts the reserved field and recovers it in a second client view", async () => {
+  it("encrypts login.aliasReference and recovers it after decrypt and restart", async () => {
     const original = new CipherView();
     original.type = CipherType.Login;
     original.name = "Alias-bound account";
     original.login.username = alias.address;
     original.login.password = "not-the-token";
-    original.aliasBinding = alias;
+    bindGeneratedAlias(original, {
+      credential: alias.address,
+      metadata: { kind: "email-alias", alias },
+    });
 
     const encryption = await client.vault().ciphers().encrypt(original.toSdkCipherView());
     const encrypted = Cipher.fromSdkCipher(encryption.cipher)!;
     const serializedVaultData = JSON.stringify(encrypted);
 
-    expect(serializedVaultData).not.toContain(ALIAS_BINDING_FIELD_NAME);
     expect(serializedVaultData).not.toContain(alias.address);
     expect(serializedVaultData).not.toContain(alias.aliasId);
+
+    const request = new CipherRequest({ cipher: encrypted, encryptedFor: userId as UserId });
+    expect(encrypted.type).toBe(CipherType.Login);
+    expect(encrypted.data).toEqual(expect.any(String));
+    expect(encrypted.login).toBeUndefined();
+    expect(request.data).toBe(encrypted.data);
+    expect(request.login).toBeUndefined();
 
     const decryptedSdkView = await client.vault().ciphers().decrypt(encrypted.toSdkCipher());
     const restored = CipherView.fromSdkCipherView(decryptedSdkView)!;
@@ -68,8 +76,8 @@ describe("alias binding SDK encryption", () => {
     expect(restored.aliasBinding).toEqual(alias);
     expect(restored.fields).toEqual([]);
 
-    const restartedClientView = CipherView.fromJSON(restored.toJSON() as any);
+    const restartedClientView = CipherView.fromJSON(restored.toJSON() as never);
     expect(restartedClientView.aliasBinding).toEqual(alias);
-    expect(restartedClientView.fields).toEqual([]);
+    expect(restartedClientView.login.aliasReference).toBe(restored.login.aliasReference);
   });
 });

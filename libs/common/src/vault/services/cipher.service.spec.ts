@@ -670,14 +670,13 @@ describe("Cipher Service", () => {
 
     it("rotates the hidden encrypted alias connection carrier", async () => {
       const connection = {
-        provider: "simplelogin" as const,
-        providerInstance: "https://app.simplelogin.io/",
+        version: 1 as const,
         connectionId: "11111111-1111-4111-8111-111111111111",
       };
       const carrier = createAliasConnectionCipher({
         version: 1,
         connection,
-        credential: { token: "encrypted-provider-token", baseUrl: connection.providerInstance },
+        credential: { token: "encrypted-provider-token", baseUrl: "https://app.simplelogin.io/" },
         sync: createAliasSyncDocument("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
       });
       carrier.id = "Alias Carrier" as CipherId;
@@ -1697,14 +1696,13 @@ describe("Cipher Service", () => {
 
     it("hides only marked alias carriers from normal decrypted consumers", async () => {
       const connection = {
-        provider: "simplelogin" as const,
-        providerInstance: "https://app.simplelogin.io/",
+        version: 1 as const,
         connectionId: "11111111-1111-4111-8111-111111111111",
       };
       const carrier = createAliasConnectionCipher({
         version: 1,
         connection,
-        credential: { token: "encrypted-provider-token", baseUrl: connection.providerInstance },
+        credential: { token: "encrypted-provider-token", baseUrl: "https://app.simplelogin.io/" },
         sync: createAliasSyncDocument("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
       });
       const ordinary = new CipherView();
