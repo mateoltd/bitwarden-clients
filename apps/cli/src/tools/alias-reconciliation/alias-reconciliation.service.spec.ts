@@ -67,7 +67,7 @@ function login(index: number, username: string, aliasId?: number): CipherView {
       version: 1,
       connectionId,
       aliasId: aliasId.toString(),
-      address: username,
+      address: sensitive(username),
     };
   }
   return cipher;
@@ -396,7 +396,7 @@ describe("alias reconciliation", () => {
       }
       const prepared = await journal.prepareReference(cipherId(1), expected, {
         ...expected,
-        address: "current@sl.test",
+        address: sensitive("current@sl.test"),
       });
       durable.state.failure = failure;
 
