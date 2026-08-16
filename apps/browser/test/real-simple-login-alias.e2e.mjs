@@ -318,9 +318,9 @@ try {
   assert.equal(encryptedVaultPayload.includes(simpleLoginToken), false);
   assert.equal(encryptedVaultPayload.includes(aliasAddress), false);
   assert.equal(
-    encryptedCipher.fields?.length,
-    1,
-    "The encrypted cipher must contain exactly one reserved alias-binding field",
+    encryptedCipher.fields?.length ?? 0,
+    0,
+    "The encrypted cipher must not contain a hidden alias-binding field",
   );
 
   const database = new DatabaseSync(bitwardenDbPath, { readOnly: true });

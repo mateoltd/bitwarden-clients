@@ -63,7 +63,7 @@ export function hydrateAliasBinding(cipher: AliasBindableCipher, candidate?: unk
     }
   } else {
     delete cipher.aliasBinding;
-    if (cipher.login) {
+    if (cipher.login && typeof cipher.login === "object") {
       cipher.login.aliasReference = undefined;
     }
   }
