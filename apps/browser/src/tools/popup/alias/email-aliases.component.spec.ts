@@ -2,6 +2,7 @@ import { FormBuilder } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { MockProxy, mock } from "jest-mock-extended";
 
+import { SensitiveString } from "@bitwarden/alias-sdk-internal";
 import { BrowserApi } from "@bitwarden/browser/platform/browser/browser-api";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { DialogService } from "@bitwarden/components";
@@ -153,7 +154,7 @@ function aliasFixture(): SimpleLoginAlias {
       version: 1,
       connectionId: "11111111-1111-4111-8111-111111111111",
       aliasId: "42",
-      address: "registration@sl.test",
+      address: "registration@sl.test" as SensitiveString,
     },
   };
 }
