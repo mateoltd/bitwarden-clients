@@ -184,7 +184,7 @@ export class EmailAliasesComponent implements OnInit {
 
   protected async toggleContact(contact: SimpleLoginContact) {
     await this.run(async () => {
-      const blocked = await this.aliasesService.toggleContactBlocked(contact.id);
+      const blocked = await this.aliasesService.toggleContactBlocked(contact);
       this.contacts.update((contacts) =>
         contacts.map((item) => (item.id === contact.id ? { ...item, blocked } : item)),
       );
@@ -202,7 +202,7 @@ export class EmailAliasesComponent implements OnInit {
       if (!confirmed) {
         return;
       }
-      await this.aliasesService.deleteContact(contact.id);
+      await this.aliasesService.deleteContact(contact);
       const alias = this.selectedAlias();
       if (alias) {
         await this.fetchContacts(alias, 0);

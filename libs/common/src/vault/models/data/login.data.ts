@@ -9,6 +9,7 @@ export class LoginData {
   password?: string;
   passwordRevisionDate?: string;
   totp?: string;
+  aliasReference?: string;
   autofillOnPageLoad?: boolean;
   fido2Credentials?: Fido2CredentialData[];
 
@@ -21,6 +22,7 @@ export class LoginData {
     this.password = data.password;
     this.passwordRevisionDate = data.passwordRevisionDate;
     this.totp = data.totp;
+    this.aliasReference = data.aliasReference;
     this.autofillOnPageLoad = data.autofillOnPageLoad;
 
     if (data.uris) {

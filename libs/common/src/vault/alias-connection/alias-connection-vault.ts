@@ -42,6 +42,12 @@ export class AliasConnectionVaultConflictError extends Error {
   }
 }
 
+function hasExactKeys(value: object, expected: readonly string[]): boolean {
+  const keys = Object.keys(value).sort();
+  const allowed = [...expected].sort();
+  return keys.length === allowed.length && keys.every((key, index) => key === allowed[index]);
+}
+
 function markerField(): FieldView {
   const field = new FieldView();
   field.type = FieldType.Text;
@@ -95,13 +101,20 @@ export function isAliasConnectionCipherListView(cipher: CipherListView): boolean
 }
 
 function parseConnection(value: unknown): AliasProviderConnection {
-  if (!value || typeof value !== "object") {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    !hasExactKeys(value, ["version", "connectionId"])
+  ) {
     throw new AliasConnectionVaultConflictError("The encrypted alias connection is malformed");
   }
   const candidate = value as Partial<AliasProviderConnection>;
+  if (candidate.version !== ALIAS_CONNECTION_VERSION) {
+    throw new AliasConnectionVaultConflictError("The encrypted alias connection is malformed");
+  }
   const connection: AliasProviderConnection = {
-    provider: candidate.provider as "simplelogin",
-    providerInstance: candidate.providerInstance ?? "",
+    version: candidate.version,
     connectionId: candidate.connectionId ?? "",
   };
   // The key helper applies all schema-v1 provider and UUID validation.
@@ -127,7 +140,18 @@ export function parseAliasConnectionCipher(cipher: CipherView): AliasConnectionV
   }
   try {
     const candidate = JSON.parse(encoded) as Partial<AliasConnectionVaultPayload>;
-    if (candidate.version !== ALIAS_CONNECTION_VERSION) {
+    if (
+      !candidate ||
+      typeof candidate !== "object" ||
+      Array.isArray(candidate) ||
+      !hasExactKeys(
+        candidate,
+        candidate.credential === undefined
+          ? ["version", "connection", "sync"]
+          : ["version", "connection", "credential", "sync"],
+      ) ||
+      candidate.version !== ALIAS_CONNECTION_VERSION
+    ) {
       throw new Error("unsupported version");
     }
     const connection = parseConnection(candidate.connection);
@@ -135,6 +159,10 @@ export function parseAliasConnectionCipher(cipher: CipherView): AliasConnectionV
     let credential: AliasConnectionCredential | undefined;
     if (candidate.credential !== undefined) {
       if (
+        !candidate.credential ||
+        typeof candidate.credential !== "object" ||
+        Array.isArray(candidate.credential) ||
+        !hasExactKeys(candidate.credential, ["token", "baseUrl"]) ||
         typeof candidate.credential.token !== "string" ||
         !candidate.credential.token.trim() ||
         typeof candidate.credential.baseUrl !== "string"

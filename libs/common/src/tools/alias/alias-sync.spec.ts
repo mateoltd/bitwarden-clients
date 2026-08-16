@@ -17,14 +17,11 @@ const replicaB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const replicaC = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const connectionId = "11111111-1111-4111-8111-111111111111";
 const connection = {
-  provider: "simplelogin" as const,
-  providerInstance: "https://app.simplelogin.io/",
+  version: 1 as const,
   connectionId,
 };
 const alias = {
   version: 1 as const,
-  provider: "simplelogin" as const,
-  providerInstance: connection.providerInstance,
   connectionId,
   aliasId: "41",
   address: "first@sl.test",
@@ -98,7 +95,7 @@ describe("alias synchronization state machine", () => {
       first,
       {
         kind: "provider-observe",
-        snapshot: { alias, enabled: true, name: "Initial" },
+        snapshot: { alias, lifecycle: "enabled" },
       },
       2,
     );
@@ -108,7 +105,7 @@ describe("alias synchronization state machine", () => {
       second,
       {
         kind: "provider-operation",
-        value: { operation: "update", alias, patch: { name: "Updated" } },
+        value: { operation: "disable", alias },
       },
       3,
     );
@@ -128,7 +125,6 @@ describe("alias synchronization state machine", () => {
     }
     expect(expected.aliases[emailAliasKey(alias)]).toMatchObject({
       status: "disabled",
-      fields: { name: "Updated" },
     });
   });
 
@@ -453,7 +449,7 @@ describe("alias synchronization state machine", () => {
         value: {
           operation: "create",
           connection,
-          request: { kind: "random", hostname: "signup.example", mode: "word" },
+          request: { hostname: "signup.example" },
         },
       },
       40,
@@ -475,7 +471,7 @@ describe("alias synchronization state machine", () => {
           value: {
             operation: "create",
             connection,
-            request: { kind: "random", token: "provider-secret" } as never,
+            request: { token: "provider-secret" } as never,
           },
         },
         43,
@@ -502,6 +498,35 @@ describe("alias synchronization state machine", () => {
     ).toThrow("Unsupported alias sync event kind");
   });
 
+  it("quarantines provider-native and unknown fields at every journal boundary", () => {
+    expect(() =>
+      append(
+        createAliasSyncDocument(replicaA),
+        {
+          kind: "connection-upsert",
+          connection: { ...connection, provider: "simplelogin" },
+        } as never,
+        431,
+      ),
+    ).toThrow("Invalid alias sync connection");
+    expect(() =>
+      append(
+        createAliasSyncDocument(replicaA),
+        {
+          kind: "provider-observe",
+          snapshot: { alias, lifecycle: "enabled", note: "provider-native" },
+        } as never,
+        432,
+      ),
+    ).toThrow("Invalid alias sync provider snapshot");
+    expect(() =>
+      parseAliasSyncDocument({
+        ...createAliasSyncDocument(replicaA),
+        providerInstance: "https://provider.invalid/",
+      }),
+    ).toThrow("Invalid alias sync document");
+  });
+
   it("projects provider stages independently of replay order", () => {
     let document = createAliasSyncDocument(replicaA);
     document = append(
@@ -516,7 +541,7 @@ describe("alias synchronization state machine", () => {
       {
         kind: "provider-ack",
         operationId,
-        snapshot: { alias, enabled: false },
+        snapshot: { alias, lifecycle: "disabled" },
       },
       46,
     );
@@ -529,7 +554,7 @@ describe("alias synchronization state machine", () => {
     let document = createAliasSyncDocument(replicaA);
     document = append(
       document,
-      { kind: "provider-observe", snapshot: { alias, enabled: true, name: "Still active" } },
+      { kind: "provider-observe", snapshot: { alias, lifecycle: "enabled" } },
       47,
     );
     document = append(
@@ -545,7 +570,6 @@ describe("alias synchronization state machine", () => {
     expect(projection.operations[operationId]).toMatchObject({ status: "failed" });
     expect(projection.aliases[emailAliasKey(alias)]).toMatchObject({
       status: "enabled",
-      fields: { name: "Still active" },
     });
   });
 

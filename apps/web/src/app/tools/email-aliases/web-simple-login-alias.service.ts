@@ -94,12 +94,12 @@ export class WebSimpleLoginAliasService {
     return (await this.service()).createReverseAlias(aliasId, contact);
   }
 
-  async toggleContactBlocked(contactId: number): Promise<boolean> {
-    return (await this.service()).toggleContactBlocked(contactId);
+  async toggleContactBlocked(contact: SimpleLoginContact): Promise<boolean> {
+    return (await this.service()).toggleContactBlocked(contact);
   }
 
-  async deleteContact(contactId: number): Promise<void> {
-    return (await this.service()).deleteContact(contactId);
+  async deleteContact(contact: SimpleLoginContact): Promise<void> {
+    return (await this.service()).deleteContact(contact);
   }
 
   private async service() {

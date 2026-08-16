@@ -38,9 +38,9 @@ describe("BrowserSimpleLoginAliasService", () => {
     const identity = client.providerIdentity();
 
     expect(identity).toMatchObject({
-      provider: "simplelogin",
-      instance: "https://app.simplelogin.io/",
+      version: 1,
       connectionId,
+      adapter: { adapterId: "simplelogin" },
     });
     expect(settings$.value.connectionId).toBe(identity.connectionId);
     expect(next).not.toHaveBeenCalled();

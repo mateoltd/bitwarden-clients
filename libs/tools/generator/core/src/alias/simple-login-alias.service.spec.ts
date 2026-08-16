@@ -28,10 +28,10 @@ describe("SimpleLoginAliasService", () => {
       connectionId,
     });
 
-    expect(service.providerIdentity()).toEqual({
-      provider: "simplelogin",
-      instance: "http://127.0.0.1:32769/",
+    expect(service.providerIdentity()).toMatchObject({
+      version: 1,
       connectionId,
+      adapter: { adapterId: "simplelogin" },
     });
   });
 
@@ -66,7 +66,7 @@ describe("SimpleLoginAliasService", () => {
       code: "invalid-response",
       message: "SimpleLogin alias id is invalid",
     });
-    await expect(service.getCanonical(BigInt(0))).rejects.toMatchObject({
+    await expect(service.getCanonical("0")).rejects.toMatchObject({
       code: "invalid-response",
       message: "SimpleLogin alias id is invalid",
     });
@@ -96,13 +96,12 @@ describe("SimpleLoginAliasService", () => {
 
   it("does not resume a prepared provider mutation after observing connection removal", async () => {
     const replicaId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-    const providerInstance = "https://app.simplelogin.io/";
-    const connection = { provider: "simplelogin" as const, providerInstance, connectionId };
+    const connection = { version: 1 as const, connectionId };
     let persisted: AliasSyncDocument = createAliasSyncDocument(replicaId);
     persisted = appendAliasSyncEvent(persisted, { kind: "connection-upsert", connection });
     persisted = appendAliasSyncEvent(persisted, {
       kind: "provider-operation",
-      value: { operation: "create", connection, request: { kind: "random" } },
+      value: { operation: "create", connection, request: {} },
     });
     persisted = appendAliasSyncEvent(persisted, { kind: "connection-remove", connection });
     const service = createSimpleLoginAliasService({
@@ -131,8 +130,6 @@ describe("SimpleLoginAliasService", () => {
     const settings = { token: "provider-secret", connectionId, syncStore };
     const identity = {
       version: 1 as const,
-      provider: "simplelogin" as const,
-      providerInstance: "https://app.simplelogin.io/",
       connectionId,
       aliasId: "41",
       address: "first@sl.test",
@@ -171,8 +168,6 @@ describe("SimpleLoginAliasService", () => {
     });
     const identity = {
       version: 1 as const,
-      provider: "simplelogin" as const,
-      providerInstance: "https://app.simplelogin.io/",
       connectionId,
       aliasId: "42",
       address: "second@sl.test",

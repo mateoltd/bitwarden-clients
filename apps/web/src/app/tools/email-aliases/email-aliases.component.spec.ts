@@ -41,6 +41,12 @@ function alias(id = 7, address = "alias@sl.example"): SimpleLoginAlias {
     pgpDisabled: false,
     mailboxes: [{ id: 3, email: "mailbox@example.com" }],
     latestActivity: null,
+    identity: {
+      version: 1,
+      connectionId: "11111111-1111-4111-8111-111111111111",
+      aliasId: String(id),
+      address,
+    },
   };
 }
 
@@ -53,6 +59,14 @@ const contact: SimpleLoginContact = {
   lastEmailSentAt: null,
   blocked: false,
   existed: false,
+  identity: {
+    alias: alias().identity,
+    identityId: "11",
+    recipient: "contact@example.com",
+    address: "reverse@sl.example",
+    valid: true,
+    blocked: false,
+  } as never,
 };
 
 describe("EmailAliasesComponent", () => {
@@ -81,7 +95,7 @@ describe("EmailAliasesComponent", () => {
       dialogService,
       { t: (key: string) => key } as I18nService,
       {
-        snapshot: { queryParamMap: { get: () => null } },
+        snapshot: { queryParamMap: { get: (): null => null } },
       } as unknown as ActivatedRoute,
       router,
     );
@@ -174,7 +188,7 @@ describe("EmailAliasesComponent", () => {
     expect(contact.blocked).toBe(true);
 
     await component.removeContact(contact);
-    expect(aliasesService.deleteContact).toHaveBeenCalledWith(11);
+    expect(aliasesService.deleteContact).toHaveBeenCalledWith(contact);
   });
 
   it("does not call the provider when SimpleLogin is not configured", async () => {

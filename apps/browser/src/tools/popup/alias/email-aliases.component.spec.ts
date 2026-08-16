@@ -58,16 +58,7 @@ describe("EmailAliasesComponent", () => {
     aliasesService.contacts.mockResolvedValue({ items: [], page: 0 });
     aliasesService.update.mockResolvedValue({ ...alias, note: "updated" });
     aliasesService.setEnabled.mockResolvedValue({ ...alias, enabled: false });
-    aliasesService.createReverseAlias.mockResolvedValue({
-      id: 99,
-      address: "contact@example.com",
-      reverseAlias: "reply-token",
-      reverseAliasAddress: "reply@sl.test",
-      createdAt: 1,
-      lastEmailSentAt: null,
-      blocked: false,
-      existed: false,
-    });
+    aliasesService.createReverseAlias.mockResolvedValue(contactFixture());
     const component = createComponent("42");
 
     await component.ngOnInit();
@@ -102,7 +93,7 @@ describe("EmailAliasesComponent", () => {
       acceptButtonText: { key: "delete" },
       type: "warning",
     });
-    expect(aliasesService.deleteContact).toHaveBeenCalledWith(contact.id);
+    expect(aliasesService.deleteContact).toHaveBeenCalledWith(contact);
   });
 
   it("coalesces concurrent destructive actions", async () => {
@@ -160,8 +151,6 @@ function aliasFixture(): SimpleLoginAlias {
     latestActivity: null,
     identity: {
       version: 1,
-      provider: "simplelogin",
-      providerInstance: "https://app.simplelogin.io/",
       connectionId: "11111111-1111-4111-8111-111111111111",
       aliasId: "42",
       address: "registration@sl.test",
@@ -179,5 +168,13 @@ function contactFixture(): SimpleLoginContact {
     lastEmailSentAt: null,
     blocked: false,
     existed: false,
+    identity: {
+      alias: aliasFixture().identity,
+      identityId: "99",
+      recipient: "contact@example.com",
+      address: "reply@sl.test",
+      valid: true,
+      blocked: false,
+    } as never,
   };
 }

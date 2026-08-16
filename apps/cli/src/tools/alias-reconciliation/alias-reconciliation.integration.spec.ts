@@ -404,8 +404,7 @@ describeIntegration("real schema-v1 alias cross-device convergence", () => {
             cipherService: adapter,
             userId: profiles[index].userId,
             connection: {
-              provider: "simplelogin",
-              providerInstance: `${simpleLoginBaseUrl}/`,
+              version: 1,
               connectionId,
             },
             credential: { token: providerToken, baseUrl: `${simpleLoginBaseUrl}/` },
@@ -525,8 +524,7 @@ describeIntegration("real schema-v1 alias cross-device convergence", () => {
         cipherService: adapters[0],
         userId: profiles[0].userId,
         connection: {
-          provider: "simplelogin",
-          providerInstance: `${simpleLoginBaseUrl}/`,
+          version: 1,
           connectionId,
         },
         credential: { token: providerToken, baseUrl: `${simpleLoginBaseUrl}/` },

@@ -43,7 +43,11 @@ describe("canonical alias SDK transport hardening", () => {
 
     try {
       const service = createSimpleLoginAliasService({ token, baseUrl: source.url, connectionId });
-      await expect(service.list()).rejects.toThrow("redirect rejected");
+      await expect(service.list()).rejects.toMatchObject({
+        code: "invalid-response",
+        status: 302,
+        message: "alias operation failed: invalid-response",
+      });
       expect(redirectedAuthentication).toBeUndefined();
     } finally {
       await source.close();
@@ -59,7 +63,10 @@ describe("canonical alias SDK transport hardening", () => {
 
     try {
       const service = createSimpleLoginAliasService({ token, baseUrl: source.url, connectionId });
-      await expect(service.list()).rejects.toThrow("response exceeded");
+      await expect(service.list()).rejects.toMatchObject({
+        code: "invalid-response",
+        message: "alias operation failed: invalid-response",
+      });
     } finally {
       await source.close();
     }

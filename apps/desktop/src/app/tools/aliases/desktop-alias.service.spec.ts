@@ -35,8 +35,6 @@ describe("DesktopAliasService", () => {
     address: "alias@example.com",
     identity: {
       version: 1,
-      provider: "simplelogin",
-      providerInstance: "https://app.simplelogin.io/",
       connectionId: "11111111-1111-4111-8111-111111111111",
       aliasId: "42",
       address: "alias@example.com",
@@ -76,10 +74,10 @@ describe("DesktopAliasService", () => {
     const client = await service.client();
 
     expect(generatorService.forwarder).toHaveBeenCalledWith(Vendor.simplelogin);
-    expect(client.providerIdentity()).toEqual({
-      provider: "simplelogin",
-      instance: "https://simplelogin.example/",
+    expect(client.providerIdentity()).toMatchObject({
+      version: 1,
       connectionId: "11111111-1111-4111-8111-111111111111",
+      adapter: { adapterId: "simplelogin" },
     });
   });
 
@@ -90,8 +88,6 @@ describe("DesktopAliasService", () => {
     bound.login = { username: "Alias@Example.com" } as any;
     bound.aliasBinding = {
       version: 1,
-      provider: "simplelogin",
-      providerInstance: "https://app.simplelogin.io/",
       connectionId: "11111111-1111-4111-8111-111111111111",
       aliasId: "42",
       address: "alias@example.com",
@@ -113,7 +109,7 @@ describe("DesktopAliasService", () => {
     otherInstance.login = { username: alias.address } as any;
     otherInstance.aliasBinding = {
       ...bound.aliasBinding,
-      providerInstance: "https://other.simplelogin.example/",
+      aliasId: "opaque-other-id",
     };
 
     const otherConnection = new CipherView();

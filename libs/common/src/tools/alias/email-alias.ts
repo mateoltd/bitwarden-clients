@@ -1,29 +1,15 @@
-import {
-  AliasReference,
-  SensitiveString,
-  serialize_alias_reference,
-} from "@bitwarden/alias-sdk-internal";
+import { AliasIdentity, parse_alias_reference } from "@bitwarden/alias-sdk-internal";
 
 /** First public SDK alias-reference version exchanged by generators and vault ciphers. */
 export const EMAIL_ALIAS_IDENTITY_VERSION = 1 as const;
 
-/** Providers whose aliases can be bound to a login cipher. */
-export type EmailAliasProvider = "simplelogin";
-
 /**
- * Stable, non-secret identity for an email alias.
+ * Stable, non-secret provider-neutral identity for an email alias.
  *
- * Provider credentials are deliberately not part of this type. Keep this shape safe to place in
- * an encrypted vault custom field and to pass through generator UI events.
+ * The SDK owns this public shape and its validation. Adapter identifiers, endpoints, and provider
+ * credentials deliberately remain outside it.
  */
-export type EmailAliasIdentity = {
-  version: typeof EMAIL_ALIAS_IDENTITY_VERSION;
-  provider: EmailAliasProvider;
-  providerInstance: string;
-  connectionId: string;
-  aliasId: string;
-  address: string;
-};
+export type EmailAliasIdentity = AliasIdentity;
 
 /** Metadata attached to a generated credential when it represents a provider-backed alias. */
 export type EmailAliasCredentialMetadata = {
@@ -45,52 +31,16 @@ export function emailAliasIdentitiesEqual(
 ): boolean {
   return (
     left.version === right.version &&
-    left.provider === right.provider &&
-    left.providerInstance === right.providerInstance &&
     left.connectionId === right.connectionId &&
     left.aliasId === right.aliasId &&
     normalizeEmailAliasAddress(left.address) === normalizeEmailAliasAddress(right.address)
   );
 }
 
-/** Parse an untrusted alias identity while retaining only the public, versioned fields. */
+/** Parse an untrusted alias identity exclusively through the SDK's canonical v1 parser. */
 export function parseEmailAliasIdentity(value: unknown): EmailAliasIdentity | undefined {
-  if (value == null || typeof value !== "object") {
-    return undefined;
-  }
-
-  const candidate = value as Partial<Record<keyof EmailAliasIdentity, unknown>>;
-  if (
-    candidate.version !== EMAIL_ALIAS_IDENTITY_VERSION ||
-    candidate.provider !== "simplelogin" ||
-    typeof candidate.providerInstance !== "string" ||
-    typeof candidate.connectionId !== "string" ||
-    typeof candidate.aliasId !== "string" ||
-    !/^[1-9]\d*$/.test(candidate.aliasId) ||
-    typeof candidate.address !== "string" ||
-    normalizeEmailAliasAddress(candidate.address) === ""
-  ) {
-    return undefined;
-  }
-
   try {
-    const reference: AliasReference = {
-      version: EMAIL_ALIAS_IDENTITY_VERSION,
-      provider: candidate.provider,
-      providerInstance: candidate.providerInstance,
-      connectionId: candidate.connectionId,
-      aliasId: BigInt(candidate.aliasId),
-      address: candidate.address.trim() as SensitiveString,
-    };
-    serialize_alias_reference(reference);
-    return {
-      version: EMAIL_ALIAS_IDENTITY_VERSION,
-      provider: reference.provider,
-      providerInstance: reference.providerInstance,
-      connectionId: reference.connectionId,
-      aliasId: reference.aliasId.toString(),
-      address: reference.address as string,
-    };
+    return parse_alias_reference(JSON.stringify(value));
   } catch {
     return undefined;
   }
@@ -105,7 +55,10 @@ export function parseGeneratedCredentialMetadata(
   }
 
   const candidate = value as { kind?: unknown; alias?: unknown };
-  if (candidate.kind !== "email-alias") {
+  if (
+    candidate.kind !== "email-alias" ||
+    Object.keys(candidate).some((key) => key !== "kind" && key !== "alias")
+  ) {
     return undefined;
   }
 

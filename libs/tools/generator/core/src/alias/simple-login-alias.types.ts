@@ -1,3 +1,4 @@
+import { SendReplyIdentity } from "@bitwarden/alias-sdk-internal";
 import {
   AliasSyncStore,
   EmailAliasCredentialMetadata,
@@ -109,6 +110,8 @@ export type SimpleLoginContact = {
   lastEmailSentAt: number | null;
   blocked: boolean;
   existed: boolean;
+  /** Provider-neutral SDK identity required for mutation across lock and process boundaries. */
+  identity: SendReplyIdentity;
 };
 
 export type SimpleLoginContactPage = {

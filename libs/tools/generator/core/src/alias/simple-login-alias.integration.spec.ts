@@ -9,6 +9,7 @@ import {
   createSimpleLoginAliasService,
   SimpleLoginAliasService,
 } from "./simple-login-alias.service";
+import { SimpleLoginContact } from "./simple-login-alias.types";
 
 const integrationEnabled = process.env["SIMPLELOGIN_INTEGRATION"] === "1";
 const describeIntegration = integrationEnabled ? describe : describe.skip;
@@ -32,7 +33,7 @@ describeIntegration("SimpleLogin real API integration", () => {
   let service: SimpleLoginAliasService;
   let lifecycleAlias: { id: number; address: string; hostname: string } | undefined;
   const aliasesToDelete = new Set<number>();
-  const contactsToDelete = new Set<number>();
+  const contactsToDelete = new Map<number, SimpleLoginContact>();
 
   beforeAll(async () => {
     const email = requiredIntegrationSetting("SIMPLELOGIN_EMAIL");
@@ -53,8 +54,8 @@ describeIntegration("SimpleLogin real API integration", () => {
   });
 
   afterAll(async () => {
-    for (const contactId of contactsToDelete) {
-      await service.deleteContact(contactId).catch((_error: unknown): void => undefined);
+    for (const contact of contactsToDelete.values()) {
+      await service.deleteContact(contact).catch((_error: unknown): void => undefined);
     }
     for (const aliasId of aliasesToDelete) {
       await service.delete(aliasId).catch((_error: unknown): void => undefined);
@@ -84,7 +85,7 @@ describeIntegration("SimpleLogin real API integration", () => {
       metadata: {
         kind: "email-alias",
         alias: {
-          provider: "simplelogin",
+          version: 1,
           connectionId,
           aliasId: expect.any(String),
         },
@@ -100,7 +101,11 @@ describeIntegration("SimpleLogin real API integration", () => {
     expect(search.items.some((alias) => alias.id === aliasId)).toBe(true);
 
     const recommendation = await service.recommend(hostname);
-    expect(recommendation.alias).toMatchObject({ id: aliasId, address: generated.credential });
+    expect(recommendation).toMatchObject({ hostname, canCreate: true });
+    expect(recommendation.suffixes.length).toBeGreaterThan(0);
+    if (recommendation.alias) {
+      expect(recommendation.alias.identity).toMatchObject({ version: 1, connectionId });
+    }
 
     const updated = await service.update(aliasId, { name: `Bitwarden ${marker}`, pinned: true });
     expect(updated).toMatchObject({ id: aliasId, name: `Bitwarden ${marker}`, pinned: true });
@@ -110,13 +115,13 @@ describeIntegration("SimpleLogin real API integration", () => {
     expect((await service.domains()).length).toBeGreaterThan(0);
 
     const contact = await service.createReverseAlias(aliasId, `contact-${marker}@example.net`);
-    contactsToDelete.add(contact.id);
+    contactsToDelete.set(contact.id, contact);
     expect(contact.reverseAliasAddress).toContain("@");
     expect((await service.contacts(aliasId)).items.some((item) => item.id === contact.id)).toBe(
       true,
     );
-    expect(await service.toggleContactBlocked(contact.id)).toBe(true);
-    await service.deleteContact(contact.id);
+    expect(await service.toggleContactBlocked(contact)).toBe(true);
+    await service.deleteContact(contact);
     contactsToDelete.delete(contact.id);
 
     // Generator serialization is the history boundary: identity and provider credentials stay out.
@@ -144,7 +149,7 @@ describeIntegration("SimpleLogin real API integration", () => {
       address: lifecycleAlias!.address,
     });
     expect(secondDetail).toEqual(firstDetail);
-    expect(recommendation.alias).toMatchObject({ id: lifecycleAlias!.id });
+    expect(recommendation).toMatchObject({ hostname: lifecycleAlias!.hostname, canCreate: true });
 
     let partialFailure: SimpleLoginAliasError | undefined;
     try {
@@ -175,8 +180,8 @@ describeIntegration("SimpleLogin real API integration", () => {
       connectionId,
     });
     await expect(offline.list()).rejects.toMatchObject({
-      code: "invalid-response",
-      message: "invalid alias provider response: provider fetch failed",
+      code: "remote-error",
+      message: "alias operation failed: offline",
     });
   });
 

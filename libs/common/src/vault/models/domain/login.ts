@@ -18,6 +18,7 @@ export class Login extends Domain {
   password?: EncString;
   passwordRevisionDate?: Date;
   totp?: EncString;
+  aliasReference?: EncString;
   autofillOnPageLoad?: boolean;
   fido2Credentials?: Fido2Credential[];
 
@@ -33,6 +34,7 @@ export class Login extends Domain {
     this.username = conditionalEncString(obj.username);
     this.password = conditionalEncString(obj.password);
     this.totp = conditionalEncString(obj.totp);
+    this.aliasReference = conditionalEncString(obj.aliasReference);
 
     if (obj.uris) {
       this.uris = obj.uris.map((u) => new LoginUri(u));
@@ -51,7 +53,7 @@ export class Login extends Domain {
     const view = await this.decryptObj<Login, LoginView>(
       this,
       new LoginView(this),
-      ["username", "password", "totp"],
+      ["username", "password", "totp", "aliasReference"],
       encKey,
       `DomainType: Login; ${context}`,
     );
@@ -106,6 +108,7 @@ export class Login extends Domain {
       username: null,
       password: null,
       totp: null,
+      aliasReference: null,
     });
 
     if (this.uris != null && this.uris.length > 0) {
@@ -131,6 +134,7 @@ export class Login extends Domain {
     login.username = encStringFrom(obj.username);
     login.password = encStringFrom(obj.password);
     login.totp = encStringFrom(obj.totp);
+    login.aliasReference = encStringFrom(obj.aliasReference);
     login.uris = obj.uris
       ?.map((uri: any) => LoginUri.fromJSON(uri))
       .filter((u): u is LoginUri => u != null);
@@ -154,6 +158,7 @@ export class Login extends Domain {
       password: this.password?.toSdk(),
       passwordRevisionDate: this.passwordRevisionDate?.toISOString(),
       totp: this.totp?.toSdk(),
+      aliasReference: this.aliasReference?.toSdk(),
       autofillOnPageLoad: this.autofillOnPageLoad ?? undefined,
       fido2Credentials: this.fido2Credentials?.map((f) => f.toSdkFido2Credential()),
     };
@@ -175,6 +180,7 @@ export class Login extends Domain {
     login.username = encStringFrom(obj.username);
     login.password = encStringFrom(obj.password);
     login.totp = encStringFrom(obj.totp);
+    login.aliasReference = encStringFrom(obj.aliasReference);
     login.uris =
       obj.uris
         ?.filter((u) => u.uri != null)

@@ -7,8 +7,6 @@ import {
 
 const validIdentity = {
   version: EMAIL_ALIAS_IDENTITY_VERSION,
-  provider: "simplelogin" as const,
-  providerInstance: "https://app.simplelogin.io/",
   connectionId: "11111111-1111-4111-8111-111111111111",
   aliasId: "41",
   address: "first@sl.test",
@@ -39,8 +37,16 @@ describe("email alias schema v1", () => {
 
   it("rejects non-canonical records", () => {
     expect(parseEmailAliasIdentity({ ...validIdentity, connectionId: "invalid" })).toBeUndefined();
-    expect(parseEmailAliasIdentity({ ...validIdentity, aliasId: "0" })).toBeUndefined();
+    expect(parseEmailAliasIdentity({ ...validIdentity, aliasId: 0 })).toBeUndefined();
     expect(parseEmailAliasIdentity({ ...validIdentity, address: "" })).toBeUndefined();
+    expect(parseEmailAliasIdentity({ ...validIdentity, provider: "simplelogin" })).toBeUndefined();
+    expect(
+      parseGeneratedCredentialMetadata({
+        kind: "email-alias",
+        alias: validIdentity,
+        compatibility: true,
+      }),
+    ).toBeUndefined();
   });
 
   it("compares the complete connection-scoped identity", () => {
@@ -48,7 +54,7 @@ describe("email alias schema v1", () => {
     expect(
       emailAliasIdentitiesEqual(validIdentity, {
         ...validIdentity,
-        providerInstance: "https://other.simplelogin.example/",
+        aliasId: "opaque-other-id",
       }),
     ).toBe(false);
     expect(

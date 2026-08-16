@@ -23,6 +23,7 @@ import {
   SimpleLoginAliasError,
   createSimpleLoginAliasService,
   SimpleLoginAliasService,
+  SimpleLoginContact,
 } from "@bitwarden/generator-core";
 
 import { DesktopHeaderComponent } from "../../layout/header";
@@ -63,7 +64,7 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
   };
   let fixture: ComponentFixture<DesktopAliasComponent>;
   let aliasId: number | undefined;
-  let contactId: number | undefined;
+  let lifecycleContact: SimpleLoginContact | undefined;
 
   beforeAll(async () => {
     const email = requiredIntegrationSetting("SIMPLELOGIN_EMAIL");
@@ -107,8 +108,8 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
   });
 
   afterAll(async () => {
-    if (contactId != null) {
-      await client.deleteContact(contactId).catch((_error: unknown): void => undefined);
+    if (lifecycleContact) {
+      await client.deleteContact(lifecycleContact).catch((_error: unknown): void => undefined);
     }
     if (aliasId != null) {
       await client.delete(aliasId).catch((_error: unknown): void => undefined);
@@ -178,7 +179,7 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
     const contacts = await client.contacts(created.id);
     const contact = contacts.items.find((item) => item.address === `contact-${marker}@example.net`);
     expect(contact?.reverseAliasAddress).toContain("@");
-    contactId = contact?.id;
+    lifecycleContact = contact;
 
     fixture.destroy();
     facade.client.mockRejectedValue(
@@ -198,9 +199,9 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain(created.address);
 
-    if (contactId != null) {
-      await client.deleteContact(contactId);
-      contactId = undefined;
+    if (lifecycleContact) {
+      await client.deleteContact(lifecycleContact);
+      lifecycleContact = undefined;
     }
     await client.delete(created.id);
     aliasId = undefined;

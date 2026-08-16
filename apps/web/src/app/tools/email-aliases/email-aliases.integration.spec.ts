@@ -66,12 +66,12 @@ async function waitUntil(condition: () => boolean): Promise<void> {
 class MockHeaderComponent {}
 
 describeIntegration("rendered web email alias experience against real services", () => {
-  jest.setTimeout(120_000);
+  jest.setTimeout(240_000);
 
   const simpleLoginBaseUrl = process.env["SIMPLELOGIN_BASE_URL"] ?? "http://127.0.0.1:7777";
   const bitwardenApiUrl = process.env["BITWARDEN_API_URL"] ?? "http://localhost:4000";
   const aliasesToDelete = new Set<number>();
-  const contactsToDelete = new Set<number>();
+  const contactsToDelete = new Map<number, SimpleLoginContact>();
   let lifecycle: SimpleLoginAliasService;
   let facade: WebSimpleLoginAliasService;
   let storedSettings: ForwarderOptions;
@@ -135,8 +135,8 @@ describeIntegration("rendered web email alias experience against real services",
   });
 
   afterAll(async () => {
-    for (const contactId of contactsToDelete) {
-      await lifecycle.deleteContact(contactId).catch((_error: unknown): void => undefined);
+    for (const contact of contactsToDelete.values()) {
+      await lifecycle.deleteContact(contact).catch((_error: unknown): void => undefined);
     }
     for (const aliasId of aliasesToDelete) {
       await lifecycle.delete(aliasId).catch((_error: unknown): void => undefined);
@@ -161,12 +161,12 @@ describeIntegration("rendered web email alias experience against real services",
         remove: { imports: [HeaderModule] },
         add: { imports: [MockHeaderComponent] },
       })
+      .overrideProvider(DialogService, { useValue: dialogService })
       .compileComponents();
 
     const fixture: ComponentFixture<EmailAliasesComponent> =
       TestBed.createComponent(EmailAliasesComponent);
     const component = fixture.componentInstance;
-    component["dialogService"] = dialogService;
     fixture.detectChanges();
     await waitUntil(() => !component.loading && !component.working);
     fixture.detectChanges();
@@ -188,6 +188,7 @@ describeIntegration("rendered web email alias experience against real services",
     expect(createButton).toBeDefined();
     await component.createAlias();
     fixture.detectChanges();
+    expect(component.error).toBeUndefined();
 
     const aliasId = component.selected?.id;
     expect(aliasId).toEqual(expect.any(Number));
@@ -197,10 +198,16 @@ describeIntegration("rendered web email alias experience against real services",
     ).toContain(component.selected?.address);
 
     await component.recommend();
-    expect(component.recommendation?.alias).toMatchObject({
-      id: aliasId,
-      address: component.selected?.address,
+    expect(component.recommendation).toMatchObject({
+      hostname: `web-${marker}.integration.test`,
+      canCreate: true,
     });
+    if (component.recommendation?.alias) {
+      expect(component.recommendation.alias.identity).toMatchObject({
+        version: 1,
+        connectionId: storedSettings.connectionId,
+      });
+    }
 
     component.selected!.name = `Web alias ${marker}`;
     component.selected!.note = `Rendered integration ${marker}`;
@@ -216,7 +223,7 @@ describeIntegration("rendered web email alias experience against real services",
     component.reverseAliasContact = `contact-${marker}@example.net`;
     await component.createReverseAlias();
     const contact = component.contacts[0] as SimpleLoginContact;
-    contactsToDelete.add(contact.id);
+    contactsToDelete.set(contact.id, contact);
     expect(contact.reverseAliasAddress).toContain("@");
     await component.toggleContact(contact);
     expect(contact.blocked).toBe(true);

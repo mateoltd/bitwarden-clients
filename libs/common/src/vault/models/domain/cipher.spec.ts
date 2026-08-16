@@ -174,6 +174,7 @@ describe("Cipher DTO", () => {
           password: "EncryptedString",
           passwordRevisionDate: "2022-01-31T12:00:00.000Z",
           totp: "EncryptedString",
+          aliasReference: "EncryptedAliasReference",
           autofillOnPageLoad: false,
         },
         passwordHistory: [
@@ -244,6 +245,7 @@ describe("Cipher DTO", () => {
           username: { encryptedString: "EncryptedString", encryptionType: 0 },
           password: { encryptedString: "EncryptedString", encryptionType: 0 },
           totp: { encryptedString: "EncryptedString", encryptionType: 0 },
+          aliasReference: { encryptedString: "EncryptedAliasReference", encryptionType: 0 },
           uris: [
             {
               match: 0,
@@ -1047,6 +1049,7 @@ describe("Cipher DTO", () => {
         notes: "EncryptedString" as SdkEncString,
         type: SdkCipherType.Login,
         login: {
+          aliasReference: undefined,
           username: "EncryptedString" as SdkEncString,
           password: "EncryptedString" as SdkEncString,
           passwordRevisionDate: "2022-01-31T12:00:00.000Z",

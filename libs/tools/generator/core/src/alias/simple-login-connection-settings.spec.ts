@@ -72,8 +72,7 @@ describe("SimpleLogin schema-v1 connection identity", () => {
     const userId = "11111111-1111-4111-8111-111111111111" as UserId;
     const account = { id: userId } as Account;
     const connection = {
-      provider: "simplelogin" as const,
-      providerInstance: "https://app.simplelogin.io/",
+      version: 1 as const,
       connectionId: "22222222-2222-4222-8222-222222222222",
     };
     let sync = createAliasSyncDocument("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
@@ -81,7 +80,7 @@ describe("SimpleLogin schema-v1 connection identity", () => {
     const carrier = createAliasConnectionCipher({
       version: 1,
       connection,
-      credential: { token: "encrypted-provider-token", baseUrl: connection.providerInstance },
+      credential: { token: "encrypted-provider-token", baseUrl: "https://app.simplelogin.io/" },
       sync,
     });
     const settings = new BehaviorSubject<ForwarderOptions>({
@@ -98,7 +97,7 @@ describe("SimpleLogin schema-v1 connection identity", () => {
 
     expect(recovered).toMatchObject({
       token: "encrypted-provider-token",
-      baseUrl: connection.providerInstance,
+      baseUrl: "https://app.simplelogin.io/",
       connectionId: connection.connectionId,
     });
     expect(settings.value).toEqual({ connectionId: connection.connectionId });

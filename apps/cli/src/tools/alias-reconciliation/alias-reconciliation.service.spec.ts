@@ -1,6 +1,6 @@
 import { MockProxy, mock } from "jest-mock-extended";
 
-import { Alias, AliasProviderIdentity, SensitiveString } from "@bitwarden/alias-sdk-internal";
+import { Alias, AliasConnection, SensitiveString } from "@bitwarden/alias-sdk-internal";
 import {
   AliasSyncDocument,
   AliasSyncStore,
@@ -21,32 +21,35 @@ import { AliasReconciliationService } from "./alias-reconciliation.service";
 
 const userId = "11111111-1111-4111-8111-111111111111" as UserId;
 const connectionId = "22222222-2222-4222-8222-222222222222";
-const provider: AliasProviderIdentity = {
-  provider: "simplelogin",
-  instance: "https://app.simplelogin.io/",
+const provider: AliasConnection = {
+  version: 1,
   connectionId,
+  adapter: {
+    adapterId: "test",
+    capabilities: {
+      create: true,
+      list: true,
+      get: true,
+      enableDisable: true,
+      delete: true,
+      createSendReplyIdentity: true,
+      listSendReplyIdentities: true,
+      removeSendReplyIdentity: true,
+      extensions: [],
+    },
+  },
 };
 const sensitive = (value: string): SensitiveString => value as SensitiveString;
 const transactionId = "33333333-3333-4333-8333-333333333333";
 
 function sdkAlias(id: number, address: string): Alias {
   return {
-    id: BigInt(id),
-    email: sensitive(address),
-    creation_date: "2026-08-12T00:00:00Z",
-    creation_timestamp: BigInt(1),
-    enabled: true,
-    note: undefined,
-    name: undefined,
-    nb_forward: BigInt(0),
-    nb_block: BigInt(0),
-    nb_reply: BigInt(0),
-    mailbox: { id: BigInt(1), email: sensitive("owner@example.test") },
-    mailboxes: [{ id: BigInt(1), email: sensitive("owner@example.test") }],
-    support_pgp: false,
-    disable_pgp: false,
-    latest_activity: undefined,
-    pinned: false,
+    identity: { version: 1, connectionId, aliasId: String(id), address: sensitive(address) },
+    lifecycle: "enabled",
+    freshness: "current",
+    consistency: "clean",
+    label: undefined,
+    capabilities: provider.adapter.capabilities,
   };
 }
 
@@ -62,8 +65,6 @@ function login(index: number, username: string, aliasId?: number): CipherView {
   if (aliasId !== undefined) {
     cipher.aliasBinding = {
       version: 1,
-      provider: "simplelogin",
-      providerInstance: provider.instance,
       connectionId,
       aliasId: aliasId.toString(),
       address: username,
@@ -77,10 +78,10 @@ function serviceWithAliases(aliases: Alias[]): MockProxy<SimpleLoginAliasService
   aliasService.providerIdentity.mockReturnValue(provider);
   aliasService.listCanonical.mockImplementation(async (page) => ({
     aliases: page === 0 ? aliases : [],
-    page,
+    nextPageToken: undefined,
   }));
   aliasService.getCanonical.mockImplementation(async (id) => {
-    const alias = aliases.find((candidate) => candidate.id === id);
+    const alias = aliases.find((candidate) => candidate.identity.aliasId === id);
     if (!alias) {
       throw new SimpleLoginAliasError("missing", "not-found", 404);
     }
@@ -221,7 +222,7 @@ describe("alias reconciliation", () => {
     expect(report.summary).toMatchObject({ plannedChanges: 0, appliedChanges: 0 });
     expect(report.missing).toEqual([
       expect.objectContaining({
-        kind: "provider-alias-without-login",
+        kind: "alias-without-login",
         alias: expect.objectContaining({ aliasId: "1" }),
       }),
     ]);
@@ -498,7 +499,9 @@ describe("alias reconciliation", () => {
     const aliases = Array.from({ length: 1_001 }, (_, index) =>
       sdkAlias(index + 1, `alias-${index}@sl.test`),
     );
-    const ciphers = aliases.map((item, index) => login(index + 1, item.email as string, index + 1));
+    const ciphers = aliases.map((item, index) =>
+      login(index + 1, item.identity.address as string, index + 1),
+    );
     const cipherService = mock<CipherService>();
     cipherService.getAllDecrypted.mockResolvedValue(ciphers);
 
@@ -523,7 +526,7 @@ describe("alias reconciliation", () => {
     aliasService.providerIdentity.mockReturnValue(provider);
     aliasService.listCanonical
       .mockRejectedValueOnce(new SimpleLoginAliasError("limited", "rate-limited", 429, 7))
-      .mockResolvedValueOnce({ aliases: [], page: 0 });
+      .mockResolvedValueOnce({ aliases: [], nextPageToken: undefined });
     cipherService.getAllDecrypted.mockResolvedValue([]);
 
     const report = await new AliasReconciliationService(
@@ -546,7 +549,7 @@ describe("alias reconciliation", () => {
     aliasService.providerIdentity.mockReturnValue(provider);
     aliasService.listCanonical.mockImplementation(async (page) => ({
       aliases: page < 2 ? aliases : [],
-      page,
+      nextPageToken: page < 2 ? `simplelogin-page:${page + 1}` : undefined,
     }));
     cipherService.getAllDecrypted.mockResolvedValue([]);
 
@@ -569,7 +572,7 @@ describe("alias reconciliation", () => {
     aliasService.providerIdentity.mockReturnValue(provider);
     aliasService.listCanonical.mockImplementation(async (page) => ({
       aliases: page === 0 ? firstPage : page === 1 ? [sdkAlias(1, "changed@sl.test")] : [],
-      page,
+      nextPageToken: page < 1 ? `simplelogin-page:${page + 1}` : undefined,
     }));
     cipherService.getAllDecrypted.mockResolvedValue([]);
 
@@ -600,7 +603,7 @@ describe("alias reconciliation", () => {
     expect(report.summary).toMatchObject({ aliasesScanned: 21, exactMatches: 1 });
     expect(report.exactMatches[0].alias.aliasId).toBe("21");
     expect(aliasService.getCanonical).toHaveBeenCalledTimes(2);
-    expect(aliasService.getCanonical).toHaveBeenCalledWith(BigInt(21));
+    expect(aliasService.getCanonical).toHaveBeenCalledWith("21");
     expect(waitForRetry).toHaveBeenCalledWith(4_000);
   });
 
@@ -618,7 +621,7 @@ describe("alias reconciliation", () => {
     );
 
     expect(report.missing).toEqual([
-      expect.objectContaining({ kind: "bound-login-without-provider-alias" }),
+      expect.objectContaining({ kind: "bound-login-without-alias" }),
     ]);
   });
 

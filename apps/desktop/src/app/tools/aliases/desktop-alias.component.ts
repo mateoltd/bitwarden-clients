@@ -246,7 +246,7 @@ export class DesktopAliasComponent implements OnInit {
 
   protected async toggleContact(contact: SimpleLoginContact): Promise<void> {
     await this.run(async () => {
-      const blocked = await (await this.aliasService.client()).toggleContactBlocked(contact.id);
+      const blocked = await (await this.aliasService.client()).toggleContactBlocked(contact);
       this.contacts.update((contacts) =>
         contacts.map((item) => (item.id === contact.id ? { ...item, blocked } : item)),
       );
@@ -265,7 +265,7 @@ export class DesktopAliasComponent implements OnInit {
       if (!confirmed) {
         return;
       }
-      await (await this.aliasService.client()).deleteContact(contact.id);
+      await (await this.aliasService.client()).deleteContact(contact);
       const alias = this.selectedAlias();
       if (alias) {
         await this.fetchContacts(alias, this.contactPage());
