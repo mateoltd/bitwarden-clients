@@ -1,6 +1,0 @@
-source_commit=4a08b5fe81c363169d36f582cc13c03b59d212d8
-runner_image=ubuntu24-20260720.247.2
-v24.17.0
-11.13.0
-rustc 1.96.0 (ac68faa20 2026-05-25)
-wasm-opt version 131 (version_131)
