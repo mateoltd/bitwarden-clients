@@ -426,15 +426,9 @@ export class CipherView implements View, InitializerMetadata {
       favorite: this.favorite ?? false,
       reprompt: this.reprompt ?? CipherRepromptType.None,
       fields: sdkCipherView.fields ?? [],
-      type: this.getSdkCipherViewType(),
+      type: this.getSdkCipherViewType(sdkCipherView),
       archivedDate: this.archivedDate?.toISOString(),
     };
-
-    // If the cipher has FIDO2 credentials, we need to set them on the SDK create request
-    // separately due to restrictions in how the SDK handles them.
-    if (this.type === CipherType.Login && this.login?.hasFido2Credentials) {
-      sdkCipherCreateRequest.type = { login: sdkCipherView.login! };
-    }
 
     return sdkCipherCreateRequest;
   }
@@ -455,18 +449,12 @@ export class CipherView implements View, InitializerMetadata {
       favorite: this.favorite ?? false,
       reprompt: this.reprompt ?? CipherRepromptType.None,
       fields: sdkCipherView.fields ?? [],
-      type: this.getSdkCipherViewType(),
+      type: this.getSdkCipherViewType(sdkCipherView),
       revisionDate: this.revisionDate?.toISOString(),
       archivedDate: this.archivedDate?.toISOString(),
       attachments: this.attachments?.map((a) => a.toSdkAttachmentView()),
       key: this.key?.toSdk(),
     };
-
-    // If the cipher has FIDO2 credentials, we need to set them on the SDK edit request
-    // separately due to restrictions in how the SDK handles them.
-    if (this.type === CipherType.Login && this.login?.hasFido2Credentials) {
-      sdkCipherEditRequest.type = { login: sdkCipherView.login! };
-    }
 
     return sdkCipherEditRequest;
   }
@@ -489,34 +477,42 @@ export class CipherView implements View, InitializerMetadata {
   /**
    * Returns the SDK CipherViewType object for the cipher.
    *
-   * @returns {CipherViewType} The SDK CipherViewType for the cipher.t
+   * @param sdkCipherView A prepared SDK view whose login may contain SDK-bound resources.
+   * @returns {CipherViewType} The SDK CipherViewType for the cipher.
    */
-  getSdkCipherViewType(): CipherViewType {
+  getSdkCipherViewType(sdkCipherView?: SdkCipherView): CipherViewType {
     let viewType: CipherViewType;
     switch (this.type) {
       case CipherType.Card:
-        viewType = { card: this.card?.toSdkCardView() };
+        viewType = { card: sdkCipherView?.card ?? this.card?.toSdkCardView() };
         break;
       case CipherType.Identity:
-        viewType = { identity: this.identity?.toSdkIdentityView() };
+        viewType = { identity: sdkCipherView?.identity ?? this.identity?.toSdkIdentityView() };
         break;
       case CipherType.Login:
-        viewType = { login: this.login?.toSdkLoginView() };
+        viewType = { login: sdkCipherView?.login ?? this.login?.toSdkLoginView() };
         break;
       case CipherType.SecureNote:
-        viewType = { secureNote: this.secureNote?.toSdkSecureNoteView() };
+        viewType = {
+          secureNote: sdkCipherView?.secureNote ?? this.secureNote?.toSdkSecureNoteView(),
+        };
         break;
       case CipherType.SshKey:
-        viewType = { sshKey: this.sshKey?.toSdkSshKeyView() };
+        viewType = { sshKey: sdkCipherView?.sshKey ?? this.sshKey?.toSdkSshKeyView() };
         break;
       case CipherType.BankAccount:
-        viewType = { bankAccount: this.bankAccount?.toSdkBankAccountView() };
+        viewType = {
+          bankAccount: sdkCipherView?.bankAccount ?? this.bankAccount?.toSdkBankAccountView(),
+        };
         break;
       case CipherType.DriversLicense:
-        viewType = { driversLicense: this.driversLicense?.toSdkDriversLicenseView() };
+        viewType = {
+          driversLicense:
+            sdkCipherView?.driversLicense ?? this.driversLicense?.toSdkDriversLicenseView(),
+        };
         break;
       case CipherType.Passport:
-        viewType = { passport: this.passport?.toSdkPassportView() };
+        viewType = { passport: sdkCipherView?.passport ?? this.passport?.toSdkPassportView() };
         break;
       default:
         viewType = {
