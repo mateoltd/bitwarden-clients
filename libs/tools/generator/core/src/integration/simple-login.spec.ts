@@ -1,5 +1,7 @@
 import { mock } from "jest-mock-extended";
 
+import { createAliasSyncDocument } from "@bitwarden/common/tools/alias";
+
 import { ForwarderContext } from "../engine";
 
 import { SimpleLogin, SimpleLoginSettings } from "./simple-login";
@@ -23,10 +25,23 @@ describe("SimpleLogin forwarder", () => {
   });
 
   describe("settings", () => {
-    it("should pass through deserialization", () => {
+    it("deserializes ordinary settings", () => {
       const value: any = {};
       const result = SimpleLogin.forwarder.settings.deserializer(value);
-      expect(result).toBe(value);
+      expect(result).toEqual(value);
+    });
+
+    it("canonically reparses a persisted alias journal", () => {
+      const aliasSync = createAliasSyncDocument("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+
+      expect(SimpleLogin.forwarder.settings.deserializer({ aliasSync } as never)).toEqual({
+        aliasSync,
+      });
+      expect(() =>
+        SimpleLogin.forwarder.settings.deserializer({
+          aliasSync: { ...aliasSync, provider: "simplelogin" },
+        } as never),
+      ).toThrow("Invalid alias sync document");
     });
   });
 
@@ -34,7 +49,7 @@ describe("SimpleLogin forwarder", () => {
     it("should pass through deserialization", () => {
       const value: any = {};
       const result = SimpleLogin.forwarder.importBuffer.options.deserializer(value);
-      expect(result).toBe(value);
+      expect(result).toEqual(value);
     });
   });
   it("does not expose the legacy HTTP generator operation", () => {
