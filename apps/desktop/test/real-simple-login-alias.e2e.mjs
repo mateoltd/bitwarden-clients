@@ -5,7 +5,6 @@ import http from "node:http";
 import https from "node:https";
 import os from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 
 import { _electron as electron } from "playwright";
 
@@ -27,13 +26,11 @@ const bitwardenIdentityBaseUrl = serviceBaseUrl(
   bitwardenIdentityUrl,
   vaultwarden ? "/identity/" : "/",
 );
-const bitwardenDbPath = requiredEnvironment("BITWARDEN_DB_PATH");
 const simpleLoginUrl = new URL(process.env.SIMPLELOGIN_URL ?? "http://127.0.0.1:32769");
 const simpleLoginEmail = requiredEnvironment("SIMPLELOGIN_EMAIL");
 const simpleLoginPassword = requiredEnvironment("SIMPLELOGIN_PASSWORD");
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), "bitwarden-alias-desktop-e2e-"));
-const existingDeviceIds = readDeviceIds();
 const servers = [];
 let app;
 let simpleLoginToken;
@@ -220,7 +217,6 @@ try {
     await deleteSimpleLoginAlias(simpleLoginToken, createdAliasId).catch(() => undefined);
   }
   await Promise.all(servers.map((server) => closeServer(server)));
-  removeCreatedDesktopDevices();
   fs.rmSync(profile, { recursive: true, force: true });
 }
 
@@ -359,33 +355,6 @@ function assertServiceLogsDoNotContain(secret) {
   );
   assert.equal(logs.status, 0, "SimpleLogin logs must be readable for leakage checks");
   assert.equal(`${logs.stdout}${logs.stderr}`.includes(secret), false);
-}
-
-function readDeviceIds() {
-  const database = new DatabaseSync(bitwardenDbPath, { readOnly: true });
-  const rows =
-    process.env.BITWARDEN_DB_DIALECT === "vaultwarden"
-      ? database.prepare('SELECT uuid AS "Id" FROM devices').all()
-      : database.prepare('SELECT "Id" FROM "Device"').all();
-  database.close();
-  return new Set(rows.map((row) => row.Id));
-}
-
-function removeCreatedDesktopDevices() {
-  if (process.env.BITWARDEN_DB_DIALECT === "vaultwarden") {
-    // The hosted test database is ephemeral and removed with its pinned container.
-    return;
-  }
-  const database = new DatabaseSync(bitwardenDbPath);
-  const created = database
-    .prepare('SELECT "Id" FROM "Device" WHERE "Name" = ?')
-    .all("macos")
-    .filter((row) => !existingDeviceIds.has(row.Id));
-  const remove = database.prepare('DELETE FROM "Device" WHERE "Id" = ?');
-  for (const device of created) {
-    remove.run(device.Id);
-  }
-  database.close();
 }
 
 function serviceBaseUrl(target, fallbackPath) {

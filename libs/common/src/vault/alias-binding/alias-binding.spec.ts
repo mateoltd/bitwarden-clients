@@ -1,4 +1,4 @@
-import { create_alias_reference } from "@bitwarden/alias-sdk-internal";
+import { SensitiveString, create_alias_reference } from "@bitwarden/alias-sdk-internal";
 
 import { EMAIL_ALIAS_IDENTITY_VERSION } from "../../tools/alias";
 import { CipherType } from "../enums";
@@ -7,14 +7,15 @@ import { FieldView } from "../models/view/field.view";
 
 import { bindGeneratedAlias, hydrateAliasBinding, reconcileAliasBinding } from "./alias-binding";
 
+const sensitive = (value: string): SensitiveString => value as SensitiveString;
 const firstAlias = {
   version: EMAIL_ALIAS_IDENTITY_VERSION,
   connectionId: "11111111-1111-4111-8111-111111111111",
   aliasId: "opaque:41",
-  address: "first@sl.test",
+  address: sensitive("first@sl.test"),
 };
 
-function login(username = firstAlias.address) {
+function login(username: string = firstAlias.address) {
   const cipher = new CipherView();
   cipher.type = CipherType.Login;
   cipher.login.username = username;
@@ -48,7 +49,11 @@ describe("alias binding", () => {
 
   it("replaces a binding with exact connectionId plus opaque aliasId identity", () => {
     const cipher = login();
-    const secondAlias = { ...firstAlias, aliasId: "opaque:99", address: "second@sl.test" };
+    const secondAlias = {
+      ...firstAlias,
+      aliasId: "opaque:99",
+      address: sensitive("second@sl.test"),
+    };
     cipher.login.username = secondAlias.address;
 
     bindGeneratedAlias(cipher, {
@@ -108,7 +113,7 @@ describe("alias binding", () => {
 
     for (let index = 0; index < 512; index++) {
       const address = `alias-${index}-${Math.floor(next() * 1_000_000)}@example.test`;
-      const identity = { ...firstAlias, aliasId: `opaque:${index}`, address };
+      const identity = { ...firstAlias, aliasId: `opaque:${index}`, address: sensitive(address) };
       const source = login(address.toUpperCase());
       bindGeneratedAlias(source, {
         credential: address,

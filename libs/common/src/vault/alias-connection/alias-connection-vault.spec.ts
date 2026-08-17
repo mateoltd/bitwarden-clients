@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 
+import { SensitiveString } from "@bitwarden/alias-sdk-internal";
 import { PasswordManagerClient, TokenProvider } from "@bitwarden/sdk-internal";
 
 import { asUuid } from "../../platform/abstractions/sdk/sdk.service";
@@ -34,6 +35,7 @@ const connection = {
 };
 const baseUrl = "https://app.simplelogin.io/";
 const token = "provider-secret-must-remain-encrypted";
+const sensitive = (value: string): SensitiveString => value as SensitiveString;
 
 class EmptyTokenProvider implements TokenProvider {
   async get_access_token(): Promise<undefined> {
@@ -230,9 +232,9 @@ describe("alias connection vault carrier", () => {
       version: 1 as const,
       connectionId: connection.connectionId,
       aliasId: "41",
-      address: "first@sl.test",
+      address: sensitive("first@sl.test"),
     };
-    const secondAlias = { ...firstAlias, aliasId: "42", address: "second@sl.test" };
+    const secondAlias = { ...firstAlias, aliasId: "42", address: sensitive("second@sl.test") };
 
     // Profile zero is offline: its event reaches only its independently persisted local journal.
     const staleOffline = await local(0).load();

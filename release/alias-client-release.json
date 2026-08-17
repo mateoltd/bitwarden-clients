@@ -3,6 +3,7 @@
   "schemaVersion": 1,
   "releaseLane": {
     "branch": "integration/provider-neutral-alias-clients",
+    "qualificationBranches": ["fix/provider-neutral-client-qualification"],
     "baseRef": "origin/fix/public-alias-review-findings",
     "baseCommit": "dd217a8ce662b40dbd0b2465a97edb806a60c924",
     "sourceRepository": "https://github.com/mateoltd/bitwarden-clients.git",
@@ -70,6 +71,13 @@
     }
   },
   "testInfrastructure": {
+    "pinnedToolchain": {
+      "containerImages": {
+        "node": "docker.io/library/node:24.17.0-bookworm-slim@sha256:862263c612aa437e3037674b85419622a9d93bff80aa1eee5398dfe686375532",
+        "python": "docker.io/library/python:3.14.2-slim-bookworm@sha256:e87711ef5c86aaeaa7031718a69db79d334d94c545c709583f651b8185870941",
+        "rust": "docker.io/library/rust:1.96.0-slim-bookworm@sha256:4732ca96fd086cb9be682050c3f0176288eebaac2b80aa2bcefccfaf198e1950"
+      }
+    },
     "chromium": {
       "playwrightVersion": "1.59.1",
       "revision": "1217",
@@ -84,6 +92,13 @@
       "upstreamRepository": "https://github.com/simple-login/app.git",
       "upstreamCommit": "dbc45fcce4e8e6b4fa615cc729ca95a67bf75266",
       "containerName": "simplelogin-owned-provider-app-1"
+    },
+    "officialBitwarden": {
+      "repository": "https://github.com/bitwarden/server.git",
+      "sourceCommit": "ffc280d2891270f7248812263aa1140e49f9c776",
+      "version": "2026.7.2",
+      "image": "ghcr.io/bitwarden/lite:2026.7.2@sha256:ca1007fb3a8e973692ca1b92b87e52d2101976ef9bdf76d8639682485a5866dc",
+      "containerName": "alias-client-release-bitwarden"
     },
     "vault": {
       "image": "docker.io/vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8",

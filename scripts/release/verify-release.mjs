@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { assert, git, readJson, readManifest, repositoryRoot, run } from "./lib.mjs";
 
 run(process.execPath, ["scripts/release/verify-sdk.mjs"]);
+run(process.execPath, ["scripts/release/verify-sdk-install.mjs"]);
 run(process.execPath, ["scripts/release/scope-audit.mjs"]);
 
 const manifest = readManifest();
@@ -20,8 +21,22 @@ const releaseWorkflows = [
 ].map((relative) => [relative, fs.readFileSync(path.join(repositoryRoot, relative), "utf8")]);
 for (const [relative, workflow] of releaseWorkflows) {
   assert(
-    workflow.includes(`branches: [${manifest.releaseLane.branch}]`),
+    workflow.includes("branches:") && workflow.includes(manifest.releaseLane.branch),
     `${relative} does not run for ${manifest.releaseLane.branch}`,
+  );
+}
+assert(
+  Array.isArray(manifest.releaseLane.qualificationBranches) &&
+    manifest.releaseLane.qualificationBranches.length > 0 &&
+    new Set(manifest.releaseLane.qualificationBranches).size ===
+      manifest.releaseLane.qualificationBranches.length,
+  "Qualification branches must be a non-empty unique list",
+);
+for (const qualificationBranch of manifest.releaseLane.qualificationBranches) {
+  assert(
+    qualificationBranch !== manifest.releaseLane.branch &&
+      headedWorkflow.includes(qualificationBranch),
+    `Headed provider workflow does not run for ${qualificationBranch}`,
   );
 }
 assert(
@@ -50,6 +65,22 @@ assert(
     headedWorkflow.includes("provider_upstream_ref:"),
   "Headed provider repository and refs are not parameterizable",
 );
+const officialBitwarden = manifest.testInfrastructure.officialBitwarden;
+assert(
+  officialBitwarden.repository === "https://github.com/bitwarden/server.git" &&
+    /^[0-9a-f]{40}$/.test(officialBitwarden.sourceCommit) &&
+    officialBitwarden.image ===
+      `ghcr.io/bitwarden/lite:${officialBitwarden.version}@sha256:ca1007fb3a8e973692ca1b92b87e52d2101976ef9bdf76d8639682485a5866dc`,
+  "Official Bitwarden test server is not pinned to the maintained Lite image",
+);
+for (const expected of [
+  officialBitwarden.image,
+  manifest.testInfrastructure.vault.image,
+  "bitwarden-test-service.mjs start-official",
+  "verify-vaultwarden-rejection.mjs",
+]) {
+  assert(headedWorkflow.includes(expected), `Headed workflow is missing: ${expected}`);
+}
 const sourceCommitFile = path.join(repositoryRoot, ".release-source-commit");
 let head;
 let branch;
@@ -77,9 +108,13 @@ if (fs.existsSync(path.join(repositoryRoot, ".git"))) {
     });
     assert(ancestry.status === 1, `Development ancestry entered the clean history: ${source}`);
   }
+  const allowedBranches = [
+    manifest.releaseLane.branch,
+    ...manifest.releaseLane.qualificationBranches,
+  ];
   assert(
-    branch === manifest.releaseLane.branch,
-    `Expected branch ${manifest.releaseLane.branch}, got ${branch}`,
+    allowedBranches.includes(branch),
+    `Expected one of ${allowedBranches.join(", ")}, got ${branch}`,
   );
 } else {
   assert(fs.existsSync(sourceCommitFile), "Exported source commit manifest is missing");
@@ -232,6 +267,18 @@ assert(
   "Chromium runtime size is invalid",
 );
 assert(/^[0-9a-f]{64}$/.test(chromiumRuntime.sha256), "Chromium runtime SHA-256 is invalid");
+
+const toolchainDockerfile = fs.readFileSync(
+  path.join(repositoryRoot, "scripts/release/pinned-toolchain.Dockerfile"),
+  "utf8",
+);
+for (const image of Object.values(manifest.testInfrastructure.pinnedToolchain.containerImages)) {
+  assert(toolchainDockerfile.includes(image), `Pinned toolchain Dockerfile is missing ${image}`);
+}
+assert(
+  toolchainDockerfile.includes(`npm install --global npm@${manifest.clientToolchain.npm}`),
+  "Pinned toolchain Dockerfile npm version differs from the manifest",
+);
 
 if (process.env.OSS_CLEAN_ROOM === "1") {
   assert(
