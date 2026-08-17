@@ -5,7 +5,21 @@ import { spawnSync } from "node:child_process";
 import { assert, git, readJson, readManifest, repositoryRoot, run } from "./lib.mjs";
 
 run(process.execPath, ["scripts/release/verify-sdk.mjs"]);
-run(process.execPath, ["scripts/release/verify-sdk-install.mjs"]);
+const sdkInstallDirectories = ["sdk-internal", "alias-sdk-internal"].map((packageName) =>
+  path.join(repositoryRoot, "node_modules/@bitwarden", packageName),
+);
+const installedSdkCount = sdkInstallDirectories.filter((directory) =>
+  fs.existsSync(directory),
+).length;
+assert(
+  installedSdkCount === 0 || installedSdkCount === sdkInstallDirectories.length,
+  "SDK dependencies are only partially installed",
+);
+if (installedSdkCount === sdkInstallDirectories.length) {
+  run(process.execPath, ["scripts/release/verify-sdk-install.mjs"]);
+} else {
+  console.log("Skipped physical SDK verification before dependency installation");
+}
 run(process.execPath, ["scripts/release/scope-audit.mjs"]);
 
 const manifest = readManifest();
