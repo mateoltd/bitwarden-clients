@@ -158,6 +158,7 @@
       matchPackageNames: [
         "@babel/core",
         "@babel/preset-env",
+        "@bitwarden/alias-sdk-internal",
         "@bitwarden/sdk-internal",
         "@bitwarden/commercial-sdk-internal",
         "@bitwarden/desktop-napi",
@@ -228,6 +229,7 @@
         "oslog",
         "pin-project",
         "pkg",
+        "playwright",
         "postcss",
         "postcss-loader",
         "rxjs",
