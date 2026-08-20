@@ -21,6 +21,7 @@ describe("DefaultUserKeyRotationService", () => {
   let mockUserCryptoManagement: {
     get_untrusted_memberships: jest.Mock;
     rotate_user_keys: jest.Mock;
+    password_change_and_rotate_user_keys: jest.Mock;
   };
 
   beforeEach(() => {
@@ -33,6 +34,7 @@ describe("DefaultUserKeyRotationService", () => {
     mockUserCryptoManagement = {
       get_untrusted_memberships: jest.fn(),
       rotate_user_keys: jest.fn(),
+      password_change_and_rotate_user_keys: jest.fn(),
     };
 
     mockUserCryptoManagement.get_untrusted_memberships.mockResolvedValue({
@@ -40,6 +42,7 @@ describe("DefaultUserKeyRotationService", () => {
       organization_memberships: [],
     });
     mockUserCryptoManagement.rotate_user_keys.mockResolvedValue(undefined);
+    mockUserCryptoManagement.password_change_and_rotate_user_keys.mockResolvedValue(undefined);
 
     const mockSdkClient = {
       take: jest.fn().mockReturnValue({
@@ -86,6 +89,7 @@ describe("DefaultUserKeyRotationService", () => {
 
       await service.verifyTrust(mockUserId);
 
+      expect(mockUserCryptoManagement.get_untrusted_memberships).toHaveBeenCalledWith();
       expect(mockUserCryptoDialogService.verifyTrust).toHaveBeenCalledWith(
         [mockOrganizationMembership],
         [mockEmergencyAccessMembership],
@@ -133,6 +137,26 @@ describe("DefaultUserKeyRotationService", () => {
         trustedEmergencyAccessUserPublicKeys: [eaKey],
       });
       expect(mockUserCryptoDialogService.verifyTrust).toHaveBeenCalledWith([], []);
+    });
+  });
+
+  describe("changePasswordAndRotateUserKey", () => {
+    it("verifies trust for the user", async () => {
+      const verifyTrustSpy = jest.spyOn(service, "verifyTrust").mockResolvedValue({
+        wasTrustDenied: false,
+        trustedOrganizationPublicKeys: [],
+        trustedEmergencyAccessUserPublicKeys: [],
+      });
+
+      const result = await service.changePasswordAndRotateUserKey(
+        "currentPassword",
+        "newPassword",
+        undefined,
+        mockUserId,
+      );
+
+      expect(result).toBe(true);
+      expect(verifyTrustSpy).toHaveBeenCalledWith(mockUserId);
     });
   });
 
@@ -220,6 +244,12 @@ describe("DefaultUserKeyRotationService", () => {
           upgrade_token_action: "CreateIfNeeded",
         }),
       );
+    });
+
+    it("keeps trust discovery independent from the upgrade token action", async () => {
+      await service.rotateUserKey(mockPasswordRotation, "CreateIfNeeded", mockUserId);
+
+      expect(verifyTrustSpy).toHaveBeenCalledWith(mockUserId);
     });
 
     it("passes empty arrays when verifyTrust returns no keys", async () => {

@@ -4,10 +4,12 @@ The release manifest records the repositories that actually produced this client
 pinned SDK artifact:
 
 - Client source: [`mateoltd/bitwarden-clients`](https://github.com/mateoltd/bitwarden-clients),
-  branch `refs/heads/integration/provider-neutral-alias-clients`, based exactly on
+  branch `refs/heads/integration/provider-neutral-alias-upstream-sync`, based exactly on
   `refs/remotes/origin/fix/public-alias-review-findings` at
-  `dd217a8ce662b40dbd0b2465a97edb806a60c924`; the final source commit is verified at release
-  time.
+  `dd217a8ce662b40dbd0b2465a97edb806a60c924`. The provider-neutral client state at
+  `6f7f3d461b34315efe8df7d9c033149c4153947e` is merged with Bitwarden upstream `main` at
+  `1430a8d835b211379894544a037dc8e354726c0c`, whose exact merge base is
+  `1f881babc15eb7d3a88cad41730ce167d8e49a41`; the final merge commit is verified at release time.
 - SDK source: [`mateoltd/bitwarden-sdk-internal`](https://github.com/mateoltd/bitwarden-sdk-internal),
   ref `refs/heads/refactor/provider-neutral-alias-v1`, commit
   `99c33ed26e51421224a4daecdf838057f1d66e75`, workflow run `31928076589`, artifact

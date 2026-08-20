@@ -2,7 +2,7 @@ name: Alias client OSS candidates
 
 on:
   push:
-    branches: [integration/provider-neutral-alias-clients]
+    branches: [integration/provider-neutral-alias-upstream-sync]
   workflow_dispatch:
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
     name: OSS boundary, secrets, locks, and licenses
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -86,7 +86,7 @@ jobs:
           - { id: browser-safari-mv3, runner: macos-15, engine: safari }
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0, persist-credentials: false }
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with: { node-version: 24.17.0, cache: npm }
@@ -149,7 +149,7 @@ jobs:
           - { id: desktop-windows-ia32, runner: windows-2022 }
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0, persist-credentials: false }
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with: { node-version: 24.17.0, cache: npm }
@@ -209,7 +209,7 @@ jobs:
     needs: policy
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0, persist-credentials: false }
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with: { node-version: 24.17.0, cache: npm }
@@ -244,7 +244,7 @@ jobs:
           - { id: cli-windows-x64, runner: windows-2022 }
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0, persist-credentials: false }
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with: { node-version: 22.22.0, cache: npm }
@@ -272,7 +272,7 @@ jobs:
     needs: [browser, desktop, web, cli]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0, persist-credentials: false }
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with: { node-version: 24.17.0, cache: npm }

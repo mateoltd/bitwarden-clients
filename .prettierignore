@@ -28,3 +28,8 @@ libs/.github
 
 # Forked library files
 libs/common/src/types/deep-jsonify.ts
+
+# Generated SDK provenance evidence
+vendor/bitwarden-sdk-internal-*.handoff.json
+vendor/bitwarden-sdk-internal-*.provenance.sigstore.json
+vendor/bitwarden-sdk-internal-*.sbom.cdx.json

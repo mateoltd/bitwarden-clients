@@ -1,4 +1,3 @@
-// eslint-disable-next-line import/no-restricted-paths -- legacy forwarder state contract
 import { UserKeyDefinition } from "@bitwarden/common/platform/state";
 import { GeneratedCredentialMetadata } from "@bitwarden/common/tools/alias";
 import { IntegrationConfiguration } from "@bitwarden/common/tools/integration/integration-configuration";

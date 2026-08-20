@@ -14,12 +14,30 @@ if (target === resolveCommit("HEAD") && branch !== policy.branch) {
 if (git(["merge-base", base, target]).trim() !== base)
   findings.push("history does not begin at pinned main");
 
-const commits = git(["rev-list", "--reverse", `${base}..${target}`])
+const commits = git(["rev-list", "--reverse", "--first-parent", `${base}..${target}`])
   .trim()
   .split("\n")
   .filter(Boolean);
-const merges = git(["rev-list", "--merges", `${base}..${target}`]).trim();
-if (merges) findings.push(`merge commits present: ${merges.replaceAll("\n", ", ")}`);
+const merges = git(["rev-list", "--merges", `${base}..${target}`])
+  .trim()
+  .split("\n")
+  .filter(Boolean);
+const upstreamSync = policy.upstreamSync;
+if (
+  git(["merge-base", upstreamSync.sourceCommit, upstreamSync.upstreamCommit]).trim() !==
+  upstreamSync.mergeBaseCommit
+) {
+  findings.push("configured upstream merge base differs");
+}
+const expectedMergeParents = `${upstreamSync.sourceCommit} ${upstreamSync.upstreamCommit}`;
+const matchingMerges = merges.filter(
+  (merge) => git(["show", "-s", "--format=%P", merge]).trim() === expectedMergeParents,
+);
+if (matchingMerges.length !== 1 || merges.length !== 1) {
+  findings.push(
+    `expected one exact upstream merge (${expectedMergeParents}), got ${merges.join(", ") || "none"}`,
+  );
+}
 for (const commit of commits) {
   const subject = git(["show", "-s", "--format=%s", commit]).trim();
   if (
@@ -53,6 +71,6 @@ if (findings.length > 0) {
   process.exitCode = 1;
 } else {
   process.stdout.write(
-    `history ok: ${base}..${target}, ${commits.length} linear conventional commits, no source ancestry${partial ? " (partial)" : ""}\n`,
+    `history ok: ${base}..${target}, ${commits.length} first-parent conventional commits, one exact upstream merge, no source ancestry${partial ? " (partial)" : ""}\n`,
   );
 }

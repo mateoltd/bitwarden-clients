@@ -52,11 +52,14 @@ import {
   KdfConfigService,
   KeyService,
 } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { LegacyCompatKeyService } from "@bitwarden/legacy-crypto";
 import {
   AuthClient,
   BitwardenClient,
   WrappedAccountCryptographicState,
 } from "@bitwarden/sdk-internal";
+import { UnlockService } from "@bitwarden/unlock";
 
 import { DefaultSetInitialPasswordService } from "./default-set-initial-password.service.implementation";
 import {
@@ -76,12 +79,14 @@ describe("DefaultSetInitialPasswordService", () => {
   let i18nService: MockProxy<I18nService>;
   let kdfConfigService: MockProxy<KdfConfigService>;
   let keyService: MockProxy<KeyService>;
+  let legacyCompatKeyService: MockProxy<LegacyCompatKeyService>;
   let masterPasswordApiService: MockProxy<MasterPasswordApiService>;
   let masterPasswordService: MockProxy<InternalMasterPasswordServiceAbstraction>;
   let organizationApiService: MockProxy<OrganizationApiServiceAbstraction>;
   let organizationUserApiService: MockProxy<OrganizationUserApiService>;
   let userDecryptionOptionsService: MockProxy<InternalUserDecryptionOptionsServiceAbstraction>;
   let accountCryptographicStateService: MockProxy<AccountCryptographicStateService>;
+  let unlockService: MockProxy<UnlockService>;
   const registerSdkService = mock<RegisterSdkService>();
 
   let userId: UserId;
@@ -95,12 +100,14 @@ describe("DefaultSetInitialPasswordService", () => {
     i18nService = mock<I18nService>();
     kdfConfigService = mock<KdfConfigService>();
     keyService = mock<KeyService>();
+    legacyCompatKeyService = mock<LegacyCompatKeyService>();
     masterPasswordApiService = mock<MasterPasswordApiService>();
     masterPasswordService = mock<InternalMasterPasswordServiceAbstraction>();
     organizationApiService = mock<OrganizationApiServiceAbstraction>();
     organizationUserApiService = mock<OrganizationUserApiService>();
     userDecryptionOptionsService = mock<InternalUserDecryptionOptionsServiceAbstraction>();
     accountCryptographicStateService = mock<AccountCryptographicStateService>();
+    unlockService = mock<UnlockService>();
 
     userId = "userId" as UserId;
     userKey = new SymmetricCryptoKey(new Uint8Array(64)) as UserKey;
@@ -113,6 +120,7 @@ describe("DefaultSetInitialPasswordService", () => {
       i18nService,
       kdfConfigService,
       keyService,
+      legacyCompatKeyService,
       masterPasswordApiService,
       masterPasswordService,
       organizationApiService,
@@ -120,6 +128,7 @@ describe("DefaultSetInitialPasswordService", () => {
       userDecryptionOptionsService,
       accountCryptographicStateService,
       registerSdkService,
+      unlockService,
     );
   });
 
@@ -222,10 +231,12 @@ describe("DefaultSetInitialPasswordService", () => {
       // Mock makeMasterKeyEncryptedUserKey() values
       if (config.userHasUserKey) {
         keyService.userKey$.mockReturnValue(of(userKey));
-        keyService.encryptUserKeyWithMasterKey.mockResolvedValue(masterKeyEncryptedUserKey);
+        legacyCompatKeyService.encryptUserKeyWithMasterKey.mockResolvedValue(
+          masterKeyEncryptedUserKey,
+        );
       } else {
         keyService.userKey$.mockReturnValue(of(null));
-        keyService.makeUserKey.mockResolvedValue(masterKeyEncryptedUserKey);
+        legacyCompatKeyService.makeUserKey.mockResolvedValue(masterKeyEncryptedUserKey);
       }
 
       // Mock keyPair values
@@ -237,7 +248,7 @@ describe("DefaultSetInitialPasswordService", () => {
         } else {
           keyService.userPrivateKey$.mockReturnValue(of(null));
           keyService.userPublicKey$.mockReturnValue(of(null));
-          keyService.makeKeyPair.mockResolvedValue(keyPair);
+          legacyCompatKeyService.makeKeyPair.mockResolvedValue(keyPair);
         }
       }
 
@@ -317,7 +328,7 @@ describe("DefaultSetInitialPasswordService", () => {
             existingUserPrivateKey,
             masterKeyEncryptedUserKey[0],
           );
-          expect(keyService.makeKeyPair).not.toHaveBeenCalled();
+          expect(legacyCompatKeyService.makeKeyPair).not.toHaveBeenCalled();
         });
       });
 
@@ -415,7 +426,10 @@ describe("DefaultSetInitialPasswordService", () => {
             credentials.newMasterKey,
             userId,
           );
-          expect(keyService.setUserKey).toHaveBeenCalledWith(masterKeyEncryptedUserKey[0], userId);
+          expect(unlockService.unlockWithDecryptedUserKey).toHaveBeenCalledWith(
+            userId,
+            masterKeyEncryptedUserKey[0],
+          );
         });
 
         it("should set the private key to state", async () => {
@@ -586,7 +600,7 @@ describe("DefaultSetInitialPasswordService", () => {
         expect(keyService.userPrivateKey$).not.toHaveBeenCalled();
         expect(keyService.userPublicKey$).not.toHaveBeenCalled();
         expect(encryptService.wrapDecapsulationKey).not.toHaveBeenCalled();
-        expect(keyService.makeKeyPair).not.toHaveBeenCalled();
+        expect(legacyCompatKeyService.makeKeyPair).not.toHaveBeenCalled();
       });
 
       describe("given the user has a userKey", () => {
@@ -653,7 +667,10 @@ describe("DefaultSetInitialPasswordService", () => {
             masterKeyEncryptedUserKey[1],
             userId,
           );
-          expect(keyService.setUserKey).toHaveBeenCalledWith(masterKeyEncryptedUserKey[0], userId);
+          expect(unlockService.unlockWithDecryptedUserKey).toHaveBeenCalledWith(
+            userId,
+            masterKeyEncryptedUserKey[0],
+          );
         });
 
         it("should NOT set the private key to state", async () => {
@@ -1010,9 +1027,9 @@ describe("DefaultSetInitialPasswordService", () => {
         userId,
       );
 
-      expect(keyService.setUserKey).toHaveBeenCalledWith(
-        SymmetricCryptoKey.fromString(sdkRegistrationResult.user_key) as UserKey,
+      expect(unlockService.unlockWithDecryptedUserKey).toHaveBeenCalledWith(
         userId,
+        SymmetricCryptoKey.fromString(sdkRegistrationResult.user_key) as UserKey,
       );
 
       // Verify legacy state updates below

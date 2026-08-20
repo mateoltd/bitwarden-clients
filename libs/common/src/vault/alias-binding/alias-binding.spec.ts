@@ -1,4 +1,4 @@
-import { create_alias_reference } from "@bitwarden/alias-sdk-internal";
+import { create_alias_reference, SensitiveString } from "@bitwarden/alias-sdk-internal";
 
 import { EMAIL_ALIAS_IDENTITY_VERSION } from "../../tools/alias";
 import { CipherType } from "../enums";
@@ -11,10 +11,10 @@ const firstAlias = {
   version: EMAIL_ALIAS_IDENTITY_VERSION,
   connectionId: "11111111-1111-4111-8111-111111111111",
   aliasId: "opaque:41",
-  address: "first@sl.test",
+  address: "first@sl.test" as SensitiveString,
 };
 
-function login(username = firstAlias.address) {
+function login(username: string = firstAlias.address) {
   const cipher = new CipherView();
   cipher.type = CipherType.Login;
   cipher.login.username = username;
@@ -48,7 +48,11 @@ describe("alias binding", () => {
 
   it("replaces a binding with exact connectionId plus opaque aliasId identity", () => {
     const cipher = login();
-    const secondAlias = { ...firstAlias, aliasId: "opaque:99", address: "second@sl.test" };
+    const secondAlias = {
+      ...firstAlias,
+      aliasId: "opaque:99",
+      address: "second@sl.test" as SensitiveString,
+    };
     cipher.login.username = secondAlias.address;
 
     bindGeneratedAlias(cipher, {

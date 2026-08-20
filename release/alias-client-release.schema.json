@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/mateoltd/bitwarden-clients/blob/integration/provider-neutral-alias-clients/release/alias-client-release.schema.json",
+  "$id": "https://github.com/mateoltd/bitwarden-clients/blob/integration/provider-neutral-alias-upstream-sync/release/alias-client-release.schema.json",
   "title": "Alias client release manifest",
   "type": "object",
   "required": [
@@ -17,7 +17,25 @@
     "schemaVersion": { "const": 1 },
     "releaseLane": {
       "type": "object",
-      "required": ["branch", "baseCommit", "sourceRepository", "upstreamRepository"]
+      "required": [
+        "branch",
+        "baseCommit",
+        "sourceRepository",
+        "upstreamRepository",
+        "upstreamRef",
+        "upstreamSync"
+      ],
+      "properties": {
+        "upstreamSync": {
+          "type": "object",
+          "required": ["sourceCommit", "upstreamCommit", "mergeBaseCommit"],
+          "properties": {
+            "sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "upstreamCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "mergeBaseCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+          }
+        }
+      }
     },
     "cleanHistoryInputs": {
       "type": "object",

@@ -6,7 +6,6 @@ import { Jsonify } from "type-fest";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { SdkService } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
-// eslint-disable-next-line import/no-restricted-paths -- legacy forwarder state contract
 import { SingleUserState, StateProvider } from "@bitwarden/common/platform/state";
 import { UserKeyEncryptor } from "@bitwarden/common/tools/cryptography/user-key-encryptor";
 import {

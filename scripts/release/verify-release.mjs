@@ -58,7 +58,12 @@ if (fs.existsSync(path.join(repositoryRoot, ".git"))) {
   branch =
     git(["branch", "--show-current"]) || process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME;
   git(["merge-base", "--is-ancestor", manifest.releaseLane.baseCommit, head], { capture: false });
-  const cleanCommits = git(["rev-list", "--reverse", `${manifest.releaseLane.baseCommit}..${head}`])
+  const cleanCommits = git([
+    "rev-list",
+    "--reverse",
+    "--first-parent",
+    `${manifest.releaseLane.baseCommit}..${head}`,
+  ])
     .split("\n")
     .filter(Boolean);
   assert(cleanCommits.length > 0, "Clean release history has no commits after the pinned base");
@@ -80,6 +85,23 @@ if (fs.existsSync(path.join(repositoryRoot, ".git"))) {
   assert(
     branch === manifest.releaseLane.branch,
     `Expected branch ${manifest.releaseLane.branch}, got ${branch}`,
+  );
+  const upstreamSync = manifest.releaseLane.upstreamSync;
+  assert(
+    git(["merge-base", upstreamSync.sourceCommit, upstreamSync.upstreamCommit]) ===
+      upstreamSync.mergeBaseCommit,
+    "Configured upstream merge base differs",
+  );
+  git(["merge-base", "--is-ancestor", upstreamSync.sourceCommit, head], { capture: false });
+  git(["merge-base", "--is-ancestor", upstreamSync.upstreamCommit, head], { capture: false });
+  const syncMerges = git(["rev-list", "--merges", `${manifest.releaseLane.baseCommit}..${head}`])
+    .split("\n")
+    .filter(Boolean);
+  const expectedMergeParents = `${upstreamSync.sourceCommit} ${upstreamSync.upstreamCommit}`;
+  assert(
+    syncMerges.length === 1 &&
+      git(["show", "-s", "--format=%P", syncMerges[0]]) === expectedMergeParents,
+    `Expected one upstream merge with parents ${expectedMergeParents}`,
   );
 } else {
   assert(fs.existsSync(sourceCommitFile), "Exported source commit manifest is missing");
