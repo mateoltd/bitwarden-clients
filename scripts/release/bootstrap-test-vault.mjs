@@ -10,7 +10,7 @@ assert.ok(password, "BITWARDEN_PASSWORD is required");
 
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH || undefined,
-  headless: true,
+  headless: process.env.BITWARDEN_HEADED !== "1",
 });
 try {
   const page = await browser.newPage({ ignoreHTTPSErrors: true });

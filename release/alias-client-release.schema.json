@@ -71,7 +71,10 @@
         }
       }
     },
-    "testInfrastructure": { "type": "object" },
+    "testInfrastructure": {
+      "type": "object",
+      "required": ["pinnedToolchain", "chromium", "simpleLogin", "officialBitwarden", "vault"]
+    },
     "clientToolchain": {
       "type": "object",
       "required": [

@@ -5,7 +5,6 @@ import http from "node:http";
 import https from "node:https";
 import os from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 
 import { chromium } from "playwright";
 
@@ -30,7 +29,6 @@ const bitwardenIdentityBaseUrl = serviceBaseUrl(
   bitwardenIdentityUrl,
   vaultwarden ? "/identity/" : "/",
 );
-const bitwardenDbPath = requiredEnvironment("BITWARDEN_DB_PATH");
 const simpleLoginUrl = new URL(process.env.SIMPLELOGIN_URL ?? "http://127.0.0.1:32769");
 const simpleLoginEmail = requiredEnvironment("SIMPLELOGIN_EMAIL");
 const simpleLoginPassword = requiredEnvironment("SIMPLELOGIN_PASSWORD");
@@ -309,6 +307,20 @@ try {
   );
   await addEditPage.getByRole("button", { name: "Save", exact: true }).click();
   const cipherResponse = await cipherResponsePromise;
+  const cipherRequest = cipherResponse.request().postDataJSON();
+  const requestShape = valueFreeCipherRequestShape(cipherRequest, [
+    simpleLoginToken,
+    aliasAddress,
+    loginPassword,
+    marker,
+  ]);
+  console.log("BITWARDEN_CIPHER_REQUEST_SHAPE", JSON.stringify(requestShape));
+  assert.equal(requestShape.data, "non-empty-string");
+  assert.equal(requestShape.sensitivePlaintext, "absent");
+  assert.equal(requestShape.login, "absent");
+  assert.equal(requestShape.fields, "absent");
+  assert.equal(cipherRequest.data.includes(simpleLoginToken), false);
+  assert.equal(cipherRequest.data.includes(aliasAddress), false);
   assert.equal(cipherResponse.ok(), true);
   const encryptedCipher = await cipherResponse.json();
   const cipherId = encryptedCipher.id;
@@ -323,12 +335,13 @@ try {
     "The encrypted cipher must not contain a hidden alias-binding field",
   );
 
-  const database = new DatabaseSync(bitwardenDbPath, { readOnly: true });
-  const persistedCipher = readCipher(database, cipherId, false);
-  database.close();
-  assert.ok(persistedCipher);
-  assert.equal(persistedCipher.Data.includes(simpleLoginToken), false);
-  assert.equal(persistedCipher.Data.includes(aliasAddress), false);
+  const persistedCipherResponse = await fetch(new URL(`ciphers/${cipherId}`, bitwardenApiBaseUrl), {
+    headers: { authorization: bitwardenAuthorization },
+  });
+  assert.equal(persistedCipherResponse.ok, true);
+  const persistedCipher = await persistedCipherResponse.text();
+  assert.equal(persistedCipher.includes(simpleLoginToken), false);
+  assert.equal(persistedCipher.includes(aliasAddress), false);
 
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/vault`);
   await popup.getByText(marker, { exact: true }).waitFor({ timeout: 20_000 });
@@ -403,7 +416,6 @@ try {
   assert.equal(restartedBrowserStorage.includes(simpleLoginToken), false);
 
   await permanentlyDeleteBitwardenCipher(bitwardenAuthorization, cipherId);
-  await waitForCipherDatabaseState(cipherId, (row) => row === undefined);
   createdCipherId = undefined;
 
   const bitwardenAccessToken = bitwardenAuthorization?.replace(/^Bearer\s+/i, "");
@@ -627,10 +639,25 @@ async function permanentlyDeleteBitwardenCipher(authorization, cipherId) {
     method: "DELETE",
     headers: { authorization },
   });
-  await waitForCipherDatabaseState(cipherId, (row) => row === undefined);
-  if (!response.ok && response.status !== 400) {
+  if (!response.ok && response.status !== 400 && response.status !== 404) {
     assert.fail(`Bitwarden delete returned HTTP ${response.status}`);
   }
+  await waitForCipherApiDeletion(authorization, cipherId);
+}
+
+async function waitForCipherApiDeletion(authorization, cipherId) {
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    const response = await fetch(new URL(`ciphers/${cipherId}`, bitwardenApiBaseUrl), {
+      headers: { authorization },
+    });
+    if (response.status === 400 || response.status === 404) {
+      return;
+    }
+    assert.equal(response.ok, true, `Bitwarden deletion check failed (${response.status})`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Bitwarden cipher ${cipherId} remained visible after deletion`);
 }
 
 async function createSimpleLoginContact(token, aliasId, contact) {
@@ -649,6 +676,23 @@ function requiredEnvironment(name) {
     throw new Error(`${name} is required`);
   }
   return value;
+}
+
+function valueFreeCipherRequestShape(request, sensitiveValues) {
+  const data = typeof request?.data === "string" ? request.data : undefined;
+  return {
+    data: data?.length > 0 ? "non-empty-string" : data == null ? "absent" : "empty-string",
+    fields: Object.hasOwn(request ?? {}, "fields")
+      ? Array.isArray(request.fields)
+        ? `array:${request.fields.length}`
+        : typeof request.fields
+      : "absent",
+    login: Object.hasOwn(request ?? {}, "login") ? typeof request.login : "absent",
+    sensitivePlaintext:
+      data && sensitiveValues.some((value) => value.length > 0 && data.includes(value))
+        ? "present"
+        : "absent",
+  };
 }
 
 async function authenticateSimpleLogin() {
@@ -695,35 +739,6 @@ async function deleteSimpleLoginAlias(token, id) {
     headers: { Authentication: token },
   });
   assert.equal(response.ok, true, `SimpleLogin cleanup failed (${response.status})`);
-}
-
-async function waitForCipherDatabaseState(cipherId, predicate) {
-  const deadline = Date.now() + 15_000;
-  while (Date.now() < deadline) {
-    const database = new DatabaseSync(bitwardenDbPath, { readOnly: true });
-    const row = readCipher(database, cipherId, true);
-    database.close();
-    if (predicate(row)) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`Cipher database state did not settle for ${cipherId}`);
-}
-
-function readCipher(database, cipherId, includeDeletedDate) {
-  if (process.env.BITWARDEN_DB_DIALECT === "vaultwarden") {
-    const columns = includeDeletedDate
-      ? 'data AS "Data", deleted_at AS "DeletedDate"'
-      : 'data AS "Data"';
-    return database
-      .prepare(`SELECT ${columns} FROM ciphers WHERE lower(uuid) = lower(?)`)
-      .get(cipherId);
-  }
-  const columns = includeDeletedDate ? '"Data", "DeletedDate"' : '"Data"';
-  return database
-    .prepare(`SELECT ${columns} FROM "Cipher" WHERE lower("Id") = lower(?)`)
-    .get(cipherId);
 }
 
 function serviceBaseUrl(target, fallbackPath) {

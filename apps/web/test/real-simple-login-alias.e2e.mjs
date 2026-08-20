@@ -3,7 +3,6 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 
 import { chromium } from "playwright";
 
@@ -12,13 +11,11 @@ const browserExecutable = process.env.CHROMIUM_PATH ?? chromium.executablePath()
 const webUrl = new URL(process.env.WEB_URL ?? "https://localhost:8080");
 const bitwardenEmail = requiredEnvironment("BITWARDEN_EMAIL");
 const bitwardenPassword = requiredEnvironment("BITWARDEN_PASSWORD");
-const bitwardenDbPath = requiredEnvironment("BITWARDEN_DB_PATH");
 const simpleLoginUrl = new URL(process.env.SIMPLELOGIN_URL ?? "http://127.0.0.1:32769");
 const simpleLoginEmail = requiredEnvironment("SIMPLELOGIN_EMAIL");
 const simpleLoginPassword = requiredEnvironment("SIMPLELOGIN_PASSWORD");
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), "bitwarden-alias-web-e2e-"));
-const existingDeviceIds = readDeviceIds();
 let context;
 let simpleLoginToken;
 let createdAliasId;
@@ -28,7 +25,7 @@ try {
   simpleLoginToken = await authenticateSimpleLogin();
   context = await chromium.launchPersistentContext(profile, {
     executablePath: browserExecutable,
-    headless: true,
+    headless: process.env.BITWARDEN_HEADED !== "1",
     ignoreHTTPSErrors: true,
     userAgent:
       "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148",
@@ -41,9 +38,17 @@ try {
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.locator('input[type="password"]:visible').fill(bitwardenPassword);
   await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await page.waitForFunction(() => ["#/vault", "#/setup-extension"].includes(location.hash), {
-    timeout: 60_000,
-  });
+  try {
+    await page.waitForFunction(() => ["#/vault", "#/setup-extension"].includes(location.hash), {
+      timeout: 60_000,
+    });
+  } catch (error) {
+    const visibleText = (await page.locator("body").innerText()).trim().slice(0, 2_000);
+    throw new Error(
+      `Real web login did not reach the vault: url=${page.url()} body=${JSON.stringify(visibleText)}`,
+      { cause: error },
+    );
+  }
   if (new URL(page.url()).hash === "#/setup-extension") {
     await page.getByRole("button", { name: "Add it later", exact: true }).click();
     const extensionDialog = page.getByRole("dialog");
@@ -75,7 +80,7 @@ try {
   const hostname = `web-${marker}.integration.test`;
   await page.locator('input[name="website"]').fill(`https://${hostname}/register`);
   await page.getByRole("button", { name: "Recommend an alias", exact: true }).click();
-  await page.getByTestId("alias-recommendation").waitFor();
+  await waitForAliasRecommendation(page);
   await page
     .getByTestId("alias-recommendation")
     .getByRole("button", { name: "Create email alias", exact: true })
@@ -120,6 +125,7 @@ try {
 
   await page.locator('input[name="website"]').fill(`https://${hostname}/sign-up`);
   await page.getByRole("button", { name: "Recommend an alias", exact: true }).click();
+  await waitForAliasRecommendation(page);
   await page
     .getByTestId("alias-recommendation")
     .getByRole("button", { name: aliasAddress, exact: true })
@@ -135,6 +141,7 @@ try {
     .click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
   await page.getByTestId("alias-detail").waitFor({ state: "detached" });
+  await waitForAliasDeletion(createdAliasId, aliasAddress);
   createdAliasId = undefined;
 
   await context.close();
@@ -155,7 +162,6 @@ try {
   if (simpleLoginToken && createdAliasId != null) {
     await deleteSimpleLoginAlias(simpleLoginToken, createdAliasId).catch(() => undefined);
   }
-  removeCreatedWebDevices();
   fs.rmSync(profile, { recursive: true, force: true });
 }
 
@@ -165,6 +171,18 @@ function requiredEnvironment(name) {
     throw new Error(`${name} is required`);
   }
   return value;
+}
+
+async function waitForAliasRecommendation(page) {
+  const recommendation = page.getByTestId("alias-recommendation");
+  const error = page.getByTestId("alias-error");
+  const outcome = await Promise.race([
+    recommendation.waitFor().then(() => "recommendation"),
+    error.waitFor().then(() => "error"),
+  ]);
+  if (outcome === "error") {
+    throw new Error(`Real web alias recommendation failed: ${(await error.innerText()).trim()}`);
+  }
 }
 
 async function dismissBlockingOverlays(page) {
@@ -246,6 +264,24 @@ async function waitForAlias(id, predicate) {
   throw new Error(`SimpleLogin alias ${id} did not reach the expected state`);
 }
 
+async function waitForAliasDeletion(id, address) {
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    const response = await fetch(new URL("api/v2/aliases?page_id=0", simpleLoginUrl), {
+      method: "POST",
+      headers: { Authentication: simpleLoginToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: address }),
+    });
+    assert.equal(response.ok, true, `SimpleLogin deletion check failed (${response.status})`);
+    const json = await response.json();
+    if (!json.aliases?.some((candidate) => candidate.id === id)) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`SimpleLogin alias ${id} remained visible after deletion`);
+}
+
 async function listSimpleLoginContacts(token, aliasId) {
   const response = await fetch(
     new URL(`api/aliases/${aliasId}/contacts?page_id=0`, simpleLoginUrl),
@@ -309,31 +345,4 @@ function assertServiceLogsDoNotContain(secret) {
   );
   assert.equal(logs.status, 0, "SimpleLogin logs must be readable for leakage checks");
   assert.equal(`${logs.stdout}${logs.stderr}`.includes(secret), false);
-}
-
-function readDeviceIds() {
-  const database = new DatabaseSync(bitwardenDbPath, { readOnly: true });
-  const rows =
-    process.env.BITWARDEN_DB_DIALECT === "vaultwarden"
-      ? database.prepare('SELECT uuid AS "Id" FROM devices').all()
-      : database.prepare('SELECT "Id" FROM "Device"').all();
-  database.close();
-  return new Set(rows.map((row) => row.Id));
-}
-
-function removeCreatedWebDevices() {
-  if (process.env.BITWARDEN_DB_DIALECT === "vaultwarden") {
-    // The hosted test database is ephemeral and removed with its pinned container.
-    return;
-  }
-  const database = new DatabaseSync(bitwardenDbPath);
-  const created = database
-    .prepare('SELECT "Id" FROM "Device"')
-    .all()
-    .filter((row) => !existingDeviceIds.has(row.Id));
-  const remove = database.prepare('DELETE FROM "Device" WHERE "Id" = ?');
-  for (const device of created) {
-    remove.run(device.Id);
-  }
-  database.close();
 }
