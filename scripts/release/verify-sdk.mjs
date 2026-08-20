@@ -200,7 +200,10 @@ for (const packageName of [sdk.package, "@bitwarden/alias-sdk-internal"]) {
   );
   assert(lockEntry?.integrity === sdk.integrity, `${packageName} lock integrity differs`);
 }
-assert(sdk.publicRef === "refs/heads/refactor/provider-neutral-alias-v1", "SDK public ref differs");
+assert(
+  sdk.publicRef === "refs/heads/integration/provider-neutral-alias-upstream-sync",
+  "SDK public ref differs",
+);
 const expectedRepository = sdk.sourceRepository.replace(/\.git$/, "");
 const expectedWorkflowRef = `${expectedRepository.replace(/^https:\/\/github\.com\//, "")}/.github/workflows/alias-sdk-release.yml@${sdk.publicRef}`;
 const expectedBuilderId = `${expectedRepository}/actions/runs/${sdk.workflow.runId}/attempts/1`;

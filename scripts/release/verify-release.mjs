@@ -213,11 +213,13 @@ assert(
   commercialOverlay.schemaVersion === 1 &&
     commercialOverlay.graph === "commercial-overlay" &&
     commercialOverlay.package?.name === "@bitwarden/commercial-sdk-internal" &&
-    commercialOverlay.package?.version === "0.2.0-main.950" &&
+    commercialOverlay.package?.version === "0.2.0-main.971" &&
     commercialOverlay.package?.license === "BITWARDEN SOFTWARE DEVELOPMENT KIT LICENSE AGREEMENT" &&
     commercialOverlay.package?.repository === "https://github.com/bitwarden/sdk-internal.git" &&
     commercialOverlay.package?.registryTarball ===
-      "https://registry.npmjs.org/@bitwarden/commercial-sdk-internal/-/commercial-sdk-internal-0.2.0-main.950.tgz" &&
+      "https://registry.npmjs.org/@bitwarden/commercial-sdk-internal/-/commercial-sdk-internal-0.2.0-main.971.tgz" &&
+    commercialOverlay.package?.sha256 ===
+      "ba72bbb41a5b9e20f3eaffa4405d03c470229b668ba2f47bb803eebfddc77968" &&
     /^sha512-[A-Za-z0-9+/]+={0,2}$/.test(commercialOverlay.package?.integrity ?? ""),
   "Commercial SDK overlay evidence is invalid",
 );

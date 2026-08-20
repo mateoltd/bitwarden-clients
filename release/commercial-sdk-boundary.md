@@ -10,11 +10,11 @@ SDK verifier enforces both fields alongside its digest and provenance.
 ## Package evidence
 
 The npm registry metadata for
-[`@bitwarden/commercial-sdk-internal@0.2.0-main.950`](https://www.npmjs.com/package/@bitwarden/commercial-sdk-internal/v/0.2.0-main.950)
+[`@bitwarden/commercial-sdk-internal@0.2.0-main.971`](https://www.npmjs.com/package/@bitwarden/commercial-sdk-internal/v/0.2.0-main.971)
 identifies its license as `BITWARDEN SOFTWARE DEVELOPMENT KIT LICENSE AGREEMENT`, its package
 repository as [`bitwarden/sdk-internal`](https://github.com/bitwarden/sdk-internal), and the exact
-registry tarball and integrity recorded in `release/commercial-sdk-overlay.json`. This is not an
-OSS dependency and is not represented as one.
+registry tarball, SHA-256, and integrity recorded in `release/commercial-sdk-overlay.json`. This is
+not an OSS dependency and is not represented as one.
 
 ## Actual source usage
 

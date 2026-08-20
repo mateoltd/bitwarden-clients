@@ -48,13 +48,13 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "2f60af391fe436aacd21e63dfa1c08f065c39e2f10eb2f3adeaad253f30c93b2"
+          "content": "ecf9c2ae88b049d14787ba05128a55e410a1cc4d2a48d212fd31f81b23cc8741"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "3601605"
+          "value": "3521400"
         }
       ]
     },
@@ -65,7 +65,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "6df433d0ed027fc969e1770981eb9da761968b4e7eb1ccee18c849eea1a89b96"
+          "content": "0f6c6e72c82e3ea3b425ef5f357857ebc67624b778d07ff06bd74a6e27a18881"
         }
       ],
       "properties": [
@@ -82,7 +82,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "8605c42e7469e5d545a3387c604f576d2e6ccbe240c7f2b513a5465d52bab09e"
+          "content": "c762a61f67dccc6b80d02caaf6ffb4240f2f37ead84018651406f73e04566a7c"
         }
       ],
       "properties": [
@@ -116,7 +116,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "25fef584313910d899939a6a67647a769938cdd9a262469826993f45cdb1867d"
+          "content": "9f63b2ace44cfde414a2c0598fbed9eba902a6339db9ddc0cf8048c5d38c01ab"
         }
       ],
       "properties": [
@@ -133,7 +133,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "0e67b998a572e93681016bdc3238a70f46b1776c6a9f283f8cf4f7427f239725"
+          "content": "3b2a30a04121bfdababe17a5980e4f76aa6685483cac336fc118e48781e71eaf"
         }
       ],
       "properties": [
@@ -150,13 +150,13 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "4a601d680969df230fe64736851b4d9af15b82148a91069a8f1d45a8632cc752"
+          "content": "a9f5d94824ec3cd561de2951c3f8f656f989cf468bdaf5460af9d99d466143a4"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "39082140"
+          "value": "38370012"
         }
       ]
     },
@@ -218,13 +218,13 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "50e8563f912a095fbbe7ecca5a481d9be9d788bc3e4b5b7769ce886c6146e435"
+          "content": "cfcc6fc526a07b5debe46047121b24a60c7bb6b9eececf788b66e2cb41a95f54"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "3613801"
+          "value": "3533356"
         }
       ]
     },
@@ -235,7 +235,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "b25dd131d57007da3685f0601f07cf5869c6955f07f5469a112e8e1c86337adc"
+          "content": "0148c194a6d13a67500df66df25017b5857de909a3677add096528854472022a"
         }
       ],
       "properties": [
@@ -269,7 +269,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "b753d21eefbfd223a15a85bb438d563218eeb06e12bd4ddddde0f7e7a133b2c8"
+          "content": "d0ccc389fd556619a4ab18bb5efbafff3d8e5947daeb7bced37812a18eea6092"
         }
       ],
       "properties": [
@@ -286,7 +286,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "0e67b998a572e93681016bdc3238a70f46b1776c6a9f283f8cf4f7427f239725"
+          "content": "3b2a30a04121bfdababe17a5980e4f76aa6685483cac336fc118e48781e71eaf"
         }
       ],
       "properties": [
@@ -303,13 +303,13 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "b0cf421ab8e4be80905c9025f3eb743101634f6cd7be688d815b60c8902d3249"
+          "content": "6c05a862bca1092968b6b68263378766c105747e048e8d51e41d6cd1bd4ef2b0"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "6482187"
+          "value": "6314656"
         }
       ]
     },
@@ -320,13 +320,13 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "94b2edafd5f021e2e90056e2b8d66d56d038ee8277950cf3e51c1debf66b9463"
+          "content": "c05feae9c9df7b596e19a49cced0e9bcc0f1f22bee2e9bc5ae62713f74541b0c"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "25415336"
+          "value": "28633232"
         }
       ]
     },
@@ -354,13 +354,13 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "ab9ae4e1994bfdfd32fc8287ff6346b8ca0ce4a72046ab8361a978d737162065"
+          "content": "c89219814bff1755add267bf86909b065e1a0a0e7ae5f5b54715224371184801"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "400497"
+          "value": "395159"
         }
       ]
     },
@@ -371,7 +371,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "98d4e3d6a508990842be749162452a7d6c03812b7ca7d62cdf52e023022b1f1d"
+          "content": "149c6713823fe3f8a1e62d756808f6ce1adef33cbab71bee761437248ccadd89"
         }
       ],
       "properties": [
@@ -405,7 +405,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "1c4d5ab8805ab48404e62dac61fe55214c5593f585cb72f0f2ffbeff32ff1733"
+          "content": "d51d5182eaffc446f3a3e59a5a040dbf480416dd14d89901fe9f1093ba57abe6"
         }
       ],
       "properties": [
@@ -422,7 +422,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "0e67b998a572e93681016bdc3238a70f46b1776c6a9f283f8cf4f7427f239725"
+          "content": "3b2a30a04121bfdababe17a5980e4f76aa6685483cac336fc118e48781e71eaf"
         }
       ],
       "properties": [
@@ -439,13 +439,13 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "196eb1443be779ad0e210c45eaa08c28307a1d1749c97fbba37f060a08eae7b9"
+          "content": "e6fe06d03de5052c9e0a4fdf3679d2b8fc657970d6fe01c1b17e2d71c48b888a"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "162695965"
+          "value": "159670617"
         }
       ]
     },
@@ -473,13 +473,13 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "4778a790854850a0859ee6f6fd31847ac8b1582f5edc65fd1d1f1da58659628b"
+          "content": "2ae2da7ab12aa1ce0db6405950c753e05fcc2dd53294cfb320ed4478f80c7712"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "514317"
+          "value": "516633"
         }
       ]
     },
@@ -490,7 +490,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "f119227aa8409d4ce3b0f4695874f1afa0158eca3c758487df1e2d78eeab6fc0"
+          "content": "4e24693338c63ddaf041235bdbf890b81892c41a734e09881fc5277c0298d530"
         }
       ],
       "properties": [
@@ -524,7 +524,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "ab642909fe1d8c6bd37c2be95fab39e4e35022c7a527e6879f6eb304932fba2c"
+          "content": "fdd93c51c43e6c6f82fd0118433edc8366e7593eed12459ddcd0e7b70519278c"
         }
       ],
       "properties": [
@@ -541,7 +541,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "0e67b998a572e93681016bdc3238a70f46b1776c6a9f283f8cf4f7427f239725"
+          "content": "3b2a30a04121bfdababe17a5980e4f76aa6685483cac336fc118e48781e71eaf"
         }
       ],
       "properties": [
@@ -558,13 +558,13 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "4409765d564706980dc2b729cd447060c98af568b0dc9e7379bcb8f8ff007b43"
+          "content": "1f40d1c145056b014184b678b57c61ac8c173efc2499f178066737ebb1647394"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "11082457"
+          "value": "11003112"
         }
       ]
     },
@@ -5412,10 +5412,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/h2@0.4.15",
+      "bom-ref": "pkg:cargo/h2@0.4.16",
       "name": "h2",
-      "version": "0.4.15",
-      "purl": "pkg:cargo/h2@0.4.15",
+      "version": "0.4.16",
+      "purl": "pkg:cargo/h2@0.4.16",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -19311,6 +19311,7 @@
         "pkg:cargo/getrandom@0.3.4",
         "pkg:cargo/getrandom@0.4.3",
         "pkg:cargo/http@1.4.2",
+        "pkg:cargo/mockall@0.14.0",
         "pkg:cargo/rand@0.10.2",
         "pkg:cargo/reqwest-middleware@0.5.2",
         "pkg:cargo/reqwest@0.13.4",
@@ -20063,6 +20064,7 @@
         "pkg:cargo/tracing-subscriber@0.3.23",
         "pkg:cargo/tracing-web@0.1.3",
         "pkg:cargo/tracing@0.1.44",
+        "pkg:cargo/tsify-macros@0.5.6",
         "pkg:cargo/tsify@0.5.6",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
@@ -20959,7 +20961,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/h2@0.4.15",
+      "ref": "pkg:cargo/h2@0.4.16",
       "dependsOn": [
         "pkg:cargo/atomic-waker@1.1.2",
         "pkg:cargo/bytes@1.12.1",
@@ -21113,7 +21115,7 @@
         "pkg:cargo/bytes@1.12.1",
         "pkg:cargo/futures-channel@0.3.33",
         "pkg:cargo/futures-core@0.3.33",
-        "pkg:cargo/h2@0.4.15",
+        "pkg:cargo/h2@0.4.16",
         "pkg:cargo/http-body@1.1.0",
         "pkg:cargo/http@1.4.2",
         "pkg:cargo/httparse@1.10.1",
@@ -21960,7 +21962,7 @@
         "pkg:cargo/bytes@1.12.1",
         "pkg:cargo/futures-core@0.3.33",
         "pkg:cargo/futures-util@0.3.33",
-        "pkg:cargo/h2@0.4.15",
+        "pkg:cargo/h2@0.4.16",
         "pkg:cargo/http-body-util@0.1.4",
         "pkg:cargo/http-body@1.1.0",
         "pkg:cargo/http@1.4.2",

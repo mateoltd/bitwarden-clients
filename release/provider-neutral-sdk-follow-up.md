@@ -1,16 +1,15 @@
 # Provider-neutral alias SDK follow-up
 
-The provider-neutral alias wire and schema are owned by sibling branch
-`refactor/provider-neutral-alias-v1`. The upstream client sync at
-`660766841b566440e1faaeeb92aecc26e1503bed` deliberately retains the currently verified
-`0.3.0-alias-provider-neutral.1` artifact from SDK commit
-`99c33ed26e51421224a4daecdf838057f1d66e75`. It does not substitute Bitwarden's unqualified
-`0.2.0-main.971` package or define a competing wire format.
+The provider-neutral alias wire and schema are owned by the public SDK source branch
+`integration/provider-neutral-alias-upstream-sync`. This client state is based on upstream commit
+`b52a472fccba2727cba9cd22257d551599c43e4f` and pins the provenance-complete
+`0.3.0-alias-provider-neutral.1` candidate from SDK commit
+`106aad00f85fb0766c2d5ede534a39b792f48789`, release-candidate run `32362581586`, and candidate
+artifact `9405727965`. The candidate preserves the provider-neutral v1 alias contract and includes
+the compatibility APIs from upstream SDK `0.2.0-main.971`. It does not substitute Bitwarden's
+unqualified SDK package or define a competing wire format.
 
-The next repin must use a public, provenance-complete provider-neutral candidate that preserves the
-v1 alias contract and incorporates the SDK compatibility required by upstream
-`0.2.0-main.971`. Do not repin until that qualified candidate exists. Then update these exact client
-boundaries together:
+The compatibility repin updates these client boundaries together:
 
 1. Repin `@bitwarden/sdk-internal` and `@bitwarden/alias-sdk-internal` through
    `scripts/release/repin-sdk.mjs`, including the source commit, artifact digest, handoff, producer
@@ -40,5 +39,5 @@ boundaries together:
    `apps/cli/src/tools/alias-reconciliation/alias-reconciliation.service.ts`, plus browser,
    desktop, and web alias adapters that consume the shared identity.
 8. Run the schema rejection, journal convergence, restart, cross-device, real provider, encrypted
-   vault, clean-room, SBOM, and provenance gates before changing the manifest's declared alias
+   vault, clean-room, SBOM, and provenance gates without changing the manifest's declared alias
    schema version.

@@ -1,9 +1,10 @@
 import {
-  CipherView as SdkCipherView,
+  CipherView as AliasSdkCipherView,
   bind_alias_reference,
   create_alias_reference,
   parse_alias_reference,
 } from "@bitwarden/alias-sdk-internal";
+import { CipherView as SdkCipherView } from "@bitwarden/sdk-internal";
 
 import {
   EmailAliasIdentity,
@@ -98,6 +99,7 @@ export function bindGeneratedAlias(
 
   if (
     cipher.type !== CipherType.Login ||
+    !cipher.login ||
     !binding ||
     normalizeEmailAliasAddress(generated.credential) !==
       normalizeEmailAliasAddress(binding.address) ||
@@ -131,5 +133,8 @@ export function bindAliasReferenceToSdkCipher(
   }
 
   const encoded = create_alias_reference(binding);
-  return bind_alias_reference(encoded, sdkCipher).cipher;
+  // The verified public candidate and commercial .971 overlay share this wire shape. Their
+  // separately generated UUID brands are intentionally isolated at this single SDK boundary.
+  return bind_alias_reference(encoded, sdkCipher as unknown as AliasSdkCipherView)
+    .cipher as unknown as SdkCipherView;
 }
