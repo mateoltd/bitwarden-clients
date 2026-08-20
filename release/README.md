@@ -8,7 +8,8 @@ store, registry, release, signing, or notarization operation is part of the lane
 
 `alias-client-release.json` is the single release manifest. It pins the starting client commit,
 toolchains, canonical SDK artifact and source commit, checksum-pinned extension test Chromium, real
-provider test deployment, vault test backend, supported targets, and explicit handoffs. `npm run
+provider test deployment, official Bitwarden test server, supported targets, and explicit
+handoffs. `npm run
 release:verify` fails if the checked-out branch does not descend from the pinned base, the SDK
 archive or lock entry differs, a target is duplicated, a lock is missing, or commercial source is
 present in an OSS clean room.
@@ -39,6 +40,23 @@ and uploads it without publishing it.
 Chromium extension launch checks use the exact Chrome for Testing archive declared in the manifest.
 The runtime installer verifies Playwright's revision and browser version, the archive byte count,
 SHA-256, member paths, executable, and reported version before any extension test starts.
+
+The qualification workflow builds `scripts/release/pinned-toolchain.Dockerfile` from the exact
+Node, Python, and Rust image digests in the manifest. A fresh OSS export is mounted into that
+container for `npm ci`; `release:verify-sdk-install` then requires both SDK dependency names to be
+physical installs and loads the pinned WASM package from browser, web, desktop, CLI, and common
+library package contexts.
+
+The positive headed lane uses official Bitwarden Lite `2026.7.2` at the exact image digest and
+source commit in the manifest. Its own Admin service creates the SQLite schema before a local-only
+account is bootstrapped. Browser, web, desktop/Electron, encrypted sync, restart/unlock,
+send/reply, and 10,000-record cross-device suites all run against that server.
+
+Vaultwarden `1.37.1` remains a negative compatibility check only. The browser emits a value-free
+request shape proving that the top-level `data` field is a non-empty opaque string, contains none
+of the known token, address, login, or marker plaintext, and sends no legacy `login` or `fields`
+payload. The check requires Vaultwarden to return HTTP 400 and log `Data missing`. The v1 wire
+schema is not altered and no alternate carrier or compatibility shim is provided.
 
 The metadata job emits adjacent CycloneDX SBOMs, SLSA-format provenance statements,
 source-commit manifests, per-file SHA-256 files, and a combined `SHA256SUMS`. Candidates are

@@ -146,6 +146,34 @@ async function vaultRequest(
   return { response, text, json };
 }
 
+async function createEncryptedCiphers(
+  profile: AuthenticatedProfile,
+  requests: CipherRequest[],
+  concurrency = 16,
+): Promise<string[]> {
+  const ids: string[] = [];
+  for (let index = 0; index < requests.length; index += concurrency) {
+    const batch = requests.slice(index, index + concurrency);
+    const created = await Promise.all(
+      batch.map(async (request) => {
+        const response = await vaultRequest(profile.accessToken, "/ciphers", {
+          method: "POST",
+          body: JSON.stringify(request),
+        });
+        const id = response.json?.id ?? response.json?.Id;
+        if (response.response.status !== 200 || typeof id !== "string") {
+          throw new Error(
+            `Bitwarden fixture create failed (${response.response.status}): ${response.text}`,
+          );
+        }
+        return id;
+      }),
+    );
+    ids.push(...created);
+  }
+  return ids;
+}
+
 function resetSimpleLoginTestRateLimits(): void {
   const container = process.env["SIMPLELOGIN_REDIS_CONTAINER"] ?? "alias-core-sl-redis";
   const keys = execFileSync(
@@ -287,14 +315,35 @@ async function removeBitwardenTestAliasConnections(profile: AuthenticatedProfile
     .filter(isAliasConnectionCipher)
     .map((cipher) => cipher.id)
     .filter((id): id is string => id !== undefined);
-  for (let index = 0; index < ids.length; index += 500) {
+  await deleteCiphers(profile, ids);
+}
+
+async function deleteCiphers(profile: AuthenticatedProfile, ids: string[]): Promise<void> {
+  for (let index = 0; index < ids.length; index += 100) {
     const deleted = await vaultRequest(profile.accessToken, "/ciphers", {
       method: "DELETE",
-      body: JSON.stringify({ ids: ids.slice(index, index + 500) }),
+      body: JSON.stringify({ ids: ids.slice(index, index + 100) }),
     });
     if (deleted.response.status !== 200) {
-      throw new Error(`Bitwarden alias carrier cleanup failed (${deleted.response.status})`);
+      throw new Error(
+        `Bitwarden cipher cleanup failed (${deleted.response.status}): ${deleted.text}`,
+      );
     }
+  }
+}
+
+async function removeBitwardenQualificationFixtures(profile: AuthenticatedProfile): Promise<void> {
+  const adapter = new RealVaultCipherAdapter(profile);
+  const ids = (await adapter.fullSync())
+    .filter((cipher) => cipher.name?.startsWith("alias-sync-load-"))
+    .map((cipher) => cipher.id)
+    .filter((id): id is string => id !== undefined);
+  await deleteCiphers(profile, ids);
+  const remaining = (await adapter.fullSync()).filter((cipher) =>
+    cipher.name?.startsWith("alias-sync-load-"),
+  );
+  if (remaining.length !== 0) {
+    throw new Error(`Bitwarden fixture cleanup left ${remaining.length} ciphers`);
   }
 }
 
@@ -324,7 +373,7 @@ describeIntegration("real schema-v1 alias cross-device convergence", () => {
     const marker = `alias-sync-load-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
     const fixtureIds: string[] = [];
     const aliasIds: number[] = [];
-    let profiles: AuthenticatedProfile[] = [];
+    const profiles: AuthenticatedProfile[] = [];
     let providerToken = "";
     let phase = "setup";
 
@@ -346,14 +395,15 @@ describeIntegration("real schema-v1 alias cross-device convergence", () => {
       }
       providerToken = simpleLoginBody.api_key;
 
-      profiles = await Promise.all(
-        directories.map((directory) =>
-          authenticateBitwardenProfile(bitwardenEmail, bitwardenPassword, directory),
-        ),
-      );
+      for (const directory of directories) {
+        profiles.push(
+          await authenticateBitwardenProfile(bitwardenEmail, bitwardenPassword, directory),
+        );
+      }
       expect(new Set(profiles.map((profile) => profile.directory)).size).toBe(3);
       expect(new Set(profiles.map((profile) => profile.userId)).size).toBe(1);
       await removeBitwardenTestAliasConnections(profiles[0]);
+      await removeBitwardenQualificationFixtures(profiles[0]);
 
       const fixtureViews = Array.from({ length: fixtureSize }, (_, index) => {
         const view = new CipherView();
@@ -374,18 +424,10 @@ describeIntegration("real schema-v1 alias cross-device convergence", () => {
             encryptedFor: profiles[0].userId,
           }),
       );
-      const fixtureImport = JSON.stringify({
-        folders: [],
-        ciphers: fixtureRequests,
-        folderRelationships: [],
-      });
-      expect(fixtureImport).not.toContain(marker);
-      expect(fixtureImport).not.toContain(providerToken);
-      const imported = await vaultRequest(profiles[0].accessToken, "/ciphers/import", {
-        method: "POST",
-        body: fixtureImport,
-      });
-      expect(imported.response.status).toBe(200);
+      const encryptedFixturePayload = JSON.stringify(fixtureRequests);
+      expect(encryptedFixturePayload).not.toContain(marker);
+      expect(encryptedFixturePayload).not.toContain(providerToken);
+      fixtureIds.push(...(await createEncryptedCiphers(profiles[0], fixtureRequests)));
 
       const adapters = profiles.map((profile) => new RealVaultCipherAdapter(profile));
       const afterImport = await adapters[0].fullSync();
@@ -598,11 +640,7 @@ describeIntegration("real schema-v1 alias cross-device convergence", () => {
         cipher: Cipher.fromSdkCipher(carrierEncryption.cipher)!,
         encryptedFor: profiles[0].userId,
       });
-      const carrierBackup = JSON.stringify({
-        folders: [],
-        ciphers: [carrierRequest],
-        folderRelationships: [],
-      });
+      const carrierBackup = JSON.stringify(carrierRequest);
       expect(carrierBackup).not.toContain(providerToken);
       expect(carrierBackup).not.toContain(connectionId);
       expect(
@@ -614,13 +652,13 @@ describeIntegration("real schema-v1 alias cross-device convergence", () => {
       ).toBe(200);
       expect(
         (
-          await vaultRequest(profiles[0].accessToken, "/ciphers/import", {
+          await vaultRequest(profiles[0].accessToken, "/ciphers", {
             method: "POST",
             body: carrierBackup,
           })
         ).response.status,
       ).toBe(200);
-      phase = "encrypted import after restore";
+      phase = "encrypted restore";
       await adapters[0].fullSync();
       const restored = await findAliasConnectionVaultPayloads(adapters[0], profiles[0].userId);
       expect(
@@ -696,13 +734,12 @@ describeIntegration("real schema-v1 alias cross-device convergence", () => {
             }
           })
           .map((cipher) => cipher.id!);
-        const ids = [...fixtureIds, ...carrierIds];
-        for (let index = 0; index < ids.length; index += 500) {
-          await vaultRequest(cleanupProfile.accessToken, "/ciphers", {
-            method: "DELETE",
-            body: JSON.stringify({ ids: ids.slice(index, index + 500) }),
-          }).catch((): void => undefined);
-        }
+        const markerIds = views
+          .filter((cipher) => cipher.name?.startsWith(marker))
+          .map((cipher) => cipher.id!);
+        const ids = [...new Set([...fixtureIds, ...markerIds, ...carrierIds])];
+        await deleteCiphers(cleanupProfile, ids);
+        await removeBitwardenQualificationFixtures(cleanupProfile);
       }
       removeSimpleLoginTestAliases(aliasIds);
       for (const profile of profiles) {

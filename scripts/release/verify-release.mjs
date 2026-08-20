@@ -5,6 +5,21 @@ import { spawnSync } from "node:child_process";
 import { assert, git, readJson, readManifest, repositoryRoot, run } from "./lib.mjs";
 
 run(process.execPath, ["scripts/release/verify-sdk.mjs"]);
+const sdkInstallDirectories = ["sdk-internal", "alias-sdk-internal"].map((packageName) =>
+  path.join(repositoryRoot, "node_modules/@bitwarden", packageName),
+);
+const installedSdkCount = sdkInstallDirectories.filter((directory) =>
+  fs.existsSync(directory),
+).length;
+assert(
+  installedSdkCount === 0 || installedSdkCount === sdkInstallDirectories.length,
+  "SDK dependencies are only partially installed",
+);
+if (installedSdkCount === sdkInstallDirectories.length) {
+  run(process.execPath, ["scripts/release/verify-sdk-install.mjs"]);
+} else {
+  console.log("Skipped physical SDK verification before dependency installation");
+}
 run(process.execPath, ["scripts/release/scope-audit.mjs"]);
 
 const manifest = readManifest();
@@ -50,6 +65,22 @@ assert(
     headedWorkflow.includes("provider_upstream_ref:"),
   "Headed provider repository and refs are not parameterizable",
 );
+const officialBitwarden = manifest.testInfrastructure.officialBitwarden;
+assert(
+  officialBitwarden.repository === "https://github.com/bitwarden/server.git" &&
+    /^[0-9a-f]{40}$/.test(officialBitwarden.sourceCommit) &&
+    officialBitwarden.image ===
+      `ghcr.io/bitwarden/lite:${officialBitwarden.version}@sha256:ca1007fb3a8e973692ca1b92b87e52d2101976ef9bdf76d8639682485a5866dc`,
+  "Official Bitwarden test server is not pinned to the maintained Lite image",
+);
+for (const expected of [
+  officialBitwarden.image,
+  manifest.testInfrastructure.vault.image,
+  "bitwarden-test-service.mjs start-official",
+  "verify-vaultwarden-rejection.mjs",
+]) {
+  assert(headedWorkflow.includes(expected), `Headed workflow is missing: ${expected}`);
+}
 const sourceCommitFile = path.join(repositoryRoot, ".release-source-commit");
 let head;
 let branch;
@@ -254,6 +285,18 @@ assert(
   "Chromium runtime size is invalid",
 );
 assert(/^[0-9a-f]{64}$/.test(chromiumRuntime.sha256), "Chromium runtime SHA-256 is invalid");
+
+const toolchainDockerfile = fs.readFileSync(
+  path.join(repositoryRoot, "scripts/release/pinned-toolchain.Dockerfile"),
+  "utf8",
+);
+for (const image of Object.values(manifest.testInfrastructure.pinnedToolchain.containerImages)) {
+  assert(toolchainDockerfile.includes(image), `Pinned toolchain Dockerfile is missing ${image}`);
+}
+assert(
+  toolchainDockerfile.includes(`npm install --global npm@${manifest.clientToolchain.npm}`),
+  "Pinned toolchain Dockerfile npm version differs from the manifest",
+);
 
 if (process.env.OSS_CLEAN_ROOM === "1") {
   assert(
