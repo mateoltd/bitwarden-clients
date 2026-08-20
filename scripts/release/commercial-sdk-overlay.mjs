@@ -17,7 +17,8 @@ if (
   overlay.package?.name !== "@bitwarden/commercial-sdk-internal" ||
   typeof overlay.package.version !== "string" ||
   typeof overlay.package.registryTarball !== "string" ||
-  !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(overlay.package.integrity ?? "")
+  !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(overlay.package.integrity ?? "") ||
+  !/^[0-9a-f]{64}$/.test(overlay.package.sha256 ?? "")
 ) {
   throw new Error("Commercial SDK overlay is invalid");
 }
@@ -25,7 +26,9 @@ if (
 const response = await fetch(overlay.package.registryTarball);
 assert(response.ok, `Commercial SDK download failed with HTTP ${response.status}`);
 const archive = Buffer.from(await response.arrayBuffer());
+const sha256 = createHash("sha256").update(archive).digest("hex");
 const integrity = `sha512-${createHash("sha512").update(archive).digest("base64")}`;
+assert(sha256 === overlay.package.sha256, "Commercial SDK archive SHA-256 differs");
 assert(integrity === overlay.package.integrity, "Commercial SDK archive integrity differs");
 
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "bitwarden-commercial-sdk-"));

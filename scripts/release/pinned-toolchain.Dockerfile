@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 FROM docker.io/library/node:24.17.0-bookworm-slim@sha256:862263c612aa437e3037674b85419622a9d93bff80aa1eee5398dfe686375532 AS node
-FROM docker.io/library/rust:1.96.0-slim-bookworm@sha256:4732ca96fd086cb9be682050c3f0176288eebaac2b80aa2bcefccfaf198e1950 AS rust
+FROM docker.io/library/rust:1.97.1-slim-bookworm@sha256:2775a09d208ff0d7c1f50490c45b62db929e87ba1dcbc3f2132ac71a704bcdd3 AS rust
 FROM docker.io/library/python:3.14.2-slim-bookworm@sha256:e87711ef5c86aaeaa7031718a69db79d334d94c545c709583f651b8185870941
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
@@ -11,7 +11,7 @@ COPY --from=rust /usr/local/rustup /usr/local/rustup
 
 ENV CARGO_HOME=/usr/local/cargo \
     RUSTUP_HOME=/usr/local/rustup \
-    RUST_VERSION=1.96.0 \
+    RUST_VERSION=1.97.1 \
     PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
@@ -29,6 +29,6 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && test "$(node --version)" = "v24.17.0" \
     && test "$(npm --version)" = "11.18.0" \
     && test "$(python3 --version)" = "Python 3.14.2" \
-    && test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+    && test "$(rustc --version | awk '{print $2}')" = "1.97.1"
 
 WORKDIR /workspace

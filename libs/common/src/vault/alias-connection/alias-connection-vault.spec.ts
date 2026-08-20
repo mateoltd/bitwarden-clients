@@ -1,7 +1,12 @@
 import { randomBytes } from "crypto";
 
 import { SensitiveString } from "@bitwarden/alias-sdk-internal";
-import { PasswordManagerClient, TokenProvider } from "@bitwarden/sdk-internal";
+import {
+  EncString,
+  PasswordManagerClient,
+  PureCrypto,
+  TokenProvider,
+} from "@bitwarden/sdk-internal";
 
 import { asUuid } from "../../platform/abstractions/sdk/sdk.service";
 import {
@@ -47,13 +52,17 @@ describe("alias connection vault carrier", () => {
 
   beforeAll(async () => {
     client = new PasswordManagerClient(new EmptyTokenProvider());
-    const userKey = randomBytes(64).toString("base64");
-    const keyPair = client.crypto().make_key_pair(userKey);
+    const userKeyBytes = randomBytes(64);
+    const userKey = userKeyBytes.toString("base64");
+    const wrappedPrivateKey = PureCrypto.symmetric_encrypt_bytes(
+      PureCrypto.rsa_generate_keypair(),
+      userKeyBytes,
+    ) as EncString;
     await client.crypto().initialize_user_crypto({
       userId: asUuid(userId),
       email: "alias-sync@bitwarden.test",
       kdfParams: { pBKDF2: { iterations: 600_000 } },
-      accountCryptographicState: { V1: { private_key: keyPair.userKeyEncryptedPrivateKey } },
+      accountCryptographicState: { V1: { private_key: wrappedPrivateKey } },
       method: { decryptedKey: { decrypted_user_key: userKey } },
     });
     await client.crypto().initialize_org_crypto({ organizationKeys: new Map() });

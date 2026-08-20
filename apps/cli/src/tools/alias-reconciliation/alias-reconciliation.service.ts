@@ -3,6 +3,7 @@ import {
   AliasConnection,
   AliasReconciliationOutcome,
   AliasReconciliationPlan,
+  CipherView as AliasSdkCipherView,
   apply_alias_reconciliation,
   plan_alias_reconciliation,
 } from "@bitwarden/alias-sdk-internal";
@@ -16,7 +17,7 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { SimpleLoginAliasError, SimpleLoginAliasService } from "@bitwarden/generator-core";
-import { CipherId } from "@bitwarden/sdk-internal";
+import { CipherId, CipherView as SdkCipherView } from "@bitwarden/sdk-internal";
 
 export const ALIAS_RECONCILIATION_REPORT_VERSION = 2 as const;
 
@@ -107,6 +108,16 @@ export type AliasReconciliationReport = AliasReconciliationAnalysis & {
   };
   changes: AliasReconciliationChange[];
 };
+
+function toAliasSdkCipherView(cipher: SdkCipherView): AliasSdkCipherView {
+  // The verified public candidate and commercial .971 overlay share this wire shape. Keep their
+  // separately generated UUID brands isolated at the reconciliation SDK boundary.
+  return cipher as unknown as AliasSdkCipherView;
+}
+
+function fromAliasSdkCipherView(cipher: AliasSdkCipherView): SdkCipherView {
+  return cipher as unknown as SdkCipherView;
+}
 
 function cipherReference(cipher: CipherView): AliasReconciliationCipher {
   return {
@@ -416,7 +427,7 @@ export class AliasReconciliationService {
     );
     const sdkCiphers = loginCiphers
       .filter((cipher) => cipher.aliasBinding !== undefined)
-      .map((cipher) => cipher.toSdkCipherView());
+      .map((cipher) => toAliasSdkCipherView(cipher.toSdkCipherView()));
     const beforePlan = plan_alias_reconciliation(connection.connectionId, aliases, sdkCiphers);
     const plannedChangeIds = new Set(
       beforePlan.actions.map((action) => cipherIdString(action.cipher_id)),
@@ -444,7 +455,9 @@ export class AliasReconciliationService {
 
       for (const cipherId of changedIds) {
         const sdkCipher = updatedById.get(cipherId);
-        const view = sdkCipher ? CipherView.fromSdkCipherView(sdkCipher) : undefined;
+        const view = sdkCipher
+          ? CipherView.fromSdkCipherView(fromAliasSdkCipherView(sdkCipher))
+          : undefined;
         const action = actionByCipherId.get(cipherId);
         const aliasId = action?.alias_id ?? view?.aliasBinding?.aliasId;
         const alias = aliases.find((candidate) => candidate.identity.aliasId === aliasId);

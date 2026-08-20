@@ -3,11 +3,12 @@
   "graph": "commercial-overlay",
   "package": {
     "name": "@bitwarden/commercial-sdk-internal",
-    "version": "0.2.0-main.950",
+    "version": "0.2.0-main.971",
     "license": "BITWARDEN SOFTWARE DEVELOPMENT KIT LICENSE AGREEMENT",
     "repository": "https://github.com/bitwarden/sdk-internal.git",
-    "registryTarball": "https://registry.npmjs.org/@bitwarden/commercial-sdk-internal/-/commercial-sdk-internal-0.2.0-main.950.tgz",
-    "integrity": "sha512-17NkUfcm6HBxribbRtvVjCFkRfeZXOyta5T4yDDWnGPg/O9Vv72k1rksmz+rqlNdrPVG/dM3qdQ9MJu0PU1XWw=="
+    "registryTarball": "https://registry.npmjs.org/@bitwarden/commercial-sdk-internal/-/commercial-sdk-internal-0.2.0-main.971.tgz",
+    "integrity": "sha512-nsHR7y/vq329EWFN2zXB+i/m9L8kBc8YQ/yd9VARxq+drueep5ktiMoqBWOyXNQWmAPRh0CMIUmDTZgMw6+VrQ==",
+    "sha256": "ba72bbb41a5b9e20f3eaffa4405d03c470229b668ba2f47bb803eebfddc77968"
   },
   "consumers": [
     "bitwarden_license/bit-browser/webpack.config.js",

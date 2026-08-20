@@ -5,15 +5,15 @@ pinned SDK artifact:
 
 - Client source: [`mateoltd/bitwarden-clients`](https://github.com/mateoltd/bitwarden-clients),
   branch `refs/heads/integration/provider-neutral-alias-upstream-sync`, based exactly on Bitwarden
-  upstream `main` at `660766841b566440e1faaeeb92aecc26e1503bed`. The provider-neutral client
+  upstream `main` at `b52a472fccba2727cba9cd22257d551599c43e4f`. The provider-neutral client
   state at `6f7f3d461b34315efe8df7d9c033149c4153947e` was rebased with merge topology
   preservation from source merge base `1f881babc15eb7d3a88cad41730ce167d8e49a41`. The source
   commit itself is not part of the rebased ancestry, and the final release commit is verified at
   release time.
 - SDK source: [`mateoltd/bitwarden-sdk-internal`](https://github.com/mateoltd/bitwarden-sdk-internal),
-  ref `refs/heads/refactor/provider-neutral-alias-v1`, commit
-  `99c33ed26e51421224a4daecdf838057f1d66e75`, workflow run `31928076589`, artifact
-  `alias-sdk-release-candidate-99c33ed26e51421224a4daecdf838057f1d66e75`. The complete
+  ref `refs/heads/integration/provider-neutral-alias-upstream-sync`, commit
+  `106aad00f85fb0766c2d5ede534a39b792f48789`, workflow run `32362581586`, artifact
+  `alias-sdk-release-candidate-106aad00f85fb0766c2d5ede534a39b792f48789`. The complete
   candidate checksum index, schema-3 handoff manifest, CycloneDX SBOM, Sigstore bundle, and
   GitHub-hosted SLSA attestations are pinned in the release manifest and vendor evidence.
 - Provider operations harness:

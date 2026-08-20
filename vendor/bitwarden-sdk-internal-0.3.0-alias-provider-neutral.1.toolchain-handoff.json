@@ -4,13 +4,13 @@
   "sdkProducer": {
     "evidence": {
       "path": "vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.1.build-environment.txt",
-      "sha256": "f119227aa8409d4ce3b0f4695874f1afa0158eca3c758487df1e2d78eeab6fc0"
+      "sha256": "4e24693338c63ddaf041235bdbf890b81892c41a734e09881fc5277c0298d530"
     },
     "toolchain": {
-      "runnerImage": "ubuntu24-20260810.271.1",
+      "runnerImage": "ubuntu24-20260816.277.1",
       "node": "24.17.0",
       "npm": "11.13.0",
-      "rust": "1.96.0",
+      "rust": "1.97.1",
       "wasmOpt": "131"
     }
   },
@@ -21,7 +21,7 @@
       "cliNode": "22.22.0",
       "npm": "11.18.0",
       "python": "3.14.2",
-      "rust": "1.96.0",
+      "rust": "1.97.1",
       "electron": "43.2.0",
       "electronBuilder": "26.9.0",
       "playwright": "1.59.1",

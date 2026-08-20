@@ -183,12 +183,14 @@ describe("V2KeyRotationMigration", () => {
       expect(mockSyncService.fullSync).toHaveBeenCalledWith(false);
     });
 
-    it("requests untrusted organization public keys before rotation", async () => {
+    it("requests untrusted organization public keys for a CreateIfNeeded rotation", async () => {
       arrangeHappyPath();
 
       await sut.needsMigration(mockUserId);
 
-      expect(mockUserCryptoMgmt.get_untrusted_organization_public_keys).toHaveBeenCalledWith();
+      expect(mockUserCryptoMgmt.get_untrusted_organization_public_keys).toHaveBeenCalledWith(
+        "CreateIfNeeded",
+      );
     });
 
     it("returns 'noMigrationNeeded' when user has granted emergency access", async () => {

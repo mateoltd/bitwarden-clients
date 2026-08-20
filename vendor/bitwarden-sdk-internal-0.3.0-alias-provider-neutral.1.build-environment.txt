@@ -1,6 +1,6 @@
-source_commit=99c33ed26e51421224a4daecdf838057f1d66e75
-runner_image=ubuntu24-20260810.271.1
+source_commit=106aad00f85fb0766c2d5ede534a39b792f48789
+runner_image=ubuntu24-20260816.277.1
 v24.17.0
 11.13.0
-rustc 1.96.0 (ac68faa20 2026-05-25)
+rustc 1.97.1 (8bab26f4f 2026-07-14)
 wasm-opt version 131 (version_131)

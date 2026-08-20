@@ -1,9 +1,9 @@
 {
   "branch": "integration/provider-neutral-alias-upstream-sync",
-  "baseCommit": "660766841b566440e1faaeeb92aecc26e1503bed",
+  "baseCommit": "b52a472fccba2727cba9cd22257d551599c43e4f",
   "upstreamRebase": {
     "sourceCommit": "6f7f3d461b34315efe8df7d9c033149c4153947e",
-    "upstreamCommit": "660766841b566440e1faaeeb92aecc26e1503bed",
+    "upstreamCommit": "b52a472fccba2727cba9cd22257d551599c43e4f",
     "sourceMergeBaseCommit": "1f881babc15eb7d3a88cad41730ce167d8e49a41",
     "strategy": "rebase-merges"
   },
@@ -60,7 +60,7 @@
     "^artifacts/"
   ],
   "allowedArtifacts": {
-    "vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.1.tgz": "4409765d564706980dc2b729cd447060c98af568b0dc9e7379bcb8f8ff007b43"
+    "vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.1.tgz": "1f40d1c145056b014184b678b57c61ac8c173efc2499f178066737ebb1647394"
   },
   "allowedLicensePatterns": [
     "^0BSD$",

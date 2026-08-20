@@ -20,11 +20,14 @@ import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
 import { MasterPasswordServiceAbstraction } from "@bitwarden/common/key-management/master-password/abstractions/master-password.service.abstraction";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
-import { SdkService } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
+import { asUuid, SdkService } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
 import { UserKey } from "@bitwarden/common/types/key";
 // eslint-disable-next-line no-restricted-imports
 import { LegacyCompatKeyService } from "@bitwarden/legacy-crypto";
-import { UserMasterPasswordRegistrationRequest } from "@bitwarden/sdk-internal";
+import {
+  OrganizationId as SdkOrganizationId,
+  UserMasterPasswordRegistrationRequest,
+} from "@bitwarden/sdk-internal";
 
 export class WebRegistrationFinishService
   extends DefaultRegistrationFinishService
@@ -122,15 +125,26 @@ export class WebRegistrationFinishService
     // Org invites are deep linked. Non-existent accounts are redirected to the register page.
     // Direct invites: per-user invite credentials are included for validation and
     // two-factor purposes.
-    // The qualified SDK pin does not yet expose open-org-invite registration context. Open
-    // invites are still accepted via the separate post-login flow. The qualified SDK repin
-    // follow-up must add the registration context here as one atomic contract update.
+    // Open invites: the invite link reference is included so the server can identify the
+    // invite link and apply any invite-link–gated behaviors during registration. The open
+    // invite itself is accepted via a separate flow after login.
     const orgInvite = await this.organizationInviteService.getOrganizationInvite();
     if (orgInvite?.kind === OrgInviteKind.Direct) {
       registerRequest.organization_user_id = this.toOptionalSdkOrganizationId(
         orgInvite.organizationUserId,
       );
       registerRequest.org_invite_token = orgInvite.token;
+    } else if (
+      orgInvite?.kind === OrgInviteKind.Open &&
+      // Defense in depth: stale flag-on state may persist into a flag-off session.
+      // TODO: clean up when FeatureFlag.GenerateInviteLink is removed — drop this
+      // guard clause.
+      (await this.configService.getFeatureFlag(FeatureFlag.GenerateInviteLink))
+    ) {
+      registerRequest.open_org_invite = {
+        organization_id: asUuid<SdkOrganizationId>(orgInvite.organizationId),
+        code: orgInvite.inviteLinkCode,
+      };
     }
 
     if (orgSponsoredFreeFamilyPlanToken) {
