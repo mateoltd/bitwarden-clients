@@ -13,7 +13,7 @@ const patterns = [
   ],
 ];
 const obviousFixture =
-  /(?:example|fixture|placeholder|must-not-leak|test-token|generated-password|account-password|alias-lab-password)/i;
+  /(?:example|fixture|placeholder|must-not-leak|test-token|generated-password|account-password|alias-lab-password|rotated-password)/i;
 const findings = [];
 
 for (const { path, text } of addedLines(base, target)) {
