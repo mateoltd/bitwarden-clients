@@ -13,7 +13,6 @@ import {
   WebAuthnPrfUnlockData as SdkWebAuthnPrfUnlockData,
   WrappedAccountCryptographicState,
   Kdf,
-  KeyId,
 } from "@bitwarden/sdk-internal";
 import { UserId } from "@bitwarden/user-core";
 
@@ -30,7 +29,6 @@ import {
   PIN_PROTECTED_USER_KEY_ENVELOPE_PERSISTENT,
   USER_KEY,
   USER_KEY_ENCRYPTED_PIN,
-  USER_KEY_ID,
   V2_UPGRADE_TOKEN,
   WEBAUTHN_PRF_OPTIONS,
 } from "./state-definitions";
@@ -142,17 +140,14 @@ export class JsWasmStateBridge implements WasmStateBridge {
   }
 
   async set_user_key(userKey: SymmetricKey): Promise<void> {
-    await writeAtomic(
-      this.stateProvider,
-      this.userId,
-      USER_KEY,
-      SymmetricCryptoKey.fromSdk(userKey) as UserKey,
-    );
+    await writeAtomic(this.stateProvider, this.userId, USER_KEY, {
+      "": SymmetricCryptoKey.fromSdk(userKey) as UserKey,
+    });
   }
 
   async get_user_key(): Promise<SymmetricKey | null> {
     const key = await readAtomic(this.stateProvider, this.userId, USER_KEY);
-    return key == null ? null : key.toSdk();
+    return key == null ? null : key[""].toSdk();
   }
 
   async clear_user_key(): Promise<void> {
@@ -160,20 +155,18 @@ export class JsWasmStateBridge implements WasmStateBridge {
   }
 
   async set_ephemeral_pin_envelope(pinEnvelope: PasswordProtectedKeyEnvelope): Promise<void> {
-    await writeAtomic(
-      this.stateProvider,
-      this.userId,
-      PIN_PROTECTED_USER_KEY_ENVELOPE_EPHEMERAL,
-      pinEnvelope,
-    );
+    await writeAtomic(this.stateProvider, this.userId, PIN_PROTECTED_USER_KEY_ENVELOPE_EPHEMERAL, {
+      "": { pin_envelope: pinEnvelope },
+    });
   }
 
   async get_ephemeral_pin_envelope(): Promise<PasswordProtectedKeyEnvelope | null> {
-    return await readAtomic(
+    const result = await readAtomic(
       this.stateProvider,
       this.userId,
       PIN_PROTECTED_USER_KEY_ENVELOPE_EPHEMERAL,
     );
+    return result == null ? null : (result[""]?.pin_envelope ?? null);
   }
 
   async clear_ephemeral_pin_envelope(): Promise<void> {
@@ -224,17 +217,5 @@ export class JsWasmStateBridge implements WasmStateBridge {
 
   async clear_kdf_config(): Promise<void> {
     await deleteAtomic(this.stateProvider, this.userId, KDF_CONFIG);
-  }
-
-  async set_user_key_id(value: KeyId): Promise<void> {
-    await writeAtomic(this.stateProvider, this.userId, USER_KEY_ID, value);
-  }
-
-  async get_user_key_id(): Promise<KeyId | null> {
-    return await readAtomic(this.stateProvider, this.userId, USER_KEY_ID);
-  }
-
-  async clear_user_key_id(): Promise<void> {
-    await deleteAtomic(this.stateProvider, this.userId, USER_KEY_ID);
   }
 }

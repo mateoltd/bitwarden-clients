@@ -7287,7 +7287,7 @@
   "transferItemsToOrganizationAction": {
     "message": "Click accept to transfer ownership of your items."
   },
-   "openTransferItemsHelpArticle": {
+  "openTransferItemsHelpArticle": {
     "message": "Open help article on transferring items"
   },
   "acceptTransfer": {
@@ -7701,7 +7701,7 @@
   },
   "weakPasswordsDescription": {
     "message": "These passwords can be easily guessed because they are too short or simple. Strengthen them by making them more complex."
-  },    
+  },
   "reusedPasswordsTitle": {
     "message": "Reused passwords"
   },
@@ -7730,7 +7730,7 @@
   },
   "exposedPasswordsEmpty": {
     "message": "None of your passwords were found in data breaches."
-  },  
+  },
   "weakPasswordsEmpty": {
     "message": "All of your passwords are strong."
   },

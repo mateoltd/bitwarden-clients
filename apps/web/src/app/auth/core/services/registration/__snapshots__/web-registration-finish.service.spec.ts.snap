@@ -8,7 +8,6 @@ exports[`WebRegistrationFinishService finishRegistration() - SDK flow forwards t
   "email_verification_token": undefined,
   "master_password": "newPassword",
   "master_password_hint": "newPasswordHint",
-  "open_org_invite": undefined,
   "org_invite_token": undefined,
   "org_sponsored_free_family_plan_token": undefined,
   "organization_user_id": undefined,
@@ -27,7 +26,6 @@ exports[`WebRegistrationFinishService finishRegistration() - SDK flow forwards t
   "email_verification_token": undefined,
   "master_password": "newPassword",
   "master_password_hint": "newPasswordHint",
-  "open_org_invite": undefined,
   "org_invite_token": undefined,
   "org_sponsored_free_family_plan_token": "orgSponsoredFreeFamilyPlanToken",
   "organization_user_id": undefined,
@@ -46,7 +44,6 @@ exports[`WebRegistrationFinishService finishRegistration() - SDK flow forwards t
   "email_verification_token": undefined,
   "master_password": "newPassword",
   "master_password_hint": "newPasswordHint",
-  "open_org_invite": undefined,
   "org_invite_token": undefined,
   "org_sponsored_free_family_plan_token": undefined,
   "organization_user_id": undefined,
@@ -65,7 +62,6 @@ exports[`WebRegistrationFinishService finishRegistration() - SDK flow populates 
   "email_verification_token": undefined,
   "master_password": "newPassword",
   "master_password_hint": "newPasswordHint",
-  "open_org_invite": undefined,
   "org_invite_token": "orgInviteToken",
   "org_sponsored_free_family_plan_token": undefined,
   "organization_user_id": "00000000-0000-0000-0000-000000000003",
@@ -76,7 +72,7 @@ exports[`WebRegistrationFinishService finishRegistration() - SDK flow populates 
 }
 `;
 
-exports[`WebRegistrationFinishService finishRegistration() - SDK flow populates open-org-invite fields and skips direct-invite fields when a stashed open org invite is active 1`] = `
+exports[`WebRegistrationFinishService finishRegistration() - SDK flow uses the transport's supported open-org-invite registration contract 1`] = `
 {
   "accept_emergency_access_id": undefined,
   "accept_emergency_access_invite_token": undefined,
@@ -84,10 +80,6 @@ exports[`WebRegistrationFinishService finishRegistration() - SDK flow populates 
   "email_verification_token": undefined,
   "master_password": "newPassword",
   "master_password_hint": "newPasswordHint",
-  "open_org_invite": {
-    "code": "00000000-0000-0000-0000-000000000011",
-    "organization_id": "00000000-0000-0000-0000-000000000010",
-  },
   "org_invite_token": undefined,
   "org_sponsored_free_family_plan_token": undefined,
   "organization_user_id": undefined,
@@ -246,7 +238,7 @@ RegisterFinishRequest {
 }
 `;
 
-exports[`WebRegistrationFinishService finishRegistration() - legacy flow populates open-org-invite fields and skips direct-invite fields when a stashed open org invite is active 1`] = `
+exports[`WebRegistrationFinishService finishRegistration() - legacy flow uses the transport's supported open-org-invite registration contract 1`] = `
 RegisterFinishRequest {
   "acceptEmergencyAccessId": undefined,
   "acceptEmergencyAccessInviteToken": undefined,
@@ -294,7 +286,6 @@ exports[`WebRegistrationFinishService finishRegistration() — SDK flow only del
   "email_verification_token": "emailVerificationToken",
   "master_password": "newPassword",
   "master_password_hint": "newPasswordHint",
-  "open_org_invite": undefined,
   "org_invite_token": undefined,
   "org_sponsored_free_family_plan_token": undefined,
   "organization_user_id": undefined,

@@ -248,6 +248,7 @@ describe("WebRegistrationFinishService", () => {
       organizationId: string;
       code: string;
     };
+    supportsOpenOrgInviteRegistration: boolean;
   }
 
   const legacyVariant: FlowVariant = {
@@ -311,6 +312,7 @@ describe("WebRegistrationFinishService", () => {
       organizationId: "organizationId",
       code: "code",
     },
+    supportsOpenOrgInviteRegistration: true,
   };
 
   const sdkVariant: FlowVariant = {
@@ -363,6 +365,7 @@ describe("WebRegistrationFinishService", () => {
       organizationId: "organization_id",
       code: "code",
     },
+    supportsOpenOrgInviteRegistration: false,
   };
 
   describe.each([legacyVariant, sdkVariant])("finishRegistration() - $label", (variant) => {
@@ -402,7 +405,7 @@ describe("WebRegistrationFinishService", () => {
       expect(request).toMatchSnapshot();
     });
 
-    it("populates open-org-invite fields and skips direct-invite fields when a stashed open org invite is active", async () => {
+    it("uses the transport's supported open-org-invite registration contract", async () => {
       // Open invites carry the invite link reference (not the per-user credentials of a
       // direct invite). The kind-guarded write path must set the open-invite fields and
       // leave direct-invite fields untouched.
@@ -421,10 +424,14 @@ describe("WebRegistrationFinishService", () => {
       const request = variant.getRequest();
       expect(request[variant.fields.orgInviteToken]).toBeUndefined();
       expect(request[variant.fields.orgUserId]).toBeUndefined();
-      expect(request[variant.fields.openOrgInvite]).toEqual({
-        [variant.openOrgInviteFields.organizationId]: openOrgInvite.organizationId,
-        [variant.openOrgInviteFields.code]: openOrgInvite.inviteLinkCode,
-      });
+      if (variant.supportsOpenOrgInviteRegistration) {
+        expect(request[variant.fields.openOrgInvite]).toEqual({
+          [variant.openOrgInviteFields.organizationId]: openOrgInvite.organizationId,
+          [variant.openOrgInviteFields.code]: openOrgInvite.inviteLinkCode,
+        });
+      } else {
+        expect(request[variant.fields.openOrgInvite]).toBeUndefined();
+      }
       expect(request).toMatchSnapshot();
     });
 
@@ -490,10 +497,14 @@ describe("WebRegistrationFinishService", () => {
       ).resolves.not.toThrow();
       const request = variant.getRequest();
       expect(request[variant.fields.emailVerificationToken]).toEqual(emailVerificationToken);
-      expect(request[variant.fields.openOrgInvite]).toEqual({
-        [variant.openOrgInviteFields.organizationId]: openOrgInvite.organizationId,
-        [variant.openOrgInviteFields.code]: openOrgInvite.inviteLinkCode,
-      });
+      if (variant.supportsOpenOrgInviteRegistration) {
+        expect(request[variant.fields.openOrgInvite]).toEqual({
+          [variant.openOrgInviteFields.organizationId]: openOrgInvite.organizationId,
+          [variant.openOrgInviteFields.code]: openOrgInvite.inviteLinkCode,
+        });
+      } else {
+        expect(request[variant.fields.openOrgInvite]).toBeUndefined();
+      }
     });
 
     it("forwards the org-sponsored free family plan token", async () => {
@@ -805,7 +816,7 @@ describe("WebRegistrationFinishService", () => {
       expect(postKeysForUserPasswordRegistration).not.toHaveBeenCalled();
     });
 
-    it("throws when the open org invite's organizationId is not a valid UUID", async () => {
+    it("leaves open org invite validation to the post-login flow", async () => {
       organizationInviteService.getOrganizationInvite.mockResolvedValue(
         new OpenOrganizationInvite({
           organizationId: "not-a-uuid",
@@ -815,8 +826,8 @@ describe("WebRegistrationFinishService", () => {
         }),
       );
 
-      await expect(service.finishRegistration(email, passwordInputResult)).rejects.toThrow();
-      expect(postKeysForUserPasswordRegistration).not.toHaveBeenCalled();
+      await expect(service.finishRegistration(email, passwordInputResult)).resolves.not.toThrow();
+      expect(postKeysForUserPasswordRegistration).toHaveBeenCalledTimes(1);
     });
 
     it("throws when the emergency access id is not a valid UUID", async () => {

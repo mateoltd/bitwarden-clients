@@ -140,7 +140,7 @@ export class V2KeyRotationMigration implements EncryptedMigration {
     return await withPasswordManagerSdk(userId, this.sdkService, async (sdk) => {
       const organizationV1Memberships = await sdk
         .user_crypto_management()
-        .get_untrusted_organization_public_keys("CreateIfNeeded");
+        .get_untrusted_organization_public_keys();
       return organizationV1Memberships.length > 0;
     });
   }

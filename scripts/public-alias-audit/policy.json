@@ -1,10 +1,21 @@
 {
-  "branch": "integration/provider-neutral-alias-clients",
-  "baseCommit": "dd217a8ce662b40dbd0b2465a97edb806a60c924",
+  "branch": "integration/provider-neutral-alias-upstream-sync",
+  "baseCommit": "660766841b566440e1faaeeb92aecc26e1503bed",
+  "upstreamRebase": {
+    "sourceCommit": "6f7f3d461b34315efe8df7d9c033149c4153947e",
+    "upstreamCommit": "660766841b566440e1faaeeb92aecc26e1503bed",
+    "sourceMergeBaseCommit": "1f881babc15eb7d3a88cad41730ce167d8e49a41",
+    "strategy": "rebase-merges"
+  },
+  "downstreamTopology": {
+    "mergeCount": 1,
+    "mergeSubjects": ["merge: incorporate final public alias integration delta"]
+  },
   "snapshotCommit": "cd1f5cb4456a27e4c75d2206c7993c7b2c1ed038",
   "releaseCommit": "95c5655065172c7505d7f82428b8bf7b46792b82",
   "arm64FixCommit": "0c4906ee61d1a5fd13c4a95560b3f69b0a8d10f8",
   "sourceCommits": [
+    "6f7f3d461b34315efe8df7d9c033149c4153947e",
     "cd1f5cb4456a27e4c75d2206c7993c7b2c1ed038",
     "95c5655065172c7505d7f82428b8bf7b46792b82",
     "0c4906ee61d1a5fd13c4a95560b3f69b0a8d10f8"

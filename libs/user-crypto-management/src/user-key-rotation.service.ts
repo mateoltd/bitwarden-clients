@@ -35,7 +35,7 @@ export class DefaultUserKeyRotationService implements UserKeyRotationService {
     // First, the provided organizations and emergency access users need to be verified;
     // this is currently done by providing the user a manual confirmation dialog.
     const { wasTrustDenied, trustedOrganizationPublicKeys, trustedEmergencyAccessUserPublicKeys } =
-      await this.verifyTrust(userId, "Skip");
+      await this.verifyTrust(userId);
     if (wasTrustDenied) {
       this.logService.info("[Userkey rotation] Trust was denied by user. Aborting!");
       return false;
@@ -65,7 +65,7 @@ export class DefaultUserKeyRotationService implements UserKeyRotationService {
     userId: UserId,
   ): Promise<boolean> {
     const { wasTrustDenied, trustedOrganizationPublicKeys, trustedEmergencyAccessUserPublicKeys } =
-      await this.verifyTrust(userId, upgradeTokenAction);
+      await this.verifyTrust(userId);
     if (wasTrustDenied) {
       this.logService.info("[UserKeyRotationService] Trust was denied by user. Aborting!");
       return false;
@@ -83,10 +83,7 @@ export class DefaultUserKeyRotationService implements UserKeyRotationService {
     });
   }
 
-  async verifyTrust(
-    userId: UserId,
-    upgradeTokenAction: UpgradeTokenAction,
-  ): Promise<TrustVerificationResult> {
+  async verifyTrust(userId: UserId): Promise<TrustVerificationResult> {
     // Since currently the joined organizations and emergency access grantees are
     // not signed, manual trust prompts are required, to verify that the server
     // does not inject public keys here.
@@ -98,9 +95,7 @@ export class DefaultUserKeyRotationService implements UserKeyRotationService {
       userId,
       this.sdkService,
       async (sdk) => {
-        const untrustedMemberships = await sdk
-          .user_crypto_management()
-          .get_untrusted_memberships(upgradeTokenAction);
+        const untrustedMemberships = await sdk.user_crypto_management().get_untrusted_memberships();
         return [
           untrustedMemberships.emergency_access_memberships,
           untrustedMemberships.organization_memberships,

@@ -314,7 +314,7 @@ const RealisticTemplate: StoryObj<
           <bit-nav-item text="Vault" icon="bwi-lock" route="vault"></bit-nav-item>
           <bit-nav-item text="Send" icon="bwi-send" route="send"></bit-nav-item>
           <bit-nav-group text="All items" route="all" [open]="true">
-            
+
             <bit-nav-group text="Engineering" icon="bwi-collection-shared" route="eng">
               <bit-nav-item text="Frontend" route="eng-fe"></bit-nav-item>
               <bit-nav-item text="Backend" route="eng-be"></bit-nav-item>

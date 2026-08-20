@@ -385,6 +385,35 @@ describe("AutofillInlineMenuList", () => {
         ).toBe(0);
       });
 
+      it("keeps one alias action alongside the Lit list across cipher updates", async () => {
+        postWindowMessage(
+          createInitAutofillInlineMenuListMessageMock({
+            authStatus: AuthenticationStatus.Unlocked,
+            ciphers: [createAutofillOverlayCipherDataMock(1)],
+            portKey,
+            useLitComponents: true,
+            emailAliasRecommendation: {
+              hostname: "registration.example",
+              canCreate: true,
+            },
+          }),
+        );
+        await flushPromises();
+
+        postWindowMessage({
+          command: "updateAutofillInlineMenuListCiphers",
+          ciphers: [createAutofillOverlayCipherDataMock(2)],
+          token: "test-token",
+        });
+        await flushPromises();
+
+        expect(
+          autofillInlineMenuList["inlineMenuListContainer"].querySelectorAll(
+            "[data-email-alias-action]",
+          ),
+        ).toHaveLength(1);
+      });
+
       it("renders only the first page of Lit ciphers", async () => {
         const ciphers = Array.from({ length: 8 }, (_, index) =>
           createAutofillOverlayCipherDataMock(index + 1),
