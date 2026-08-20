@@ -1,3 +1,4 @@
+import { SensitiveString } from "@bitwarden/alias-sdk-internal";
 import {
   AliasSyncDocument,
   appendAliasSyncEvent,
@@ -8,6 +9,7 @@ import {
 import { createSimpleLoginAliasService } from "./simple-login-alias.service";
 
 const connectionId = "11111111-1111-4111-8111-111111111111";
+const sensitive = (value: string): SensitiveString => value as SensitiveString;
 
 describe("SimpleLoginAliasService", () => {
   it.each([
@@ -132,7 +134,7 @@ describe("SimpleLoginAliasService", () => {
       version: 1 as const,
       connectionId,
       aliasId: "41",
-      address: "first@sl.test",
+      address: sensitive("first@sl.test"),
     };
     const firstProcess = createSimpleLoginAliasService(settings);
 
@@ -170,7 +172,7 @@ describe("SimpleLoginAliasService", () => {
       version: 1 as const,
       connectionId,
       aliasId: "42",
-      address: "second@sl.test",
+      address: sensitive("second@sl.test"),
     };
 
     const transactionId = await service.prepareReference("cipher-2", undefined, identity);

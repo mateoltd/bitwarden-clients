@@ -2,6 +2,8 @@
 import { TextEncoder, TextDecoder } from "util";
 Object.assign(global, { TextDecoder, TextEncoder });
 
+import { SensitiveString } from "@bitwarden/alias-sdk-internal";
+
 import { Type } from "../metadata";
 
 import { GeneratedCredential } from "./generated-credential";
@@ -46,7 +48,7 @@ describe("GeneratedCredential", () => {
           version: 1,
           connectionId: "11111111-1111-4111-8111-111111111111",
           aliasId: "42",
-          address: "alias@sl.test",
+          address: "alias@sl.test" as SensitiveString,
         },
       },
     );

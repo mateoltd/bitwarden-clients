@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 
+import { SensitiveString } from "@bitwarden/alias-sdk-internal";
 import { PasswordManagerClient, TokenProvider } from "@bitwarden/sdk-internal";
 
 import { asUuid } from "../../platform/abstractions/sdk/sdk.service";
@@ -230,9 +231,13 @@ describe("alias connection vault carrier", () => {
       version: 1 as const,
       connectionId: connection.connectionId,
       aliasId: "41",
-      address: "first@sl.test",
+      address: "first@sl.test" as SensitiveString,
     };
-    const secondAlias = { ...firstAlias, aliasId: "42", address: "second@sl.test" };
+    const secondAlias = {
+      ...firstAlias,
+      aliasId: "42",
+      address: "second@sl.test" as SensitiveString,
+    };
 
     // Profile zero is offline: its event reaches only its independently persisted local journal.
     const staleOffline = await local(0).load();

@@ -1,3 +1,5 @@
+import { SensitiveString } from "@bitwarden/alias-sdk-internal";
+
 import {
   AliasSyncDocument,
   AliasSyncEvent,
@@ -20,11 +22,12 @@ const connection = {
   version: 1 as const,
   connectionId,
 };
+const sensitive = (value: string): SensitiveString => value as SensitiveString;
 const alias = {
   version: 1 as const,
   connectionId,
   aliasId: "41",
-  address: "first@sl.test",
+  address: sensitive("first@sl.test"),
 };
 
 function eventId(value: number): string {
@@ -166,8 +169,8 @@ describe("alias synchronization state machine", () => {
 
   it("keeps a concurrent reference retarget unresolved until an explicit resolution observes it", () => {
     const originalKey = emailAliasKey(alias);
-    const secondAlias = { ...alias, aliasId: "42", address: "second@sl.test" };
-    const thirdAlias = { ...alias, aliasId: "43", address: "third@sl.test" };
+    const secondAlias = { ...alias, aliasId: "42", address: sensitive("second@sl.test") };
+    const thirdAlias = { ...alias, aliasId: "43", address: sensitive("third@sl.test") };
     let left = createAliasSyncDocument(replicaA);
     left = append(
       left,
@@ -212,8 +215,8 @@ describe("alias synchronization state machine", () => {
   });
 
   it("rejects a causally newer reference write whose compare-and-set snapshot is stale", () => {
-    const secondAlias = { ...alias, aliasId: "42", address: "second@sl.test" };
-    const thirdAlias = { ...alias, aliasId: "43", address: "third@sl.test" };
+    const secondAlias = { ...alias, aliasId: "42", address: sensitive("second@sl.test") };
+    const thirdAlias = { ...alias, aliasId: "43", address: sensitive("third@sl.test") };
     let document = createAliasSyncDocument(replicaA);
     document = append(
       document,
@@ -247,8 +250,8 @@ describe("alias synchronization state machine", () => {
   });
 
   it("accepts a sequential reference retarget only when it names the observed value", () => {
-    const secondAlias = { ...alias, aliasId: "42", address: "second@sl.test" };
-    const thirdAlias = { ...alias, aliasId: "43", address: "third@sl.test" };
+    const secondAlias = { ...alias, aliasId: "42", address: sensitive("second@sl.test") };
+    const thirdAlias = { ...alias, aliasId: "43", address: sensitive("third@sl.test") };
     let document = createAliasSyncDocument(replicaA);
     document = append(
       document,
@@ -278,7 +281,11 @@ describe("alias synchronization state machine", () => {
   });
 
   it("keeps a prepared reference inert until a causally valid commit", () => {
-    const replacement = { ...alias, aliasId: "42", address: "replacement@sl.test" };
+    const replacement = {
+      ...alias,
+      aliasId: "42",
+      address: sensitive("replacement@sl.test"),
+    };
     let document = createAliasSyncDocument(replicaA);
     document = append(
       document,
@@ -586,7 +593,11 @@ describe("alias synchronization state machine", () => {
         kind: "reference-set",
         cipherId: `cipher-${index}`,
         expectedAliasKey: null,
-        alias: { ...alias, aliasId: String(index), address: `alias-${index}@sl.test` },
+        alias: {
+          ...alias,
+          aliasId: String(index),
+          address: sensitive(`alias-${index}@sl.test`),
+        },
       });
     }
     const document: AliasSyncDocument = {

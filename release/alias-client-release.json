@@ -2,12 +2,22 @@
   "$schema": "./alias-client-release.schema.json",
   "schemaVersion": 1,
   "releaseLane": {
-    "branch": "integration/provider-neutral-alias-clients",
-    "baseRef": "origin/fix/public-alias-review-findings",
-    "baseCommit": "dd217a8ce662b40dbd0b2465a97edb806a60c924",
+    "branch": "integration/provider-neutral-alias-upstream-sync",
+    "baseRef": "refs/remotes/upstream/main",
+    "baseCommit": "660766841b566440e1faaeeb92aecc26e1503bed",
     "sourceRepository": "https://github.com/mateoltd/bitwarden-clients.git",
     "upstreamRepository": "https://github.com/bitwarden/clients.git",
     "upstreamRef": "refs/heads/main",
+    "upstreamRebase": {
+      "sourceCommit": "6f7f3d461b34315efe8df7d9c033149c4153947e",
+      "upstreamCommit": "660766841b566440e1faaeeb92aecc26e1503bed",
+      "sourceMergeBaseCommit": "1f881babc15eb7d3a88cad41730ce167d8e49a41",
+      "strategy": "rebase-merges"
+    },
+    "downstreamTopology": {
+      "mergeCount": 1,
+      "mergeSubjects": ["merge: incorporate final public alias integration delta"]
+    },
     "sourceDateEpoch": 1786782435,
     "license": "GPL-3.0"
   },

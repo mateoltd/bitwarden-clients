@@ -1,4 +1,3 @@
-/* eslint-disable import/no-restricted-paths -- legacy forwarder state contract */
 import { Jsonify } from "type-fest";
 
 import {
@@ -6,7 +5,6 @@ import {
   GENERATOR_MEMORY,
   UserKeyDefinition,
 } from "@bitwarden/common/platform/state";
-/* eslint-enable import/no-restricted-paths */
 import { AliasSyncDocument, parseAliasSyncDocument } from "@bitwarden/common/tools/alias";
 import { VendorId } from "@bitwarden/common/tools/extension";
 import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";

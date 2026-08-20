@@ -11,18 +11,58 @@ const branch = git(["branch", "--show-current"]).trim();
 if (target === resolveCommit("HEAD") && branch !== policy.branch) {
   findings.push(`checked-out branch is ${branch}, expected ${policy.branch}`);
 }
-if (git(["merge-base", base, target]).trim() !== base)
-  findings.push("history does not begin at pinned main");
+if (git(["merge-base", base, target]).trim() !== base) {
+  findings.push("history does not descend from pinned upstream main");
+}
 
 const commits = git(["rev-list", "--reverse", `${base}..${target}`])
   .trim()
   .split("\n")
   .filter(Boolean);
-const merges = git(["rev-list", "--merges", `${base}..${target}`]).trim();
-if (merges) findings.push(`merge commits present: ${merges.replaceAll("\n", ", ")}`);
+const merges = git(["rev-list", "--reverse", "--merges", `${base}..${target}`])
+  .trim()
+  .split("\n")
+  .filter(Boolean);
+const upstreamRebase = policy.upstreamRebase;
+if (base !== resolveCommit(upstreamRebase.upstreamCommit)) {
+  findings.push("pinned history base differs from the configured upstream rebase commit");
+}
+if (
+  git(["merge-base", upstreamRebase.sourceCommit, upstreamRebase.upstreamCommit]).trim() !==
+  upstreamRebase.sourceMergeBaseCommit
+) {
+  findings.push("configured source merge base differs");
+}
+if (git(["merge-base", upstreamRebase.upstreamCommit, target]).trim() !== base) {
+  findings.push("target does not contain the configured upstream rebase commit");
+}
+
+const expectedMergeSubjects = policy.downstreamTopology.mergeSubjects;
+const mergeSubjects = merges.map((merge) => git(["show", "-s", "--format=%s", merge]).trim());
+if (
+  merges.length !== policy.downstreamTopology.mergeCount ||
+  mergeSubjects.some((subject, index) => subject !== expectedMergeSubjects[index])
+) {
+  findings.push(
+    `expected downstream merge subjects ${expectedMergeSubjects.join(", ")}, got ${mergeSubjects.join(", ") || "none"}`,
+  );
+}
+for (const merge of merges) {
+  const parents = git(["show", "-s", "--format=%P", merge]).trim().split(/\s+/).filter(Boolean);
+  if (parents.length !== 2)
+    findings.push(`downstream merge has ${parents.length} parents: ${merge}`);
+  for (const parent of parents) {
+    if (git(["merge-base", base, parent]).trim() !== base) {
+      findings.push(`downstream merge parent does not descend from pinned upstream: ${parent}`);
+    }
+    if (parent === base)
+      findings.push(`downstream merge directly imports pinned upstream: ${merge}`);
+  }
+}
 for (const commit of commits) {
   const subject = git(["show", "-s", "--format=%s", commit]).trim();
   if (
+    !expectedMergeSubjects.includes(subject) &&
     !/^(?:build|chore|ci|docs|feat|fix|perf|refactor|revert|test)(?:\([^)]+\))?!?: .+/.test(subject)
   ) {
     findings.push(`non-conventional subject ${commit}: ${subject}`);
@@ -53,6 +93,6 @@ if (findings.length > 0) {
   process.exitCode = 1;
 } else {
   process.stdout.write(
-    `history ok: ${base}..${target}, ${commits.length} linear conventional commits, no source ancestry${partial ? " (partial)" : ""}\n`,
+    `history ok: ${base}..${target}, ${commits.length} downstream commits, ${merges.length} preserved downstream merge, no source ancestry${partial ? " (partial)" : ""}\n`,
   );
 }

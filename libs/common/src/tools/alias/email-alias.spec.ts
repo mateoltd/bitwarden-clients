@@ -1,15 +1,18 @@
+import { SensitiveString } from "@bitwarden/alias-sdk-internal";
+
 import {
   EMAIL_ALIAS_IDENTITY_VERSION,
+  EmailAliasIdentity,
   emailAliasIdentitiesEqual,
   parseEmailAliasIdentity,
   parseGeneratedCredentialMetadata,
 } from "./email-alias";
 
-const validIdentity = {
+const validIdentity: EmailAliasIdentity = {
   version: EMAIL_ALIAS_IDENTITY_VERSION,
   connectionId: "11111111-1111-4111-8111-111111111111",
   aliasId: "41",
-  address: "first@sl.test",
+  address: "first@sl.test" as SensitiveString,
 };
 
 describe("email alias schema v1", () => {

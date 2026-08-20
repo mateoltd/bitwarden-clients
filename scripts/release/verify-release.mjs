@@ -89,7 +89,12 @@ if (fs.existsSync(path.join(repositoryRoot, ".git"))) {
   branch =
     git(["branch", "--show-current"]) || process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME;
   git(["merge-base", "--is-ancestor", manifest.releaseLane.baseCommit, head], { capture: false });
-  const cleanCommits = git(["rev-list", "--reverse", `${manifest.releaseLane.baseCommit}..${head}`])
+  const cleanCommits = git([
+    "rev-list",
+    "--reverse",
+    "--first-parent",
+    `${manifest.releaseLane.baseCommit}..${head}`,
+  ])
     .split("\n")
     .filter(Boolean);
   assert(cleanCommits.length > 0, "Clean release history has no commits after the pinned base");
@@ -97,7 +102,20 @@ if (fs.existsSync(path.join(repositoryRoot, ".git"))) {
     git(["rev-parse", `${cleanCommits[0]}^`]) === manifest.releaseLane.baseCommit,
     "First clean release commit is not parented directly by the pinned base",
   );
+  const upstreamRebase = manifest.releaseLane.upstreamRebase;
+  assert(
+    upstreamRebase.strategy === "rebase-merges" &&
+      upstreamRebase.upstreamCommit === manifest.releaseLane.baseCommit,
+    "Release base does not match the configured rebase-merges upstream commit",
+  );
+  assert(
+    git(["merge-base", upstreamRebase.sourceCommit, upstreamRebase.upstreamCommit]) ===
+      upstreamRebase.sourceMergeBaseCommit,
+    "Configured source merge base differs",
+  );
+  git(["merge-base", "--is-ancestor", upstreamRebase.upstreamCommit, head], { capture: false });
   for (const source of [
+    upstreamRebase.sourceCommit,
     manifest.cleanHistoryInputs.clientV1Commit,
     manifest.cleanHistoryInputs.releaseCheckpointCommit,
     manifest.cleanHistoryInputs.arm64FixCommit,
@@ -112,6 +130,38 @@ if (fs.existsSync(path.join(repositoryRoot, ".git"))) {
     branch === manifest.releaseLane.branch,
     `Expected branch ${manifest.releaseLane.branch}, got ${branch}`,
   );
+  const downstreamTopology = manifest.releaseLane.downstreamTopology;
+  const downstreamMerges = git([
+    "rev-list",
+    "--reverse",
+    "--merges",
+    `${upstreamRebase.upstreamCommit}..${head}`,
+  ])
+    .split("\n")
+    .filter(Boolean);
+  const downstreamMergeSubjects = downstreamMerges.map((merge) =>
+    git(["show", "-s", "--format=%s", merge]),
+  );
+  assert(
+    downstreamMerges.length === downstreamTopology.mergeCount &&
+      downstreamMergeSubjects.every(
+        (subject, index) => subject === downstreamTopology.mergeSubjects[index],
+      ),
+    `Unexpected downstream merge topology: ${downstreamMergeSubjects.join(", ") || "none"}`,
+  );
+  for (const merge of downstreamMerges) {
+    const parents = git(["show", "-s", "--format=%P", merge]).split(/\s+/).filter(Boolean);
+    assert(parents.length === 2, `Downstream merge ${merge} must have exactly two parents`);
+    for (const parent of parents) {
+      assert(
+        parent !== upstreamRebase.upstreamCommit,
+        `Downstream merge ${merge} directly imports the pinned upstream commit`,
+      );
+      git(["merge-base", "--is-ancestor", upstreamRebase.upstreamCommit, parent], {
+        capture: false,
+      });
+    }
+  }
 } else {
   assert(fs.existsSync(sourceCommitFile), "Exported source commit manifest is missing");
   head = fs.readFileSync(sourceCommitFile, "utf8").trim();
