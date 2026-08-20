@@ -386,7 +386,7 @@ try {
   await unlockWithPin.waitFor();
   await unlockWithPin.check();
   const setPinDialog = popup.getByRole("dialog");
-  await setPinDialog.getByLabel("PIN", { exact: true }).fill(bitwardenPassword);
+  await setPinDialog.locator('input[type="password"]').fill(bitwardenPassword);
   await setPinDialog.getByRole("button", { name: "Set PIN", exact: true }).click();
   await setPinDialog.waitFor({ state: "hidden" });
   assert.equal(await unlockWithPin.isChecked(), true, "the supported unlock method must be set");
