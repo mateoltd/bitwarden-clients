@@ -32,7 +32,8 @@ env:
   PROVIDER_REPOSITORY: ${{ inputs.provider_repository || 'mateoltd/simplelogin-owned-provider' }}
   PROVIDER_OPERATIONS_COMMIT: ${{ inputs.provider_operations_ref || 'e157b6804f7b1b60e149207cebe2d414f6e4a73f' }}
   PROVIDER_UPSTREAM_COMMIT: ${{ inputs.provider_upstream_ref || 'dbc45fcce4e8e6b4fa615cc729ca95a67bf75266' }}
-  VAULT_IMAGE: docker.io/vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8
+  BITWARDEN_IMAGE: ghcr.io/bitwarden/lite:2026.7.2@sha256:ca1007fb3a8e973692ca1b92b87e52d2101976ef9bdf76d8639682485a5866dc
+  VAULTWARDEN_IMAGE: docker.io/vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8
 
 jobs:
   browser-and-desktop:
@@ -69,7 +70,30 @@ jobs:
         run: |
           scripts/release/export-oss-source.sh "$RUNNER_TEMP/source"
           cd "$RUNNER_TEMP/source"
-          HUSKY=0 npm ci
+          docker build \
+            --file scripts/release/pinned-toolchain.Dockerfile \
+            --tag alias-client-pinned-toolchain \
+            . > "$RUNNER_TEMP/pinned-toolchain-build.log" 2>&1 || {
+              tail -160 "$RUNNER_TEMP/pinned-toolchain-build.log"
+              exit 1
+            }
+          tail -40 "$RUNNER_TEMP/pinned-toolchain-build.log"
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --env HOME=/tmp/alias-toolchain-home \
+            --env npm_config_cache=/tmp/alias-toolchain-npm-cache \
+            --volume "$RUNNER_TEMP/source:/workspace" \
+            --workdir /workspace \
+            alias-client-pinned-toolchain \
+            bash -c 'HUSKY=0 npm ci && npm run release:verify-sdk-install' \
+            > "$RUNNER_TEMP/pinned-toolchain-install.log" 2>&1 || {
+              tail -160 "$RUNNER_TEMP/pinned-toolchain-install.log"
+              exit 1
+            }
+          tail -60 "$RUNNER_TEMP/pinned-toolchain-install.log"
+          sha256sum \
+            "$RUNNER_TEMP/pinned-toolchain-build.log" \
+            "$RUNNER_TEMP/pinned-toolchain-install.log"
           chromium_path="$(node scripts/release/install-browser-runtime.mjs --output "$RUNNER_TEMP/playwright-chromium")"
           test -x "$chromium_path"
           echo "CHROMIUM_PATH=$chromium_path" >> "$GITHUB_ENV"
@@ -92,42 +116,27 @@ jobs:
           provider/ops/owned-provider/bin/owned-provider up
           restore_secret_acls
           trap - EXIT
-      - name: Start pinned ephemeral vault
+      - name: Start pinned official Bitwarden Lite
         run: |
-          mkdir -p "$RUNNER_TEMP/vault-data"
-          chmod 777 "$RUNNER_TEMP/vault-data"
-          docker run --detach --name alias-client-release-vault \
-            --volume "$RUNNER_TEMP/vault-data:/data" \
-            --publish 127.0.0.1:18080:80 \
-            --env DOMAIN=https://localhost:18443 \
-            --env SIGNUPS_ALLOWED=true \
-            --env SIGNUPS_VERIFY=false \
-            "$VAULT_IMAGE"
-          for attempt in $(seq 1 60); do
-            if curl --silent --fail http://127.0.0.1:18080/alive >/dev/null; then break; fi
-            if [[ "$attempt" == 60 ]]; then docker logs alias-client-release-vault; exit 1; fi
-            sleep 1
-          done
+          service_runtime="$RUNNER_TEMP/bitwarden-test-service"
+          mkdir -p "$service_runtime"
           cd "$RUNNER_TEMP/source"
-          node scripts/release/vault-tls-proxy.mjs > "$RUNNER_TEMP/vault-tls-proxy.log" 2>&1 &
-          for attempt in $(seq 1 30); do
-            if curl --insecure --silent --fail https://localhost:18443/alive >/dev/null; then break; fi
-            if [[ "$attempt" == 30 ]]; then cat "$RUNNER_TEMP/vault-tls-proxy.log"; exit 1; fi
-            sleep 1
-          done
+          node scripts/release/bitwarden-test-service.mjs start-official \
+            --runtime-directory "$service_runtime"
           vault_password="$(openssl rand -base64 30 | tr -d '\r\n')"
           echo "::add-mask::$vault_password"
           {
             echo "BITWARDEN_PASSWORD=$vault_password"
             echo "BITWARDEN_EMAIL=alias-release-${GITHUB_RUN_ID}@mailbox.lan"
-            echo "BITWARDEN_DB_PATH=$RUNNER_TEMP/vault-data/db.sqlite3"
+            echo "BITWARDEN_RUNTIME_DIRECTORY=$service_runtime"
           } >> "$GITHUB_ENV"
       - name: Bootstrap client-generated vault keys
         env:
           BITWARDEN_WEB_URL: https://localhost:18443
+          BITWARDEN_HEADED: "1"
         run: |
           cd "$RUNNER_TEMP/source"
-          node scripts/release/bootstrap-test-vault.mjs
+          xvfb-run -a node scripts/release/bootstrap-test-vault.mjs
       - name: Build headed test clients
         run: |
           cd "$RUNNER_TEMP/source"
@@ -158,14 +167,15 @@ jobs:
         env: &alias-e2e-environment
           BITWARDEN_API_URL: http://127.0.0.1:18080/api
           BITWARDEN_IDENTITY_URL: http://127.0.0.1:18080/identity
-          BITWARDEN_DB_DIALECT: vaultwarden
+          BITWARDEN_DB_DIALECT: bitwarden
+          BITWARDEN_HEADED: "1"
           SIMPLELOGIN_URL: http://127.0.0.1:17777
           SIMPLELOGIN_EMAIL: admin@mailbox.lan
           SIMPLELOGIN_APP_CONTAINER: simplelogin-owned-provider-app-1
         run: |
           cd "$RUNNER_TEMP/source"
           xvfb-run -a node apps/browser/test/real-simple-login-alias.e2e.mjs
-      - name: Desktop create, lock, restart, and unlock
+      - name: Desktop and Electron create, send, reply, lock, restart, and unlock
         env: *alias-e2e-environment
         run: |
           cd "$RUNNER_TEMP/source"
@@ -174,7 +184,7 @@ jobs:
               docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
             done
           xvfb-run -a node apps/desktop/test/real-simple-login-alias.e2e.mjs
-      - name: Web alias lifecycle through the real application route
+      - name: Headed web alias lifecycle through the real application route
         env: *alias-e2e-environment
         run: |
           cd "$RUNNER_TEMP/source"
@@ -189,7 +199,7 @@ jobs:
           ALIAS_CROSS_DEVICE_INTEGRATION: "1"
           ALIAS_SYNC_FIXTURE_SIZE: "10000"
           BITWARDEN_API_URL: http://127.0.0.1:18080/api
-          BITWARDEN_DB_DIALECT: vaultwarden
+          BITWARDEN_DB_DIALECT: bitwarden
           BITWARDEN_IDENTITY_URL: http://127.0.0.1:18080/identity
           BITWARDEN_SERVER_INTEGRATION: "1"
           SIMPLELOGIN_BASE_URL: http://127.0.0.1:17777
@@ -233,14 +243,60 @@ jobs:
             --projects libs/tools/generator/core/jest.config.js \
             --runTestsByPath \
             libs/tools/generator/core/src/alias/simple-login-alias.integration.spec.ts
+      - name: Preserve Vaultwarden 1.37.1 encrypted-data incompatibility evidence
+        run: |
+          cd "$RUNNER_TEMP/source"
+          docker logs alias-client-release-bitwarden \
+            > "$BITWARDEN_RUNTIME_DIRECTORY/official-bitwarden.log" 2>&1
+          node scripts/release/bitwarden-test-service.mjs start-vaultwarden \
+            --runtime-directory "$BITWARDEN_RUNTIME_DIRECTORY"
+          compatibility_password="$(openssl rand -base64 30 | tr -d '\r\n')"
+          echo "::add-mask::$compatibility_password"
+          export BITWARDEN_PASSWORD="$compatibility_password"
+          export BITWARDEN_EMAIL="alias-vaultwarden-${GITHUB_RUN_ID}@mailbox.lan"
+          export BITWARDEN_DB_DIALECT=vaultwarden
+          export BITWARDEN_WEB_URL=https://localhost:18443
+          export BITWARDEN_API_URL=http://127.0.0.1:18080/api
+          export BITWARDEN_IDENTITY_URL=http://127.0.0.1:18080/identity
+          export BITWARDEN_HEADED=1
+          export SIMPLELOGIN_URL=http://127.0.0.1:17777
+          export SIMPLELOGIN_EMAIL=admin@mailbox.lan
+          export SIMPLELOGIN_APP_CONTAINER=simplelogin-owned-provider-app-1
+          xvfb-run -a node scripts/release/bootstrap-test-vault.mjs
+          docker exec simplelogin-owned-provider-redis-1 redis-cli --scan --pattern 'LIMITS:*' |
+            while IFS= read -r key; do
+              docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
+            done
+          set +e
+          xvfb-run -a node apps/browser/test/real-simple-login-alias.e2e.mjs \
+            > "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-browser.log" 2>&1
+          browser_exit=$?
+          set -e
+          docker logs alias-client-release-vault \
+            > "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-server.log" 2>&1
+          node scripts/release/verify-vaultwarden-rejection.mjs \
+            --browser-exit "$browser_exit" \
+            --browser-log "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-browser.log" \
+            --server-log "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-server.log"
+          tail -80 "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-browser.log"
+          tail -80 "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-server.log"
       - name: Capture diagnostics
         if: always()
         run: |
           mkdir -p diagnostics
-          docker logs alias-client-release-vault > diagnostics/vault.log 2>&1 || true
+          docker logs alias-client-release-bitwarden > diagnostics/official-bitwarden-live.log 2>&1 || true
+          docker logs alias-client-release-vault > diagnostics/vaultwarden-live.log 2>&1 || true
           docker logs simplelogin-owned-provider-app-1 > diagnostics/provider.log 2>&1 || true
           cp "$RUNNER_TEMP/web.log" diagnostics/web.log 2>/dev/null || true
+          cp "$RUNNER_TEMP"/pinned-toolchain-*.log diagnostics/ 2>/dev/null || true
+          cp "$RUNNER_TEMP"/bitwarden-test-service/*.log diagnostics/ 2>/dev/null || true
           find /tmp -maxdepth 1 -name 'alias-*.png' -exec cp {} diagnostics/ \; || true
+      - name: Stop contained test services
+        if: always()
+        run: |
+          cd "$RUNNER_TEMP/source"
+          node scripts/release/bitwarden-test-service.mjs stop \
+            --runtime-directory "$RUNNER_TEMP/bitwarden-test-service"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

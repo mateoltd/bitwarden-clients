@@ -187,24 +187,28 @@ describeIntegration("SimpleLogin real API integration", () => {
 
   const describeRateLimit =
     process.env["SIMPLELOGIN_RATE_LIMIT_INTEGRATION"] === "1" ? it : it.skip;
-  describeRateLimit("classifies the real SimpleLogin 429 response", async () => {
-    let rateLimit: SimpleLoginAliasError | undefined;
-    for (let request = 0; request < 60 && !rateLimit; request++) {
-      try {
-        await service.list(0);
-      } catch (error) {
-        const candidate = error as SimpleLoginAliasError;
-        if (candidate.code === "rate-limited") {
-          rateLimit = candidate;
-        } else {
-          throw error;
+  describeRateLimit(
+    "classifies the real SimpleLogin 429 response",
+    async () => {
+      let rateLimit: SimpleLoginAliasError | undefined;
+      for (let request = 0; request < 60 && !rateLimit; request++) {
+        try {
+          await service.list(0);
+        } catch (error) {
+          const candidate = error as SimpleLoginAliasError;
+          if (candidate.code === "rate-limited") {
+            rateLimit = candidate;
+          } else {
+            throw error;
+          }
         }
       }
-    }
 
-    expect(rateLimit).toMatchObject({ code: "rate-limited", status: 429 });
-    // The pinned official SimpleLogin service returns no Retry-After or X-RateLimit headers. The
-    // transport unit test separately proves that Retry-After is retained when a server supplies it.
-    expect(rateLimit?.retryAfterSeconds).toBeUndefined();
-  });
+      expect(rateLimit).toMatchObject({ code: "rate-limited", status: 429 });
+      // The pinned official SimpleLogin service returns no Retry-After or X-RateLimit headers. The
+      // transport unit test separately proves that Retry-After is retained when a server supplies it.
+      expect(rateLimit?.retryAfterSeconds).toBeUndefined();
+    },
+    30_000,
+  );
 });

@@ -48,6 +48,7 @@
     "debug:cli": "npm run debug:cli --workspace @bitwarden/cli --",
     "release:verify": "node scripts/release/verify-release.mjs",
     "release:verify-sdk": "node scripts/release/verify-sdk.mjs",
+    "release:verify-sdk-install": "node scripts/release/verify-sdk-install.mjs",
     "release:scope-audit": "node scripts/release/scope-audit.mjs",
     "release:sdk:repin": "node scripts/release/repin-sdk.mjs",
     "release:build": "node scripts/release/build-target.mjs",
