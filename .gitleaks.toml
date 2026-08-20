@@ -23,5 +23,5 @@ paths = [
   '''(?:^|/)apps/web/src/app/billing/shared/offboarding-survey\.component\.ts$''',
   '''(?:^|/)libs/common/src/billing/services/subscription-pricing\.service\.ts$''',
   '''(?:^|/)libs/common/src/enums/feature-flag\.enum\.ts$''',
-  '''(?:^|/)libs/common/src/platform/models/domain/symmetric-crypto-key\.ts$'''
+  '''(?:^|/)libs/legacy-crypto/src/models/symmetric-crypto-key\.ts$'''
 ]
