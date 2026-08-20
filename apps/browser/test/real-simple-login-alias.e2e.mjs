@@ -381,8 +381,21 @@ try {
   assert.equal((await deleteContactResponse).ok(), true);
   await popup.getByText(reverseContact, { exact: true }).waitFor({ state: "detached" });
 
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/account-security`);
+  const unlockWithPin = popup.getByRole("checkbox", { name: "Unlock with PIN", exact: true });
+  await unlockWithPin.waitFor();
+  await unlockWithPin.check();
+  const setPinDialog = popup.getByRole("dialog");
+  await setPinDialog.getByLabel("PIN", { exact: true }).fill(bitwardenPassword);
+  await setPinDialog.getByRole("button", { name: "Set PIN", exact: true }).click();
+  await setPinDialog.waitFor({ state: "hidden" });
+  assert.equal(await unlockWithPin.isChecked(), true, "the supported unlock method must be set");
+
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/account-switcher`);
-  await popup.getByRole("button", { name: "Lock now", exact: true }).click();
+  const lockNow = popup.getByRole("button", { name: "Lock now", exact: true });
+  await lockNow.waitFor();
+  assert.equal(await lockNow.isEnabled(), true, "the account must be lockable before restart");
+  await lockNow.click();
   await context.close().catch(() => undefined);
   context = await chromium.launchPersistentContext(profile, launchOptions);
   context.setDefaultTimeout(15_000);
