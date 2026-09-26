@@ -63,7 +63,7 @@ export class EmailAliasesComponent implements OnInit {
 
       const aliasId = Number(this.route.snapshot.queryParamMap.get("aliasId"));
       if (Number.isInteger(aliasId) && aliasId > 0) {
-        await this.selectAlias(aliasId);
+        await this.selectAlias(aliasId, this.route.snapshot.queryParamMap.get("connectionId"));
       }
     });
     this.loading = false;
@@ -119,13 +119,19 @@ export class EmailAliasesComponent implements OnInit {
     await this.run(() => this.selectAlias(id));
   }
 
-  private async selectAlias(id: number): Promise<void> {
-    this.selected = await this.aliasesService.get(id);
+  private async selectAlias(id: number, expectedConnectionId?: string | null): Promise<void> {
+    const alias = await this.aliasesService.get(id);
+    if (expectedConnectionId != null && alias.identity.connectionId !== expectedConnectionId) {
+      this.selected = undefined;
+      this.contacts = [];
+      throw new Error(this.i18nService.t("aliasUnknownError"));
+    }
+    this.selected = alias;
     this.contactPage = 0;
     await this.loadContacts(0);
     await this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { aliasId: id },
+      queryParams: { aliasId: id, connectionId: alias.identity.connectionId },
       queryParamsHandling: "merge",
       replaceUrl: true,
     });
@@ -136,7 +142,7 @@ export class EmailAliasesComponent implements OnInit {
     this.contacts = [];
     await this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { aliasId: null },
+      queryParams: { aliasId: null, connectionId: null },
       queryParamsHandling: "merge",
       replaceUrl: true,
     });

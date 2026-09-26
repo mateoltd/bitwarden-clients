@@ -53,6 +53,32 @@ describe("EmailAliasesComponent", () => {
     expect(aliasesService.recommend).toHaveBeenCalledWith("https://signup.example.com/register");
   });
 
+  it.each(["11111111-1111-4111-8111-111111111111", "other-connection"])(
+    "validates a deep link connection before loading contacts (%s)",
+    async (connectionId) => {
+      aliasesService.get.mockResolvedValue(aliasFixture());
+      aliasesService.contacts.mockResolvedValue({ items: [], page: 0 });
+      const component = createComponent("42", connectionId);
+      await component.ngOnInit();
+      if (connectionId === "other-connection") {
+        expect(component["selectedAlias"]()).toBeUndefined();
+        expect(component["contacts"]()).toEqual([]);
+        expect(aliasesService.contacts).not.toHaveBeenCalled();
+        expect(component["error"]()).toBe("aliasUnknownError");
+      } else {
+        expect(component["selectedAlias"]()).toEqual(aliasFixture());
+      }
+    },
+  );
+
+  it("includes the connection when opening an alias from the list", async () => {
+    const component = createComponent();
+    await component["open"](aliasFixture());
+    expect(router.navigate).toHaveBeenCalledWith(["/email-aliases", 42], {
+      queryParams: { connectionId: aliasFixture().identity.connectionId },
+    });
+  });
+
   it("performs detail lifecycle and reverse-alias actions", async () => {
     const alias = aliasFixture();
     aliasesService.get.mockResolvedValue(alias);
@@ -119,9 +145,12 @@ describe("EmailAliasesComponent", () => {
     expect(aliasesService.deleteContact).not.toHaveBeenCalled();
   });
 
-  function createComponent(id: string | null = null) {
+  function createComponent(id: string | null = null, connectionId: string | null = null) {
     const route = {
-      snapshot: { paramMap: { get: jest.fn().mockReturnValue(id) } },
+      snapshot: {
+        paramMap: { get: jest.fn().mockReturnValue(id) },
+        queryParamMap: { get: jest.fn().mockReturnValue(connectionId) },
+      },
     } as unknown as ActivatedRoute;
     return new EmailAliasesComponent(
       aliasesService,

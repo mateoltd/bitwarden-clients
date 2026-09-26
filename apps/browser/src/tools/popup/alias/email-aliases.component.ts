@@ -84,7 +84,7 @@ export class EmailAliasesComponent implements OnInit {
   async ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get("id"));
     if (Number.isInteger(id) && id > 0) {
-      await this.loadDetail(id);
+      await this.loadDetail(id, this.route.snapshot.queryParamMap.get("connectionId"));
       return;
     }
     await this.loadList(0);
@@ -121,7 +121,9 @@ export class EmailAliasesComponent implements OnInit {
   }
 
   protected async open(alias: SimpleLoginAlias) {
-    await this.router.navigate(["/email-aliases", alias.id]);
+    await this.router.navigate(["/email-aliases", alias.id], {
+      queryParams: { connectionId: alias.identity.connectionId },
+    });
   }
 
   protected async save() {
@@ -239,9 +241,14 @@ export class EmailAliasesComponent implements OnInit {
     this.recommendation.set(recommendation);
   }
 
-  private async loadDetail(id: number) {
+  private async loadDetail(id: number, expectedConnectionId?: string | null) {
     await this.run(async () => {
       const alias = await this.aliasesService.get(id);
+      if (expectedConnectionId != null && alias.identity.connectionId !== expectedConnectionId) {
+        this.selectedAlias.set(undefined);
+        this.contacts.set([]);
+        throw new SimpleLoginAliasError("Alias connection does not match", "conflict");
+      }
       const contacts = await this.aliasesService.contacts(alias.id, 0);
       this.selectedAlias.set(alias);
       this.patchEditForm(alias);

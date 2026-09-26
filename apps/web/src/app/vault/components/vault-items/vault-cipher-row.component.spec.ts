@@ -25,6 +25,7 @@ import {
   CopyCipherFieldService,
   OrganizationNameBadgeComponent,
   VaultCopyButtonsService,
+  VaultItemCopyActionsComponent,
 } from "@bitwarden/vault";
 
 import { VaultCipherRowComponent } from "./vault-cipher-row.component";
@@ -61,6 +62,7 @@ describe("VaultCipherRowComponent", () => {
         OrganizationNameBadgeComponent,
         PremiumBadgeComponent,
         ShareLinkMenuItemDirective,
+        VaultItemCopyActionsComponent,
       ],
       providers: [
         { provide: I18nService, useValue: { t: (key: string) => key } },
@@ -131,6 +133,7 @@ describe("VaultCipherRowComponent", () => {
     const overlayContent = TestBed.inject(OverlayContainer).getContainerElement().innerHTML;
     expect(overlayContent).toContain("manageEmailAlias");
     expect(overlayContent).toContain("/tools/aliases?aliasId=42");
+    expect(overlayContent).toContain(`connectionId=${cipher.aliasBinding.connectionId}`);
   });
 
   describe("showAssignToCollections", () => {

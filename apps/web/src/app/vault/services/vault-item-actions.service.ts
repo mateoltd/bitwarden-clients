@@ -7,6 +7,7 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { uuidAsString } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
+import { EmailAliasIdentity } from "@bitwarden/common/tools/alias";
 import { CipherId, CollectionId, OrganizationId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
@@ -228,6 +229,11 @@ export class WebVaultItemActionsService {
     formConfig: CipherFormConfig,
     link?: ItemDeepLink,
   ): Promise<void> {
+    const accountId = (await firstValueFrom(this.accountService.activeAccount$))?.id;
+    if (!accountId) {
+      return;
+    }
+    let requestedAlias: EmailAliasIdentity | undefined;
     this._itemDialogOpen.set(true);
 
     try {
@@ -235,7 +241,13 @@ export class WebVaultItemActionsService {
         await this.setItemQueryParams(link);
       }
 
-      const dialogRef = VaultItemDialogComponent.open(this.dialogService, { mode, formConfig });
+      const dialogRef = VaultItemDialogComponent.open(this.dialogService, {
+        mode,
+        formConfig,
+        onManageAlias: (alias) => {
+          requestedAlias = alias;
+        },
+      });
       const result = await lastValueFrom(dialogRef.closed);
 
       // The user is navigated to subscription settings elsewhere; leave the URL alone.
@@ -243,8 +255,22 @@ export class WebVaultItemActionsService {
         return;
       }
 
+      if ((await firstValueFrom(this.accountService.activeAccount$))?.id !== accountId) {
+        return;
+      }
       // Cleared before the flag drops, so the page does not read the params back as a new deep link.
       await this.clearItemQueryParams();
+      if (
+        requestedAlias &&
+        (await firstValueFrom(this.accountService.activeAccount$))?.id === accountId
+      ) {
+        await this.router.navigate(["/tools/aliases"], {
+          queryParams: {
+            aliasId: requestedAlias.aliasId,
+            connectionId: requestedAlias.connectionId,
+          },
+        });
+      }
     } finally {
       this._itemDialogOpen.set(false);
     }

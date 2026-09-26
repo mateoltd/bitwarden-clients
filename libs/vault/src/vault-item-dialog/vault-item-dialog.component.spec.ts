@@ -163,6 +163,73 @@ describe("VaultItemDialogComponent", () => {
     expect(component).toBeTruthy();
   });
 
+  describe("manage email alias", () => {
+    const alias = {
+      version: 1 as const,
+      connectionId: "11111111-1111-4111-8111-111111111111",
+      aliasId: "42",
+      address: "alias@example.com",
+    };
+    let cipher: CipherView;
+    let onManageAlias: jest.Mock;
+
+    beforeEach(() => {
+      cipher = new CipherView();
+      cipher.type = CipherType.Login;
+      cipher.login.username = alias.address;
+      cipher.aliasBinding = alias;
+      onManageAlias = jest.fn();
+      component.setTestCipher(cipher);
+      component.setTestParams({ mode: "view", onManageAlias });
+      component["performingInitialLoad"] = false;
+    });
+
+    it("offers a valid personal binding and records the request before closing", async () => {
+      expect(component["manageableAlias"]).toEqual(alias);
+      await component["manageAlias"]();
+      expect(onManageAlias).toHaveBeenCalledWith(alias);
+      expect(close).toHaveBeenCalled();
+      expect(onManageAlias.mock.invocationCallOrder[0]).toBeLessThan(
+        close.mock.invocationCallOrder[0],
+      );
+    });
+
+    it.each([
+      ["unbound", { aliasBinding: undefined }],
+      ["malformed", { aliasBinding: { ...alias, version: 2 } }],
+      ["organization", { organizationId: "organization-id" }],
+      ["deleted", { deletedDate: new Date() }],
+      ["archived", { archivedDate: new Date() }],
+      ["decryption failure", { decryptionFailure: true }],
+      ["non-login", { type: CipherType.SecureNote }],
+    ])("does not offer or invoke the action for %s items", async (_, overrides) => {
+      Object.assign(cipher, overrides);
+      expect(component["manageableAlias"]).toBeUndefined();
+      await component["manageAlias"]();
+      expect(onManageAlias).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+    });
+
+    it("rejects a binding whose address no longer matches the username", () => {
+      cipher.login.username = "different@example.com";
+      expect(component["manageableAlias"]).toBeUndefined();
+    });
+
+    it.each([
+      { onManageAlias: undefined },
+      { mode: "form" as const },
+      { isAdminConsoleAction: true },
+    ])("requires a view-mode client callback outside the admin console (%j)", (params) => {
+      component.setTestParams(params);
+      expect(component["manageableAlias"]).toBeUndefined();
+    });
+
+    it("waits for successful initial loading", () => {
+      component["performingInitialLoad"] = true;
+      expect(component["manageableAlias"]).toBeUndefined();
+    });
+  });
+
   describe("dialog title", () => {
     it("sets title for view mode and Login type", () => {
       component.setTestCipher({ type: CipherType.Login } as any);

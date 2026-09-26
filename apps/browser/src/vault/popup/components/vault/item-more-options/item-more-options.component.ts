@@ -292,7 +292,9 @@ export class ItemMoreOptionsComponent {
     if (!cipher.aliasBinding) {
       return;
     }
-    await this.router.navigate(["/email-aliases", cipher.aliasBinding.aliasId]);
+    await this.router.navigate(["/email-aliases", cipher.aliasBinding.aliasId], {
+      queryParams: { connectionId: cipher.aliasBinding.connectionId },
+    });
   }
 
   /**

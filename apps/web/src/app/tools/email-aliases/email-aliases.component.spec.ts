@@ -101,6 +101,33 @@ describe("EmailAliasesComponent", () => {
     );
   });
 
+  it.each([alias().identity.connectionId, "another-connection", null])(
+    "validates a deep link connection before displaying an alias (%s)",
+    async (connectionId) => {
+      component = new EmailAliasesComponent(
+        aliasesService,
+        dialogService,
+        { t: (key: string) => key } as I18nService,
+        {
+          snapshot: {
+            queryParamMap: { get: (key: string) => (key === "aliasId" ? "7" : connectionId) },
+          },
+        } as unknown as ActivatedRoute,
+        router,
+      );
+      await component.ngOnInit();
+      if (connectionId === "another-connection") {
+        expect(component.selected).toBeUndefined();
+        expect(component.contacts).toEqual([]);
+        expect(aliasesService.contacts).not.toHaveBeenCalled();
+        expect(component.error).toBe("aliasUnknownError");
+      } else {
+        expect(component.selected).toEqual(alias());
+        expect(aliasesService.contacts).toHaveBeenCalledWith(7, 0);
+      }
+    },
+  );
+
   it("loads aliases, pagination, and domains from encrypted SimpleLogin configuration", async () => {
     await component.ngOnInit();
 
@@ -136,7 +163,7 @@ describe("EmailAliasesComponent", () => {
     expect(component.selected?.id).toBe(8);
     expect(router.navigate).toHaveBeenCalledWith([], {
       relativeTo: expect.anything(),
-      queryParams: { aliasId: 8 },
+      queryParams: { aliasId: 8, connectionId: alias().identity.connectionId },
       queryParamsHandling: "merge",
       replaceUrl: true,
     });

@@ -162,6 +162,21 @@ describe("ItemMoreOptionsComponent", () => {
     expect(cipherService.cipherView$).toHaveBeenCalledWith("UserId", "cipher-1");
   });
 
+  it("keeps the bound connection identity in the management route", async () => {
+    const aliasBinding = {
+      version: 1 as const,
+      connectionId: "11111111-1111-4111-8111-111111111111",
+      aliasId: "42",
+      address: "bound-alias@sl.test",
+    };
+    jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+    cipherService.getFullCipherView.mockResolvedValue({ ...baseCipher, aliasBinding });
+    await component["manageBoundAlias"]();
+    expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(["/email-aliases", "42"], {
+      queryParams: { connectionId: aliasBinding.connectionId },
+    });
+  });
+
   describe("doAutofill", () => {
     beforeEach(() => {
       jest.spyOn(component as any, "_domainMatched").mockResolvedValue(false);

@@ -29,6 +29,11 @@ import { ConfigService } from "@bitwarden/common/platform/abstractions/config/co
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { MessagingService } from "@bitwarden/common/platform/abstractions/messaging.service";
+import {
+  EmailAliasIdentity,
+  normalizeEmailAliasAddress,
+  parseEmailAliasIdentity,
+} from "@bitwarden/common/tools/alias";
 import { CipherId, CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -100,6 +105,9 @@ export interface VaultItemDialogParams {
    * Function to restore a cipher from the trash.
    */
   restore?: (c: CipherViewLike) => Promise<void>;
+
+  /** Record a request to manage a bound alias. Navigate only after the dialog closes. */
+  onManageAlias?: (alias: EmailAliasIdentity) => void;
 }
 
 export const VaultItemDialogResult = {
@@ -270,6 +278,38 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
   protected get disableEdit() {
     return !this.canEdit && this.formConfig.mode !== "partial-edit";
   }
+
+  protected get manageableAlias(): EmailAliasIdentity | undefined {
+    if (
+      this.performingInitialLoad ||
+      this.params.mode !== "view" ||
+      !this.params.onManageAlias ||
+      this.params.isAdminConsoleAction ||
+      this.formConfig.isAdminConsole ||
+      this.cipher?.type !== CipherType.Login ||
+      this.cipher.decryptionFailure ||
+      this.cipher.organizationId != null ||
+      this.cipher.isDeleted ||
+      this.cipher.isArchived
+    ) {
+      return undefined;
+    }
+    const alias = parseEmailAliasIdentity(this.cipher.aliasBinding);
+    return alias &&
+      normalizeEmailAliasAddress(alias.address) ===
+        normalizeEmailAliasAddress(this.cipher.login?.username)
+      ? alias
+      : undefined;
+  }
+
+  protected manageAlias = async () => {
+    const alias = this.manageableAlias;
+    if (!alias) {
+      return;
+    }
+    this.params.onManageAlias?.(alias);
+    await this.dialogRef.close(this._cipherModified ? VaultItemDialogResult.Saved : undefined);
+  };
 
   protected get showEdit() {
     return this.showCipherView && !this.isTrashFilter && !this.showRestore;

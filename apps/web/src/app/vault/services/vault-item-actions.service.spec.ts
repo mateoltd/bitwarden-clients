@@ -1,7 +1,7 @@
 import { TestBed } from "@angular/core/testing";
 import { Router } from "@angular/router";
 import { mock, MockProxy } from "jest-mock-extended";
-import { of, Subject } from "rxjs";
+import { BehaviorSubject, of, Subject } from "rxjs";
 
 import { CollectionView } from "@bitwarden/common/admin-console/models/collections";
 import { Account, AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -38,6 +38,7 @@ describe("WebVaultItemActionsService", () => {
   let passwordRepromptService: MockProxy<PasswordRepromptService>;
   let router: MockProxy<Router>;
   let toastService: MockProxy<ToastService>;
+  let activeAccount$: BehaviorSubject<Account | null>;
 
   let itemDialogOpen: jest.SpyInstance;
   let assignCollectionsDialogOpen: jest.SpyInstance;
@@ -80,7 +81,8 @@ describe("WebVaultItemActionsService", () => {
     router.navigate.mockResolvedValue(true);
 
     const accountService = mock<AccountService>();
-    accountService.activeAccount$ = of({ id: userId } as Account);
+    activeAccount$ = new BehaviorSubject<Account | null>({ id: userId } as Account);
+    accountService.activeAccount$ = activeAccount$;
 
     const i18nService = mock<I18nService>();
     i18nService.t.mockImplementation((key: string) => key);
@@ -346,6 +348,59 @@ describe("WebVaultItemActionsService", () => {
         }),
       );
     });
+  });
+
+  describe("manage alias navigation", () => {
+    const alias = {
+      version: 1 as const,
+      connectionId: "11111111-1111-4111-8111-111111111111",
+      aliasId: "42",
+      address: "alias@example.com",
+    };
+
+    it("waits for the dialog and query cleanup before navigating", async () => {
+      const closed = new Subject<undefined>();
+      itemDialogOpen.mockReturnValue({ closed } as unknown as DialogRef<never>);
+      const opening = service.view(buildCipher());
+      await flushMicrotasks();
+      itemDialogOpen.mock.calls[0][1].onManageAlias(alias);
+      expect(router.navigate).not.toHaveBeenCalledWith(["/tools/aliases"], expect.anything());
+
+      let finishCleanup!: (value: boolean) => void;
+      router.navigate.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishCleanup = resolve;
+          }),
+      );
+      closed.next(undefined);
+      closed.complete();
+      await flushMicrotasks();
+      expect(router.navigate).not.toHaveBeenCalledWith(["/tools/aliases"], expect.anything());
+      finishCleanup(true);
+      await opening;
+      expect(router.navigate).toHaveBeenLastCalledWith(["/tools/aliases"], {
+        queryParams: { aliasId: "42", connectionId: alias.connectionId },
+      });
+      expect(service.itemDialogOpen()).toBe(false);
+    });
+
+    it.each([null, { id: "another-user" } as Account])(
+      "does not navigate after an account change (%j)",
+      async (account) => {
+        const closed = new Subject<undefined>();
+        itemDialogOpen.mockReturnValue({ closed } as unknown as DialogRef<never>);
+        const opening = service.view(buildCipher());
+        await flushMicrotasks();
+        itemDialogOpen.mock.calls[0][1].onManageAlias(alias);
+        activeAccount$.next(account);
+        router.navigate.mockClear();
+        closed.next(undefined);
+        closed.complete();
+        await opening;
+        expect(router.navigate).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("dialog open state", () => {
