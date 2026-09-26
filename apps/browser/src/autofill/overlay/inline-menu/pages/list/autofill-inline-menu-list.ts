@@ -9,7 +9,10 @@ import { EVENTS, UPDATE_PASSKEYS_HEADINGS_ON_SCROLL } from "@bitwarden/common/au
 import { Theme, ThemeTypes } from "@bitwarden/common/platform/enums";
 import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
 
-import { InlineMenuCipherData, InlineMenuEmailAliasRecommendation } from "../../../../background/abstractions/overlay.background";
+import {
+  InlineMenuCipherData,
+  InlineMenuEmailAliasRecommendation,
+} from "../../../../background/abstractions/overlay.background";
 import { ActionButton } from "../../../../content/components/buttons/action-button";
 import { Lock, Plus } from "../../../../content/components/icons";
 import {

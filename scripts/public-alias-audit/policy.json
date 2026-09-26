@@ -1,10 +1,10 @@
 {
-  "branch": "integration/provider-neutral-alias-upstream-sync",
-  "baseCommit": "b52a472fccba2727cba9cd22257d551599c43e4f",
+  "branch": "integration/alias-clients-launch-20260926",
+  "baseCommit": "45eb0013dc413dab78932c418d209d89371febf6",
   "upstreamRebase": {
-    "sourceCommit": "6f7f3d461b34315efe8df7d9c033149c4153947e",
-    "upstreamCommit": "b52a472fccba2727cba9cd22257d551599c43e4f",
-    "sourceMergeBaseCommit": "1f881babc15eb7d3a88cad41730ce167d8e49a41",
+    "sourceCommit": "ac3eb8c3c1ad2b74dda473a22cc044000fa96371",
+    "upstreamCommit": "45eb0013dc413dab78932c418d209d89371febf6",
+    "sourceMergeBaseCommit": "b52a472fccba2727cba9cd22257d551599c43e4f",
     "strategy": "rebase-merges"
   },
   "downstreamTopology": {
@@ -15,6 +15,7 @@
   "releaseCommit": "95c5655065172c7505d7f82428b8bf7b46792b82",
   "arm64FixCommit": "0c4906ee61d1a5fd13c4a95560b3f69b0a8d10f8",
   "sourceCommits": [
+    "ac3eb8c3c1ad2b74dda473a22cc044000fa96371",
     "6f7f3d461b34315efe8df7d9c033149c4153947e",
     "cd1f5cb4456a27e4c75d2206c7993c7b2c1ed038",
     "95c5655065172c7505d7f82428b8bf7b46792b82",

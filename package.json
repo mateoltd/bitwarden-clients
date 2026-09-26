@@ -42,10 +42,6 @@
     "icons:migrate": "ts-node scripts/material-icons/migrate-icon-names.ts",
     "icons:reverse-migrate": "ts-node scripts/material-icons/reverse-migrate-icon-names.ts",
     "dev:reverse-proxy": "node --experimental-strip-types scripts/reverse-proxy-emulator/index.ts",
-    "debug:desktop": "npm run debug:electron --workspace @bitwarden/desktop",
-    "debug:desktop:automation": "cross-env USE_AUTOMATION_BIOMETRICS=true npm run debug:desktop",
-    "debug:browser": "node apps/browser/scripts/dev-chrome.mjs --popup",
-    "debug:cli": "npm run debug:cli --workspace @bitwarden/cli --",
     "release:verify": "node scripts/release/verify-release.mjs",
     "release:verify-sdk": "node scripts/release/verify-sdk.mjs",
     "release:verify-sdk-install": "node scripts/release/verify-sdk-install.mjs",
@@ -56,7 +52,11 @@
     "release:metadata": "node scripts/release/generate-metadata.mjs",
     "release:license-inventory": "node scripts/release/license-inventory.mjs",
     "release:license-check": "node scripts/release/license-policy.mjs",
-    "release:upstream-drift": "node scripts/release/upstream-drift.mjs"
+    "release:upstream-drift": "node scripts/release/upstream-drift.mjs",
+    "debug:desktop": "npm run debug:electron --workspace @bitwarden/desktop",
+    "debug:desktop:automation": "cross-env USE_AUTOMATION_BIOMETRICS=true npm run debug:desktop",
+    "debug:browser": "node apps/browser/scripts/dev-chrome.mjs --popup",
+    "debug:cli": "npm run debug:cli --workspace @bitwarden/cli --"
   },
   "workspaces": [
     "apps/*",
@@ -155,8 +155,8 @@
     "mini-css-extract-plugin": "2.10.2",
     "nx": "22.7.7",
     "path-browserify": "1.0.1",
-    "postcss": "8.5.23",
     "playwright": "1.59.1",
+    "postcss": "8.5.23",
     "postcss-loader": "8.2.1",
     "prettier": "3.9.5",
     "prettier-plugin-tailwindcss": "0.8.0",

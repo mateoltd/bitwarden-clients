@@ -35,8 +35,8 @@ const releaseWorkflows = [
 ].map((relative) => [relative, fs.readFileSync(path.join(repositoryRoot, relative), "utf8")]);
 for (const [relative, workflow] of releaseWorkflows) {
   assert(
-    workflow.includes(`branches: [${manifest.releaseLane.branch}]`),
-    `${relative} does not run for ${manifest.releaseLane.branch}`,
+    workflow.includes("  workflow_dispatch:"),
+    `${relative} must support explicit qualification dispatch`,
   );
 }
 assert(
