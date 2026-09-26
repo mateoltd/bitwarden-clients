@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "../../../dist/out-tsc/renderer-pilot-angular",
+    "types": []
+  },
+  "files": ["./angular/bootstrap.ts", "./styles.d.ts"],
+  "include": ["./angular/**/*.ts", "./harness/**/*.ts", "./shared/**/*.ts", "./styles.d.ts"],
+  "exclude": ["./**/*.spec.ts", "./storybook/**/*"],
+  "angularCompilerOptions": {
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true,
+    "strictTemplates": true
+  }
+}

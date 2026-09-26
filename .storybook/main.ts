@@ -14,6 +14,7 @@ const config: StorybookConfig = {
     "../libs/storybook/src/**/*.stories.@(js|jsx|ts|tsx)",
     "../libs/auth/src/**/*.mdx",
     "../libs/auth/src/**/*.stories.@(js|jsx|ts|tsx)",
+    "../libs/key-management-ui/src/**/*.stories.@(js|jsx|ts|tsx)",
     "../libs/dirt/card/src/**/*.mdx",
     "../libs/dirt/card/src/**/*.stories.@(js|jsx|ts|tsx)",
     "../libs/pricing/src/**/*.mdx",
@@ -37,6 +38,7 @@ const config: StorybookConfig = {
     "../bitwarden_license/bit-browser/src/**/*.mdx",
     "../bitwarden_license/bit-browser/src/**/*.stories.@(js|jsx|ts|tsx)",
     "../libs/angular/src/**/*.stories.@(js|jsx|ts|tsx)",
+    "../tests/ui-redesign/renderer-pilot/storybook/**/*.stories.@(js|jsx|ts|tsx)",
   ],
   addons: [
     getAbsolutePath("@storybook/addon-links"),

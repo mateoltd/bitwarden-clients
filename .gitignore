@@ -38,6 +38,8 @@ target
 # Testing
 coverage
 junit.xml
+playwright-report
+test-results
 ## The "base" root level folder is expected for some local tests that do
 ## comparisons between the current branch and a base branch (usually main)
 base/

@@ -303,6 +303,7 @@
         "@storybook/addon-themes",
         "@storybook/angular",
         "@types/react",
+        "@types/react-dom",
         "autoprefixer",
         "bootstrap",
         "chromatic",
