@@ -7,8 +7,33 @@ import { assert, parseArgs, readManifest, repositoryRoot, requireString } from "
 
 const manifest = readManifest();
 const runtime = manifest.testInfrastructure;
-const officialNetwork = "alias-client-release-bitwarden-network";
-const compatibilityNetwork = "alias-client-release-vault-network";
+const args = parseArgs(process.argv.slice(2));
+const namespace = args.namespace;
+assert(
+  namespace === undefined || /^[a-z0-9][a-z0-9-]{2,48}$/.test(namespace),
+  "--namespace must contain 3–49 lowercase letters, digits, or hyphens",
+);
+function portOption(name, fallback) {
+  const value = Number(args[name] ?? fallback);
+  assert(Number.isInteger(value) && value > 1024 && value <= 65535, `Invalid --${name}`);
+  return value;
+}
+const httpPort = portOption("http-port", 18080);
+const tlsPort = portOption("tls-port", 18443);
+assert(httpPort !== tlsPort, "HTTP and TLS ports must differ");
+const httpUrl = `http://127.0.0.1:${httpPort}`;
+const tlsUrl = `https://localhost:${tlsPort}`;
+const envFile = args["env-file"];
+if (envFile !== undefined) {
+  assert(path.isAbsolute(envFile), "--env-file must be absolute");
+  assert((fs.statSync(envFile).mode & 0o077) === 0, "--env-file must be private (0600)");
+}
+const officialNetwork = namespace
+  ? `${namespace}-network`
+  : "alias-client-release-bitwarden-network";
+const compatibilityNetwork = namespace
+  ? `${namespace}-compatibility-network`
+  : "alias-client-release-vault-network";
 
 function docker(args, { allowFailure = false, capture = false } = {}) {
   const result = spawnSync("docker", args, {
@@ -83,6 +108,14 @@ class DockerBitwardenService {
   }
 
   createNetwork() {
+    // A namespaced lab may share its network with its own local SMTP sink.
+    if (
+      namespace &&
+      docker(["network", "inspect", this.networkName], { allowFailure: true, capture: true })
+        .status === 0
+    ) {
+      return;
+    }
     this.stopNetwork();
     docker(["network", "create", this.networkName], { capture: true });
   }
@@ -129,7 +162,7 @@ class DockerBitwardenService {
       [path.join(repositoryRoot, "scripts/release/vault-tls-proxy.mjs")],
       {
         detached: true,
-        env: { ...process.env, VAULT_HTTP_TARGET: "http://127.0.0.1:18080" },
+        env: { ...process.env, VAULT_HTTP_TARGET: httpUrl, VAULT_HTTPS_PORT: String(tlsPort) },
         stdio: ["ignore", log, log],
       },
     );
@@ -162,7 +195,7 @@ class DockerBitwardenService {
 class OfficialBitwardenService extends DockerBitwardenService {
   constructor(dataDirectory, runtimeDirectory) {
     super({
-      containerName: runtime.officialBitwarden.containerName,
+      containerName: namespace ? `${namespace}-bitwarden` : runtime.officialBitwarden.containerName,
       networkName: officialNetwork,
       runtimeDirectory,
     });
@@ -176,7 +209,7 @@ class OfficialBitwardenService extends DockerBitwardenService {
     await this.startWithRollback(async () => {
       this.startContainer([
         "--publish",
-        "127.0.0.1:18080:8080",
+        `127.0.0.1:${httpPort}:8080`,
         "--volume",
         `${this.dataDirectory}:/etc/bitwarden`,
         "--env",
@@ -189,10 +222,8 @@ class OfficialBitwardenService extends DockerBitwardenService {
         "BW_DB_PROVIDER=sqlite",
         "--env",
         "BW_DB_FILE=/etc/bitwarden/vault.db",
-        "--env",
-        "BW_INSTALLATION_ID=11111111-1111-4111-8111-111111111111",
-        "--env",
-        "BW_INSTALLATION_KEY=local-qualification-only",
+        ...(envFile ? [] : ["--env", "BW_INSTALLATION_ID=11111111-1111-4111-8111-111111111111"]),
+        ...(envFile ? [] : ["--env", "BW_INSTALLATION_KEY=local-qualification-only"]),
         "--env",
         "BW_ENABLE_ADMIN=true",
         "--env",
@@ -210,32 +241,37 @@ class OfficialBitwardenService extends DockerBitwardenService {
         "--env",
         "BW_ENABLE_SCIM=false",
         "--env",
-        "globalSettings__baseServiceUri__vault=https://localhost:18443",
+        `globalSettings__baseServiceUri__vault=${tlsUrl}`,
         "--env",
         "globalSettings__internalIdentityKey=",
         "--env",
         "globalSettings__pushRelayBaseUri=",
-        "--env",
-        "globalSettings__identityServer__certificatePassword=local-qualification-certificate",
+        ...(envFile
+          ? []
+          : [
+              "--env",
+              "globalSettings__identityServer__certificatePassword=local-qualification-certificate",
+            ]),
         "--env",
         "globalSettings__disableUserRegistration=false",
         "--env",
         "globalSettings__enableEmailVerification=false",
+        ...(envFile ? ["--env-file", envFile] : []),
         runtime.officialBitwarden.image,
       ]);
 
       await waitFor(async () => {
         if (
-          !(await httpReady("http://127.0.0.1:18080/api/alive")) ||
-          !(await httpReady("http://127.0.0.1:18080/identity/.well-known/openid-configuration")) ||
-          !(await httpReady("http://127.0.0.1:18080/admin/"))
+          !(await httpReady(`${httpUrl}/api/alive`)) ||
+          !(await httpReady(`${httpUrl}/identity/.well-known/openid-configuration`)) ||
+          !(await httpReady(`${httpUrl}/admin/`))
         ) {
           return false;
         }
         return fs.existsSync(this.database);
       }, "official Bitwarden API, Identity, and migrated SQLite schema");
       this.startProxy();
-      await waitFor(() => httpsReady("https://localhost:18443/api/alive"), "Bitwarden TLS proxy");
+      await waitFor(() => httpsReady(`${tlsUrl}/api/alive`), "Bitwarden TLS proxy");
     });
 
     console.log(
@@ -258,7 +294,7 @@ class OfficialBitwardenService extends DockerBitwardenService {
 class VaultwardenCompatibilityService extends DockerBitwardenService {
   constructor(dataDirectory, runtimeDirectory) {
     super({
-      containerName: runtime.vault.containerName,
+      containerName: namespace ? `${namespace}-vaultwarden` : runtime.vault.containerName,
       networkName: compatibilityNetwork,
       runtimeDirectory,
     });
@@ -271,23 +307,20 @@ class VaultwardenCompatibilityService extends DockerBitwardenService {
     await this.startWithRollback(async () => {
       this.startContainer([
         "--publish",
-        "127.0.0.1:18080:80",
+        `127.0.0.1:${httpPort}:80`,
         "--volume",
         `${this.dataDirectory}:/data`,
         "--env",
-        "DOMAIN=https://localhost:18443",
+        `DOMAIN=${tlsUrl}`,
         "--env",
         "SIGNUPS_ALLOWED=true",
         "--env",
         "SIGNUPS_VERIFY=false",
         runtime.vault.image,
       ]);
-      await waitFor(
-        () => httpReady("http://127.0.0.1:18080/alive"),
-        "Vaultwarden compatibility API",
-      );
+      await waitFor(() => httpReady(`${httpUrl}/alive`), "Vaultwarden compatibility API");
       this.startProxy();
-      await waitFor(() => httpsReady("https://localhost:18443/alive"), "Vaultwarden TLS proxy");
+      await waitFor(() => httpsReady(`${tlsUrl}/alive`), "Vaultwarden TLS proxy");
     });
 
     console.log(
@@ -304,7 +337,6 @@ class VaultwardenCompatibilityService extends DockerBitwardenService {
   }
 }
 
-const args = parseArgs(process.argv.slice(2));
 const command = args._[0];
 const runtimeDirectory = assertAbsoluteDirectory(args["runtime-directory"], "--runtime-directory");
 const official = new OfficialBitwardenService(

@@ -34,6 +34,17 @@ const simpleLoginEmail = requiredEnvironment("SIMPLELOGIN_EMAIL");
 const simpleLoginPassword = requiredEnvironment("SIMPLELOGIN_PASSWORD");
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), "bitwarden-alias-browser-e2e-"));
+const evidenceDirectory = process.env.ALIAS_E2E_EVIDENCE_DIRECTORY
+  ? path.resolve(process.env.ALIAS_E2E_EVIDENCE_DIRECTORY)
+  : fs.mkdtempSync(path.join(os.tmpdir(), "bitwarden-alias-evidence-"));
+fs.mkdirSync(evidenceDirectory, { recursive: true, mode: 0o700 });
+async function captureEvidence(page, name) {
+  // Credentials must not enter screenshots, including when a password is revealed.
+  await page.screenshot({
+    path: path.join(evidenceDirectory, name),
+    mask: [page.locator("input")],
+  });
+}
 const servers = [];
 let context;
 let extensionId;
@@ -100,7 +111,7 @@ try {
   try {
     await popup.locator("#email").waitFor({ timeout: 30_000 });
   } catch (error) {
-    await popup.screenshot({ path: "/tmp/alias-extension-login-unavailable.png" });
+    await captureEvidence(popup, "alias-extension-login-unavailable.png");
     recordDiagnostic(
       "LOGIN_SCREEN_UNAVAILABLE",
       `${popup.url()} ${(await popup.locator("body").innerText()).slice(0, 500)}`,
@@ -175,7 +186,7 @@ try {
   assert.ok(menuContainerFrame, "the extension menu container must be injected");
   await registration.locator("#email").press("ArrowDown");
   const hostileAttacks = await attemptHostileAliasMessages(registration);
-  await registration.screenshot({ path: "/tmp/alias-registration.png" });
+  await captureEvidence(registration, "alias-registration.png");
   const hostileReplay = hostileAttacks.replay;
   assert.ok(
     hostileReplay.frameCount > 0,
@@ -277,7 +288,7 @@ try {
     addLoginPoint,
     `an inline add-login action must be visible after ${inlineMenuButtonClicks} button clicks`,
   );
-  await registration.screenshot({ path: "/tmp/alias-registration-save.png" });
+  await captureEvidence(registration, "alias-registration-save.png");
   const addEditPagePromise = context.waitForEvent("page");
   await registration.mouse.click(addLoginPoint.x, addLoginPoint.y);
   const addEditPage = await addEditPagePromise;
@@ -298,7 +309,7 @@ try {
     registrationUrl.toString(),
   );
   await addEditPage.locator('input[formcontrolname="name"]').fill(marker);
-  await addEditPage.screenshot({ path: "/tmp/alias-login-binding.png" });
+  await captureEvidence(addEditPage, "alias-login-binding.png");
 
   const cipherResponsePromise = context.waitForEvent(
     "response",
@@ -347,7 +358,7 @@ try {
   await popup.getByText(marker, { exact: true }).waitFor({ timeout: 20_000 });
   const vaultItem = popup.getByText(marker, { exact: true }).locator("xpath=ancestor::bit-item");
   await vaultItem.getByRole("button", { name: "More options" }).click();
-  await popup.screenshot({ path: "/tmp/alias-bound-menu.png" });
+  await captureEvidence(popup, "alias-bound-menu.png");
   await popup.getByRole("menuitem", { name: "Manage bound alias", exact: true }).click();
   await popup.waitForURL(new RegExp(`#\/email-aliases\/${alias.id}$`));
   await popup.waitForFunction(
@@ -409,7 +420,7 @@ try {
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html`);
   await popup.waitForURL(/#\/lock$/);
   assert.match(await popup.locator("body").innerText(), /vault is locked/i);
-  await popup.screenshot({ path: "/tmp/alias-extension-locked.png" });
+  await captureEvidence(popup, "alias-extension-locked.png");
   await popup.locator('input[type="password"]').fill(bitwardenPassword);
   await popup.getByRole("button", { name: "Unlock", exact: true }).click();
   await popup.waitForURL(/#\/tabs\//, { timeout: 30_000 });
