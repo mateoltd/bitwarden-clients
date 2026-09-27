@@ -159,9 +159,9 @@
           </ng-template>
         </bit-table>
       } @else {
-        <bit-no-items data-testid="alias-empty">
-          <span slot="title">{{ "noEmailAliases" | i18n }}</span>
-        </bit-no-items>
+        <p bitTypography="body2" class="tw-text-muted" data-testid="alias-empty">
+          {{ "noEmailAliases" | i18n }}
+        </p>
       }
 
       <div class="tw-flex tw-items-center tw-justify-between tw-mt-4">
