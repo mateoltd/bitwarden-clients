@@ -25,7 +25,7 @@ export class DesktopAliasService {
   private readonly generatorService = inject(CredentialGeneratorService);
   private readonly syncService = inject(SyncService, { optional: true }) ?? undefined;
 
-  async client(): Promise<SimpleLoginAliasService> {
+  async client(expectedConnectionId?: string): Promise<SimpleLoginAliasService> {
     const account = await firstValueFrom(this.accountService.activeAccount$);
     if (!account) {
       throw new SimpleLoginAliasError("SimpleLogin credentials are missing", "invalid-credentials");
@@ -36,6 +36,7 @@ export class DesktopAliasService {
         account,
         this.cipherService,
         this.syncService,
+        expectedConnectionId,
       ),
     );
   }

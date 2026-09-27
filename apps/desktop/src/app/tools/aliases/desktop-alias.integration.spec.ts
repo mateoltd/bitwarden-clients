@@ -13,7 +13,7 @@ import { MessagePort as NodeMessagePort } from "worker_threads";
 
 import { ChangeDetectionStrategy, Component, input } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { Router } from "@angular/router";
+import { ActivatedRoute, convertToParamMap, Router } from "@angular/router";
 import { mock } from "jest-mock-extended";
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
@@ -129,6 +129,10 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
     await TestBed.configureTestingModule({
       imports: [DesktopAliasComponent],
       providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: convertToParamMap({}) } },
+        },
         { provide: DesktopAliasService, useValue: facade },
         { provide: DialogService, useValue: mock<DialogService>() },
         { provide: I18nService, useValue: i18n },

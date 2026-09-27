@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
-import { Router } from "@angular/router";
+import { ActivatedRoute, convertToParamMap, Router } from "@angular/router";
 import { mock, MockProxy } from "jest-mock-extended";
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
@@ -74,6 +74,10 @@ describe("DesktopAliasComponent", () => {
     await TestBed.configureTestingModule({
       imports: [DesktopAliasComponent],
       providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: convertToParamMap({}) } },
+        },
         { provide: DesktopAliasService, useValue: facade },
         { provide: DialogService, useValue: dialogService },
         { provide: I18nService, useValue: i18n },
@@ -92,6 +96,41 @@ describe("DesktopAliasComponent", () => {
     await fixture.whenStable();
     fixture.detectChanges();
   });
+
+  it.each(["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"])(
+    "opens the saved alias only for its routed connection: %s",
+    async (connectionId) => {
+      const identity = {
+        version: 1 as const,
+        connectionId: "11111111-1111-4111-8111-111111111111",
+        aliasId: "42",
+        address: alias.address,
+      };
+      client.get.mockResolvedValue(makeAlias({ identity }));
+      TestBed.inject(ActivatedRoute).snapshot.queryParamMap = convertToParamMap({
+        aliasId: "42",
+        connectionId,
+      });
+      fixture.destroy();
+      facade.client.mockClear();
+      fixture = TestBed.createComponent(DesktopAliasComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(facade.client.mock.calls.every(([requested]) => requested === connectionId)).toBe(
+        true,
+      );
+      const detail = fixture.nativeElement.querySelector("#alias-detail-title");
+      if (connectionId === identity.connectionId) {
+        expect(detail?.textContent).toContain(alias.address);
+      } else {
+        expect(detail?.textContent).toContain("selectAlias");
+        expect(fixture.nativeElement.textContent).toContain(
+          "Alias connection differs from the saved login",
+        );
+      }
+    },
+  );
 
   it("renders aliases and provider domains", () => {
     expect(fixture.nativeElement.textContent).toContain(alias.address);

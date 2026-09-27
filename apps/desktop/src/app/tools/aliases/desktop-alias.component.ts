@@ -1,7 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { Router } from "@angular/router";
+import { ActivatedRoute, Router } from "@angular/router";
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
@@ -51,6 +51,9 @@ export class DesktopAliasComponent implements OnInit {
   private readonly dialogService = inject(DialogService);
   private readonly i18nService = inject(I18nService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly connectionId =
+    this.route.snapshot.queryParamMap.get("connectionId") ?? undefined;
   private readonly toastService = inject(ToastService);
 
   protected readonly aliases = signal<SimpleLoginAlias[]>([]);
@@ -86,6 +89,13 @@ export class DesktopAliasComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.reload();
+    const aliasId = Number(this.route.snapshot.queryParamMap.get("aliasId"));
+    if (this.connectionId !== undefined && Number.isSafeInteger(aliasId) && aliasId > 0) {
+      await this.run(async () => {
+        const client = await this.aliasService.client(this.connectionId);
+        await this.loadAlias(await client.get(aliasId));
+      });
+    }
   }
 
   protected async reload(page = 0): Promise<void> {
@@ -94,7 +104,7 @@ export class DesktopAliasComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const client = await this.aliasService.client();
+      const client = await this.aliasService.client(this.connectionId);
       const [result, domains] = await Promise.all([
         client.list(page, this.search().trim() || undefined, this.filter()),
         client.domains(),
@@ -133,7 +143,9 @@ export class DesktopAliasComponent implements OnInit {
     }
 
     await this.run(async () => {
-      const recommendation = await (await this.aliasService.client()).recommend(this.website());
+      const recommendation = await (
+        await this.aliasService.client(this.connectionId)
+      ).recommend(this.website());
       this.recommendation.set(recommendation);
       if (recommendation.alias) {
         await this.loadAlias(recommendation.alias);
@@ -152,7 +164,7 @@ export class DesktopAliasComponent implements OnInit {
   protected async createAlias(hostname = this.createHostname()): Promise<void> {
     await this.run(async () => {
       const alias = await (
-        await this.aliasService.client()
+        await this.aliasService.client(this.connectionId)
       ).create({
         kind: "random",
         hostname: hostname.trim() || undefined,
@@ -176,7 +188,7 @@ export class DesktopAliasComponent implements OnInit {
     }
     await this.run(async () => {
       const updated = await (
-        await this.aliasService.client()
+        await this.aliasService.client(this.connectionId)
       ).update(alias.id, {
         name: this.editName().trim() || null,
         note: this.editNote().trim() || null,
@@ -193,7 +205,9 @@ export class DesktopAliasComponent implements OnInit {
       return;
     }
     await this.run(async () => {
-      const updated = await (await this.aliasService.client()).setEnabled(alias.id, !alias.enabled);
+      const updated = await (
+        await this.aliasService.client(this.connectionId)
+      ).setEnabled(alias.id, !alias.enabled);
       this.replaceAlias(updated);
       this.showSuccess(updated.enabled ? "aliasEnabled" : "aliasDisabled");
     });
@@ -215,7 +229,7 @@ export class DesktopAliasComponent implements OnInit {
       if (!confirmed) {
         return;
       }
-      await (await this.aliasService.client()).delete(alias.id);
+      await (await this.aliasService.client(this.connectionId)).delete(alias.id);
       this.clearSelection();
       await this.reload(Math.max(0, this.page()));
       this.showSuccess("aliasDeleted");
@@ -237,7 +251,9 @@ export class DesktopAliasComponent implements OnInit {
       return;
     }
     await this.run(async () => {
-      await (await this.aliasService.client()).createReverseAlias(alias.id, contact);
+      await (
+        await this.aliasService.client(this.connectionId)
+      ).createReverseAlias(alias.id, contact);
       this.newContact.set("");
       await this.fetchContacts(alias, 0);
       this.showSuccess("reverseAliasCreated");
@@ -246,7 +262,9 @@ export class DesktopAliasComponent implements OnInit {
 
   protected async toggleContact(contact: SimpleLoginContact): Promise<void> {
     await this.run(async () => {
-      const blocked = await (await this.aliasService.client()).toggleContactBlocked(contact);
+      const blocked = await (
+        await this.aliasService.client(this.connectionId)
+      ).toggleContactBlocked(contact);
       this.contacts.update((contacts) =>
         contacts.map((item) => (item.id === contact.id ? { ...item, blocked } : item)),
       );
@@ -265,7 +283,7 @@ export class DesktopAliasComponent implements OnInit {
       if (!confirmed) {
         return;
       }
-      await (await this.aliasService.client()).deleteContact(contact);
+      await (await this.aliasService.client(this.connectionId)).deleteContact(contact);
       const alias = this.selectedAlias();
       if (alias) {
         await this.fetchContacts(alias, this.contactPage());
@@ -304,12 +322,18 @@ export class DesktopAliasComponent implements OnInit {
   }
 
   private async loadAlias(alias: SimpleLoginAlias): Promise<void> {
-    const client = await this.aliasService.client();
+    const client = await this.aliasService.client(this.connectionId);
     const [detail, contacts, boundLogins] = await Promise.all([
       client.get(alias.id),
       client.contacts(alias.id),
       this.aliasService.boundLogins(alias),
     ]);
+    if (this.connectionId !== undefined && detail.identity.connectionId !== this.connectionId) {
+      throw new SimpleLoginAliasError(
+        "Alias connection differs from the saved login",
+        "invalid-response",
+      );
+    }
     this.selectedAlias.set(detail);
     this.contacts.set(contacts.items);
     this.boundLogins.set(boundLogins);
@@ -321,7 +345,9 @@ export class DesktopAliasComponent implements OnInit {
   }
 
   private async fetchContacts(alias: SimpleLoginAlias, page: number): Promise<void> {
-    const result = await (await this.aliasService.client()).contacts(alias.id, page);
+    const result = await (
+      await this.aliasService.client(this.connectionId)
+    ).contacts(alias.id, page);
     this.contacts.set(result.items);
     this.contactPage.set(result.page);
     this.nextContactsPage.set(result.nextPage);

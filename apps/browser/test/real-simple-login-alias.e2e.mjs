@@ -457,6 +457,29 @@ try {
     console.log("REAL_EXTENSION_TO_WEB_SYNC_RETAINED_BINDING");
   }
 
+  if (process.env.DESKTOP_SYNC_ACCEPTANCE === "1") {
+    const fixture = path.join(evidenceDirectory, "desktop-saved-login.private.json");
+    fs.writeFileSync(
+      fixture,
+      JSON.stringify({ marker, aliasAddress, aliasId: alias.id, connectionId: boundConnectionId }),
+      { mode: 0o600 },
+    );
+    try {
+      const desktop = spawnSync(
+        process.execPath,
+        ["apps/desktop/test/real-simple-login-alias.e2e.mjs"],
+        {
+          env: { ...process.env, DESKTOP_SAVED_LOGIN_FIXTURE: fixture },
+          stdio: "inherit",
+          timeout: 240_000,
+        },
+      );
+      assert.equal(desktop.status, 0, "Packaged desktop saved-alias acceptance must pass");
+    } finally {
+      fs.rmSync(fixture, { force: true });
+    }
+  }
+
   // Inject a genuine network outage, then retry against the same live provider.
   const boundUrl = popup.url();
   await context.setOffline(true);

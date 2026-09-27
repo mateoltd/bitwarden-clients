@@ -107,6 +107,7 @@ export function attachSimpleLoginAliasSyncStore(
   account: Account,
   cipherService?: CipherService,
   syncService?: SyncService,
+  expectedConnectionId?: string,
 ): ForwarderOptions {
   const local = createSubjectSyncStore(subject, settings, account);
   let store: AliasSyncStore = local;
@@ -191,6 +192,7 @@ export async function readSimpleLoginAliasSettings(
   account: Account,
   cipherService?: CipherService,
   syncService?: SyncService,
+  expectedConnectionId?: string,
 ): Promise<SimpleLoginAliasSettings> {
   const account$ = new ReplaySubject<Account>(1);
   account$.next(account);
@@ -199,7 +201,18 @@ export async function readSimpleLoginAliasSettings(
     { account$ },
   );
   try {
-    const current = await firstValueFrom(settings$);
+    const persisted = await firstValueFrom(settings$);
+    // A saved login selects one encrypted connection. Never reuse another connection's token.
+    const current =
+      expectedConnectionId === undefined || expectedConnectionId === persisted.connectionId
+        ? persisted
+        : {
+            ...persisted,
+            connectionId: expectedConnectionId,
+            token: undefined,
+            baseUrl: undefined,
+            aliasSync: undefined,
+          };
     if (!isSimpleLoginConnectionId(current.connectionId)) {
       throw new SimpleLoginAliasError(
         "SimpleLogin connection identity is invalid",
