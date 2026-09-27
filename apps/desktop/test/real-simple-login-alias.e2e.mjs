@@ -245,11 +245,9 @@ async function launchDesktop() {
       process.env.DESKTOP_ISOLATION_WRAPPER,
       "Packaged acceptance requires filesystem isolation",
     );
-    const log = fs.openSync(
-      process.env.DESKTOP_PROCESS_LOG ?? path.join(profile, "desktop-process.log"),
-      "a",
-      0o600,
-    );
+    const processLogPath =
+      process.env.DESKTOP_PROCESS_LOG ?? path.join(profile, "desktop-process.log");
+    const log = fs.openSync(processLogPath, "a", 0o600);
     const env = { ...process.env, BITWARDEN_APPDATA_DIR: profile, ELECTRON_NO_UPDATER: "1" };
     delete env.ELECTRON_RUN_AS_NODE;
     const child = spawn(
@@ -294,6 +292,57 @@ async function launchDesktop() {
           firstWindow: async () =>
             browser.contexts()[0].pages()[0] ?? browser.contexts()[0].waitForEvent("page"),
           close,
+          async lockAndReconnect() {
+            const offset = fs.readFileSync(processLogPath, "utf8").length;
+            // A live debugger delays Electron's intentional renderer crash on lock.
+            // Detach so memory clearing completes, then inspect the replacement renderer.
+            await browser.close();
+            this.pressAccelerator("ctrl+l");
+            const deadline = Date.now() + 30_000;
+            while (
+              !fs
+                .readFileSync(processLogPath, "utf8")
+                .slice(offset)
+                .includes("Render process reloaded")
+            ) {
+              assert.ok(
+                Date.now() < deadline,
+                "Lock must replace the renderer within the bounded wait",
+              );
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+            browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
+            return browser.contexts()[0].pages()[0] ?? browser.contexts()[0].waitForEvent("page");
+          },
+          pressAccelerator: (shortcut) => {
+            const xdotool = requiredEnvironment("DESKTOP_XDOTOOL_PATH");
+            const children = spawnSync("pgrep", ["-P", String(child.pid)], {
+              encoding: "utf8",
+              timeout: 5_000,
+            });
+            assert.equal(children.status, 0, "Isolated desktop process must still be running");
+            const mainPid = children.stdout
+              .trim()
+              .split(/\s+/)
+              .find((pid) => {
+                const command = fs.readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0")[0];
+                return command === `${process.env.DESKTOP_EXECUTABLE_PATH}-app`;
+              });
+            assert.ok(mainPid, "Accelerator target must be this test's packaged app");
+            const windows = spawnSync(xdotool, ["search", "--onlyvisible", "--pid", mainPid], {
+              encoding: "utf8",
+              timeout: 5_000,
+            });
+            assert.equal(windows.status, 0, "Task-owned desktop window must be visible");
+            const ids = windows.stdout.trim().split(/\s+/);
+            assert.equal(ids.length, 1, "Never send shortcuts to an ambiguous window");
+            const pressed = spawnSync(
+              xdotool,
+              ["windowfocus", "--sync", ids[0], "key", "--clearmodifiers", shortcut],
+              { encoding: "utf8", timeout: 5_000 },
+            );
+            assert.equal(pressed.status, 0, "Native desktop accelerator must be delivered");
+          },
         },
       };
     } catch (error) {
@@ -515,14 +564,10 @@ async function qualifySavedLogin(page) {
   await page.waitForURL(/#\/vault/);
   await page.getByText(fixture.marker, { exact: true }).waitFor();
   console.log("REAL_DESKTOP_SAVED_ALIAS_MANAGED");
-  await page.keyboard.press("Control+,");
-  const settings = page.getByRole("dialog");
-  await settings.getByRole("checkbox", { name: "Unlock with PIN", exact: true }).check();
-  await page.locator('input[formcontrolname="pin"]').fill(bitwardenPassword);
-  await page.getByRole("dialog").last().getByRole("button", { name: "OK", exact: true }).click();
-  await settings.getByRole("button", { name: "Close", exact: true }).click();
-  await page.keyboard.press("Control+l");
-  await page.waitForURL(/#\/lock$/, { timeout: 30_000 });
+  // Native menu input reaches the app after detaching the old renderer debugger.
+  page = await app.lockAndReconnect();
+  activePage = page;
+  await page.waitForURL(/#\/lock(?:\?|$)/, { timeout: 30_000 });
   if (evidence)
     await page.locator("form").screenshot({
       path: path.join(evidence, "alias-desktop-locked.png"),

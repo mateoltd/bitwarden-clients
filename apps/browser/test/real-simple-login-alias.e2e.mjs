@@ -249,16 +249,32 @@ try {
 
   const reuse = await context.newPage();
   await reuse.goto(registrationUrl.toString());
+  await reuse.bringToFront();
   await reuse.locator("#email").focus();
-  await reuse.waitForTimeout(3_000);
   await reuse.locator("#email").press("ArrowDown");
-  await reuse.waitForTimeout(500);
-  await reuse.keyboard.press("Enter");
-  await reuse.waitForFunction(
-    (address) => document.querySelector("#email")?.value === address,
-    aliasAddress,
-    { timeout: 15_000 },
-  );
+  let reusePoint;
+  const reuseDeadline = Date.now() + 15_000;
+  while (!reusePoint && Date.now() < reuseDeadline) {
+    reusePoint = await getInlineMenuTargetPoint(reuse, {
+      framePath: "/overlay/menu-list.html",
+      hostSelector: "autofill-inline-menu-list",
+      targetProperty: "inlineMenuListContainer",
+      descendantSelector: "[data-email-alias-action]",
+    });
+    if (!reusePoint) await reuse.waitForTimeout(100);
+  }
+  try {
+    assert.ok(reusePoint, "the reuse action must be ready before the trusted UI click");
+    await reuse.mouse.click(reusePoint.x, reusePoint.y);
+    await reuse.waitForFunction(
+      (address) => document.querySelector("#email")?.value === address,
+      aliasAddress,
+      { timeout: 15_000 },
+    );
+  } catch (error) {
+    await captureEvidence(reuse, "alias-reuse-failure-masked.png");
+    throw error;
+  }
   assert.equal(await reuse.locator("#email").inputValue(), aliasAddress);
   assert.equal(simpleLoginCreateRequests, 1, "hostname reuse must not create a second alias");
 
