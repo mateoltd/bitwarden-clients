@@ -374,7 +374,7 @@ describe("CipherView", () => {
         },
       });
 
-      const result = cipherView.toSdkCreateCipherRequest(mockCiphersClient);
+      const result = cipherView.toSdkCreateCipherRequest();
 
       expect("login" in result.type && result.type.login?.aliasReference).toBe(
         cipherView.login.aliasReference,
@@ -537,7 +537,7 @@ describe("CipherView", () => {
         },
       });
 
-      const result = cipherView.toSdkUpdateCipherRequest(mockCiphersClient);
+      const result = cipherView.toSdkUpdateCipherRequest();
 
       expect("login" in result.type && result.type.login?.aliasReference).toBe(
         cipherView.login.aliasReference,
