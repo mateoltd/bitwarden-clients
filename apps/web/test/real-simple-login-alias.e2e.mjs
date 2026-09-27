@@ -32,6 +32,19 @@ try {
   });
   context.setDefaultTimeout(30_000);
   const page = context.pages()[0] ?? (await context.newPage());
+  page.on("pageerror", (error) => console.error("WEB_PAGE_ERROR", error.name, error.message));
+  page.on("requestfailed", (request) =>
+    console.error(
+      "WEB_REQUEST_FAILED",
+      request.method(),
+      new URL(request.url()).pathname,
+      request.failure()?.errorText,
+    ),
+  );
+  page.on("response", (response) => {
+    if (response.status() >= 400)
+      console.error("WEB_HTTP_ERROR", response.status(), new URL(response.url()).pathname);
+  });
 
   await page.goto(new URL("#/login", webUrl).toString());
   await page.locator("#email").fill(bitwardenEmail);
@@ -39,9 +52,13 @@ try {
   await page.locator('input[type="password"]:visible').fill(bitwardenPassword);
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   try {
-    await page.waitForFunction(() => ["#/vault", "#/setup-extension"].includes(location.hash), {
-      timeout: 60_000,
-    });
+    await page.waitForFunction(
+      () => ["#/vault", "#/setup-extension"].includes(location.hash),
+      undefined,
+      {
+        timeout: 60_000,
+      },
+    );
   } catch (error) {
     const visibleText = (await page.locator("body").innerText()).trim().slice(0, 2_000);
     throw new Error(
@@ -69,7 +86,7 @@ try {
   const baseUrlInput = page.locator('tools-forwarder-settings input[formcontrolname="baseUrl"]');
   await tokenInput.fill(simpleLoginToken);
   await tokenInput.blur();
-  await baseUrlInput.fill(simpleLoginUrl.toString());
+  await baseUrlInput.fill(process.env.SIMPLELOGIN_BROWSER_URL ?? simpleLoginUrl.toString());
   await baseUrlInput.blur();
 
   await page.goto(new URL("#/tools/aliases", webUrl).toString());
@@ -339,10 +356,13 @@ function assertProfileDoesNotContain(secret) {
 
 function assertServiceLogsDoNotContain(secret) {
   const logs = spawnSync(
-    "docker",
-    ["logs", process.env.SIMPLELOGIN_APP_CONTAINER ?? "alias-core-sl-app"],
+    process.env.SIMPLELOGIN_SYSTEMD_UNIT ? "journalctl" : "docker",
+    process.env.SIMPLELOGIN_SYSTEMD_UNIT
+      ? ["--user", "--unit", process.env.SIMPLELOGIN_SYSTEMD_UNIT, "--no-pager", "--output=cat"]
+      : ["logs", process.env.SIMPLELOGIN_APP_CONTAINER ?? "alias-core-sl-app"],
     { encoding: "utf8" },
   );
   assert.equal(logs.status, 0, "SimpleLogin logs must be readable for leakage checks");
+  assert.ok(logs.stdout.trim() || logs.stderr.trim(), "SimpleLogin logs must not be empty");
   assert.equal(`${logs.stdout}${logs.stderr}`.includes(secret), false);
 }

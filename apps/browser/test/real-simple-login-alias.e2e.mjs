@@ -40,10 +40,15 @@ const evidenceDirectory = process.env.ALIAS_E2E_EVIDENCE_DIRECTORY
 fs.mkdirSync(evidenceDirectory, { recursive: true, mode: 0o700 });
 async function captureEvidence(page, name) {
   // Credentials must not enter screenshots, including when a password is revealed.
-  await page.screenshot({
+  const options = {
     path: path.join(evidenceDirectory, name),
-    mask: [page.locator("input")],
-  });
+    mask: [page.locator("input"), page.getByText(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)],
+  };
+  if (name === "alias-bound-menu.png") {
+    await page.getByRole("menu").screenshot(options);
+  } else {
+    await page.screenshot(options);
+  }
 }
 const servers = [];
 let context;
@@ -54,6 +59,7 @@ let simpleLoginToken;
 let bitwardenAuthorization;
 let createdAliasId;
 let createdCipherId;
+let createdCipherAuthorization;
 let simpleLoginCreateRequests = 0;
 const safeDiagnostics = [];
 
@@ -101,6 +107,12 @@ try {
       button.click();
       return true;
     }, label);
+  await popup
+    .locator("#email")
+    .or(popup.getByRole("button", { name: "Skip", exact: true }))
+    .or(popup.getByRole("button", { name: "Log in", exact: true }))
+    .first()
+    .waitFor({ timeout: 30_000 });
   for (let step = 0; step < 8 && !(await popup.locator("#email").isVisible()); step++) {
     // Fresh-install state can replace either prompt while Chrome's default-manager check settles.
     // Resolve and click in one page evaluation so a detached locator cannot consume the timeout.
@@ -337,6 +349,7 @@ try {
   const cipherId = encryptedCipher.id;
   assert.equal(typeof cipherId, "string");
   createdCipherId = cipherId;
+  createdCipherAuthorization = bitwardenAuthorization;
   const encryptedVaultPayload = JSON.stringify(encryptedCipher);
   assert.equal(encryptedVaultPayload.includes(simpleLoginToken), false);
   assert.equal(encryptedVaultPayload.includes(aliasAddress), false);
@@ -439,7 +452,64 @@ try {
   );
   assert.equal(restartedBrowserStorage.includes(simpleLoginToken), false);
 
-  await permanentlyDeleteBitwardenCipher(bitwardenAuthorization, cipherId);
+  if (process.env.WEB_URL) {
+    await assertIndependentWebSync(marker, aliasAddress, alias.id, boundConnectionId);
+    console.log("REAL_EXTENSION_TO_WEB_SYNC_RETAINED_BINDING");
+  }
+
+  // Inject a genuine network outage, then retry against the same live provider.
+  const boundUrl = popup.url();
+  await context.setOffline(true);
+  try {
+    await popup.reload();
+    await popup.getByRole("alert").waitFor();
+    assert.equal(await popup.getByTestId("alias-address").count(), 0);
+  } finally {
+    await context.setOffline(false);
+  }
+  await popup.reload();
+  await popup.getByTestId("alias-address").filter({ hasText: aliasAddress }).waitFor();
+  assert.equal(await waitForBoundAliasRoute(popup, alias.id), boundConnectionId);
+  assert.equal(
+    simpleLoginCreateRequests,
+    1,
+    "read failure and retry must not create another alias",
+  );
+  console.log("REAL_OFFLINE_RETRY_RETAINED_BINDING");
+
+  if (process.env.BITWARDEN_SECOND_EMAIL && process.env.BITWARDEN_SECOND_PASSWORD) {
+    await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/account-switcher`);
+    await popup.getByRole("button", { name: "Add account", exact: true }).click();
+    await popup.locator("#email").fill(process.env.BITWARDEN_SECOND_EMAIL);
+    await popup.getByRole("button", { name: "Continue", exact: true }).click();
+    await popup.locator('input[type="password"]').fill(process.env.BITWARDEN_SECOND_PASSWORD);
+    await popup.getByRole("button", { name: "Log in", exact: true }).click();
+    await popup.waitForURL(/#\/tabs\//, { timeout: 30_000 });
+    assert.equal(await popup.getByText(marker, { exact: true }).count(), 0);
+    await popup.goto(boundUrl);
+    await popup.getByRole("alert").waitFor();
+    assert.equal(await popup.getByTestId("alias-address").count(), 0);
+    assert.equal((await popup.locator("body").innerText()).includes(simpleLoginToken), false);
+    await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/account-switcher`);
+    await popup
+      .locator("auth-account")
+      .filter({ hasText: bitwardenEmail })
+      .getByRole("button")
+      .click();
+    await popup.waitForURL(/#\/(tabs\/|lock)/, { timeout: 30_000 });
+    if (new URL(popup.url()).hash === "#/lock") {
+      await popup.locator('input[type="password"]').fill(bitwardenPassword);
+      await popup.getByRole("button", { name: "Unlock", exact: true }).click();
+      await popup.waitForURL(/#\/tabs\//, { timeout: 30_000 });
+    }
+    await popup.goto(boundUrl);
+    await popup.getByTestId("alias-address").filter({ hasText: aliasAddress }).waitFor();
+    assert.equal(await waitForBoundAliasRoute(popup, alias.id), boundConnectionId);
+    assert.equal(simpleLoginCreateRequests, 1);
+    console.log("REAL_ACCOUNT_SWITCH_ISOLATED");
+  }
+
+  await permanentlyDeleteBitwardenCipher(createdCipherAuthorization, cipherId);
   createdCipherId = undefined;
 
   const bitwardenAccessToken = bitwardenAuthorization?.replace(/^Bearer\s+/i, "");
@@ -458,9 +528,9 @@ try {
   console.log("REAL_EXTENSION_RESTART_UNLOCKED");
   console.log("REAL_STATE_CLEANED");
 } finally {
-  if (bitwardenAuthorization && createdCipherId) {
+  if (createdCipherAuthorization && createdCipherId) {
     try {
-      await permanentlyDeleteBitwardenCipher(bitwardenAuthorization, createdCipherId);
+      await permanentlyDeleteBitwardenCipher(createdCipherAuthorization, createdCipherId);
     } catch (error) {
       recordDiagnostic(
         "BITWARDEN_CLEANUP_FAILED",
@@ -650,11 +720,14 @@ function recordDiagnostic(kind, message) {
 
 function assertServiceLogsDoNotContain(secret) {
   const logs = spawnSync(
-    "docker",
-    ["logs", process.env.SIMPLELOGIN_APP_CONTAINER ?? "alias-core-sl-app"],
+    process.env.SIMPLELOGIN_SYSTEMD_UNIT ? "journalctl" : "docker",
+    process.env.SIMPLELOGIN_SYSTEMD_UNIT
+      ? ["--user", "--unit", process.env.SIMPLELOGIN_SYSTEMD_UNIT, "--no-pager", "--output=cat"]
+      : ["logs", process.env.SIMPLELOGIN_APP_CONTAINER ?? "alias-core-sl-app"],
     { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
   );
   assert.equal(logs.status, 0, "SimpleLogin logs must be readable for leakage checks");
+  assert.ok(logs.stdout.trim() || logs.stderr.trim(), "SimpleLogin logs must not be empty");
   assert.equal(`${logs.stdout}${logs.stderr}`.includes(secret), false);
 }
 
@@ -838,4 +911,45 @@ function closeServer(server) {
     server.close((error) => (error ? reject(error) : resolve()));
     server.closeAllConnections?.();
   });
+}
+
+async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectionId) {
+  // A fresh browser context receives the saved login only through the real vault sync API.
+  const browser = await chromium.launch({ executablePath: browserExecutable, headless: false });
+  try {
+    const webContext = await browser.newContext({ ignoreHTTPSErrors: true });
+    const page = await webContext.newPage();
+    page.setDefaultTimeout(30_000);
+    const webUrl = new URL(process.env.WEB_URL);
+    await page.goto(new URL("#/login", webUrl).toString());
+    await page.locator("#email").fill(bitwardenEmail);
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.locator('input[type="password"]:visible').fill(bitwardenPassword);
+    await page.getByRole("button", { name: "Log in", exact: true }).click();
+    await page.waitForURL(/#\/(vault|setup-extension)$/, { timeout: 60_000 });
+    if (new URL(page.url()).hash === "#/setup-extension") {
+      await page.getByRole("button", { name: "Add it later", exact: true }).click();
+      await page.getByRole("dialog").getByText("Skip to web app", { exact: true }).click();
+    }
+    await page.waitForURL(/#\/vault$/, { timeout: 60_000 });
+    const skip = page.getByRole("dialog").getByRole("button", { name: "Skip", exact: true });
+    if (await skip.isVisible()) await skip.click();
+    const row = page.getByRole("row").filter({ hasText: marker });
+    await row.waitFor();
+    assert.equal((await row.innerText()).includes(aliasAddress), true);
+    await row.getByRole("button", { name: "More options", exact: true }).click();
+    const link = page.getByRole("menuitem").filter({ hasText: /Manage.*alias/i });
+    const href = await link.getAttribute("href");
+    assert.ok(href);
+    const route = new URL(new URL(href, webUrl).hash.slice(1), webUrl);
+    assert.equal(route.pathname, "/tools/aliases");
+    assert.equal(route.searchParams.get("aliasId"), String(aliasId));
+    assert.equal(route.searchParams.get("connectionId"), connectionId);
+    await page.getByRole("menu").screenshot({
+      path: path.join(evidenceDirectory, "alias-web-synced-menu.png"),
+      mask: [page.locator("input"), page.getByText(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)],
+    });
+  } finally {
+    await browser.close();
+  }
 }
