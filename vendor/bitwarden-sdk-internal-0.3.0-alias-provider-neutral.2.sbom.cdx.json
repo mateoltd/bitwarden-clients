@@ -26,154 +26,18 @@
   "components": [
     {
       "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-android%2FALIAS_REFERENCE_SCHEMA_VERSION",
-      "name": "alias-sdk-android/ALIAS_REFERENCE_SCHEMA_VERSION",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "2"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-android%2FAPI-REPORT.txt",
-      "name": "alias-sdk-android/API-REPORT.txt",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "ecf9c2ae88b049d14787ba05128a55e410a1cc4d2a48d212fd31f81b23cc8741"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "3521400"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-android%2FBUILD-ENVIRONMENT.txt",
-      "name": "alias-sdk-android/BUILD-ENVIRONMENT.txt",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "0f6c6e72c82e3ea3b425ef5f357857ebc67624b778d07ff06bd74a6e27a18881"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "317"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-android%2FNATIVE-REPRODUCIBILITY.txt",
-      "name": "alias-sdk-android/NATIVE-REPRODUCIBILITY.txt",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "c762a61f67dccc6b80d02caaf6ffb4240f2f37ead84018651406f73e04566a7c"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "425"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-android%2FPACKAGE_VERSION",
-      "name": "alias-sdk-android/PACKAGE_VERSION",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "245d44ad683cb84efb98e21f17d004af814cd7e8e018ffef75a58c175236e8d4"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "31"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-android%2FREPRODUCIBILITY.txt",
-      "name": "alias-sdk-android/REPRODUCIBILITY.txt",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "9f63b2ace44cfde414a2c0598fbed9eba902a6339db9ddc0cf8048c5d38c01ab"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "90"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-android%2FVERSION",
-      "name": "alias-sdk-android/VERSION",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "3b2a30a04121bfdababe17a5980e4f76aa6685483cac336fc118e48781e71eaf"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "41"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-android%2Fbitwarden-alias-sdk-android-0.3.0-alias-provider-neutral.1.aar",
-      "name": "alias-sdk-android/bitwarden-alias-sdk-android-0.3.0-alias-provider-neutral.1.aar",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "a9f5d94824ec3cd561de2951c3f8f656f989cf468bdaf5460af9d99d466143a4"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "38370012"
-        }
-      ]
-    },
-    {
-      "type": "file",
       "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-assurance%2FAUDIT-REPORT.json",
       "name": "alias-sdk-assurance/AUDIT-REPORT.json",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "dbc06536e47500ad9a21cf0545983dc431472cf6dee109542943c924441d9546"
+          "content": "7fb982d5d9f048cd1e015956abf619377954b3c6c8ad59862127a81038e671ad"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "1335"
+          "value": "1539"
         }
       ]
     },
@@ -191,261 +55,6 @@
         {
           "name": "bitwarden:size",
           "value": "36"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-kotlin%2FALIAS_REFERENCE_SCHEMA_VERSION",
-      "name": "alias-sdk-kotlin/ALIAS_REFERENCE_SCHEMA_VERSION",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "2"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-kotlin%2FAPI-REPORT.txt",
-      "name": "alias-sdk-kotlin/API-REPORT.txt",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "cfcc6fc526a07b5debe46047121b24a60c7bb6b9eececf788b66e2cb41a95f54"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "3533356"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-kotlin%2FBUILD-ENVIRONMENT.txt",
-      "name": "alias-sdk-kotlin/BUILD-ENVIRONMENT.txt",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "0148c194a6d13a67500df66df25017b5857de909a3677add096528854472022a"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "311"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-kotlin%2FPACKAGE_VERSION",
-      "name": "alias-sdk-kotlin/PACKAGE_VERSION",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "245d44ad683cb84efb98e21f17d004af814cd7e8e018ffef75a58c175236e8d4"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "31"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-kotlin%2FREPRODUCIBILITY.txt",
-      "name": "alias-sdk-kotlin/REPRODUCIBILITY.txt",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "d0ccc389fd556619a4ab18bb5efbafff3d8e5947daeb7bced37812a18eea6092"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "90"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-kotlin%2FVERSION",
-      "name": "alias-sdk-kotlin/VERSION",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "3b2a30a04121bfdababe17a5980e4f76aa6685483cac336fc118e48781e71eaf"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "41"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-kotlin%2Fbitwarden-alias-sdk-kotlin-host-0.3.0-alias-provider-neutral.1.jar",
-      "name": "alias-sdk-kotlin/bitwarden-alias-sdk-kotlin-host-0.3.0-alias-provider-neutral.1.jar",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "6c05a862bca1092968b6b68263378766c105747e048e8d51e41d6cd1bd4ef2b0"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "6314656"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-kotlin%2Flibbitwarden_uniffi.so",
-      "name": "alias-sdk-kotlin/libbitwarden_uniffi.so",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "c05feae9c9df7b596e19a49cced0e9bcc0f1f22bee2e9bc5ae62713f74541b0c"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "28633232"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-swift%2FALIAS_REFERENCE_SCHEMA_VERSION",
-      "name": "alias-sdk-swift/ALIAS_REFERENCE_SCHEMA_VERSION",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "2"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-swift%2FAPI-REPORT.txt",
-      "name": "alias-sdk-swift/API-REPORT.txt",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "c89219814bff1755add267bf86909b065e1a0a0e7ae5f5b54715224371184801"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "395159"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-swift%2FBUILD-ENVIRONMENT.txt",
-      "name": "alias-sdk-swift/BUILD-ENVIRONMENT.txt",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "149c6713823fe3f8a1e62d756808f6ce1adef33cbab71bee761437248ccadd89"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "255"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-swift%2FPACKAGE_VERSION",
-      "name": "alias-sdk-swift/PACKAGE_VERSION",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "245d44ad683cb84efb98e21f17d004af814cd7e8e018ffef75a58c175236e8d4"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "31"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-swift%2FREPRODUCIBILITY.txt",
-      "name": "alias-sdk-swift/REPRODUCIBILITY.txt",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "d51d5182eaffc446f3a3e59a5a040dbf480416dd14d89901fe9f1093ba57abe6"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "90"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-swift%2FVERSION",
-      "name": "alias-sdk-swift/VERSION",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "3b2a30a04121bfdababe17a5980e4f76aa6685483cac336fc118e48781e71eaf"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "41"
-        }
-      ]
-    },
-    {
-      "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-swift%2Fbitwarden-alias-sdk-swift-0.3.0-alias-provider-neutral.1.tar.gz",
-      "name": "alias-sdk-swift/bitwarden-alias-sdk-swift-0.3.0-alias-provider-neutral.1.tar.gz",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "e6fe06d03de5052c9e0a4fdf3679d2b8fc657970d6fe01c1b17e2d71c48b888a"
-        }
-      ],
-      "properties": [
-        {
-          "name": "bitwarden:size",
-          "value": "159670617"
         }
       ]
     },
@@ -473,13 +82,13 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "2ae2da7ab12aa1ce0db6405950c753e05fcc2dd53294cfb320ed4478f80c7712"
+          "content": "3e2b2ba032987f3e85f52ee964dc099b7bc30c1daddf6d6256bb9bb1be1d3f8d"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "516633"
+          "value": "579735"
         }
       ]
     },
@@ -490,7 +99,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "4e24693338c63ddaf041235bdbf890b81892c41a734e09881fc5277c0298d530"
+          "content": "e9264476d59ca495b38984afd09d0dad9bd0d30d4beb7b6ced32c3aae0a28849"
         }
       ],
       "properties": [
@@ -507,7 +116,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "245d44ad683cb84efb98e21f17d004af814cd7e8e018ffef75a58c175236e8d4"
+          "content": "4d6e4d41f026aa95c9854c39bd2c3b83b5642da81db83c183786cb1419dbb723"
         }
       ],
       "properties": [
@@ -524,7 +133,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "fdd93c51c43e6c6f82fd0118433edc8366e7593eed12459ddcd0e7b70519278c"
+          "content": "832d99afa65d2cea1c9b214a603ad5af517202603e60a55246f4ed9808d56c8b"
         }
       ],
       "properties": [
@@ -541,7 +150,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "3b2a30a04121bfdababe17a5980e4f76aa6685483cac336fc118e48781e71eaf"
+          "content": "94a512b4a295b3fdc0852c1dfcf2bb72445e3d4b6dd81ae0065af91aa5de89ab"
         }
       ],
       "properties": [
@@ -553,18 +162,18 @@
     },
     {
       "type": "file",
-      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-typescript%2Fbitwarden-sdk-internal-0.3.0-alias-provider-neutral.1.tgz",
-      "name": "alias-sdk-typescript/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.1.tgz",
+      "bom-ref": "urn:bitwarden:alias-sdk-artifact:alias-sdk-typescript%2Fbitwarden-sdk-internal-0.3.0-alias-provider-neutral.2.tgz",
+      "name": "alias-sdk-typescript/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.2.tgz",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "1f40d1c145056b014184b678b57c61ac8c173efc2499f178066737ebb1647394"
+          "content": "d294d0e22b8627f61f2c7faa2c90baf44c2def92fbf0d7230aac574656df8470"
         }
       ],
       "properties": [
         {
           "name": "bitwarden:size",
-          "value": "11003112"
+          "value": "11252698"
         }
       ]
     },
@@ -930,10 +539,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/askama_derive@0.14.0",
+      "bom-ref": "pkg:cargo/askama_derive@0.16.0",
       "name": "askama_derive",
-      "version": "0.14.0",
-      "purl": "pkg:cargo/askama_derive@0.14.0",
+      "version": "0.16.0",
+      "purl": "pkg:cargo/askama_derive@0.16.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -954,10 +563,34 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/askama_parser@0.14.0",
+      "bom-ref": "pkg:cargo/askama_macros@0.16.0",
+      "name": "askama_macros",
+      "version": "0.16.0",
+      "purl": "pkg:cargo/askama_macros@0.16.0",
+      "properties": [
+        {
+          "name": "bitwarden:ecosystem",
+          "value": "cargo"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/askama-rs/askama"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/askama_parser@0.16.0",
       "name": "askama_parser",
-      "version": "0.14.0",
-      "purl": "pkg:cargo/askama_parser@0.14.0",
+      "version": "0.16.0",
+      "purl": "pkg:cargo/askama_parser@0.16.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -978,10 +611,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/askama@0.14.0",
+      "bom-ref": "pkg:cargo/askama@0.16.0",
       "name": "askama",
-      "version": "0.14.0",
-      "purl": "pkg:cargo/askama@0.14.0",
+      "version": "0.16.0",
+      "purl": "pkg:cargo/askama@0.16.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -1890,6 +1523,78 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/bitwarden-managed-settings-types@3.0.0",
+      "name": "bitwarden-managed-settings-types",
+      "version": "3.0.0",
+      "purl": "pkg:cargo/bitwarden-managed-settings-types@3.0.0",
+      "properties": [
+        {
+          "name": "bitwarden:ecosystem",
+          "value": "cargo"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "GPL-3.0-only OR LicenseRef-Bitwarden-SDK"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/bitwarden/sdk-internal"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/bitwarden-managed-settings@3.0.0",
+      "name": "bitwarden-managed-settings",
+      "version": "3.0.0",
+      "purl": "pkg:cargo/bitwarden-managed-settings@3.0.0",
+      "properties": [
+        {
+          "name": "bitwarden:ecosystem",
+          "value": "cargo"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "GPL-3.0-only OR LicenseRef-Bitwarden-SDK"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/bitwarden/sdk-internal"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/bitwarden-member-administration@3.0.0",
+      "name": "bitwarden-member-administration",
+      "version": "3.0.0",
+      "purl": "pkg:cargo/bitwarden-member-administration@3.0.0",
+      "properties": [
+        {
+          "name": "bitwarden:ecosystem",
+          "value": "cargo"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "GPL-3.0-only OR LicenseRef-Bitwarden-SDK"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/bitwarden/sdk-internal"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/bitwarden-organization-crypto@3.0.0",
       "name": "bitwarden-organization-crypto",
       "version": "3.0.0",
@@ -2724,10 +2429,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/cargo_metadata@0.19.2",
+      "bom-ref": "pkg:cargo/cargo_metadata@0.23.1",
       "name": "cargo_metadata",
-      "version": "0.19.2",
-      "purl": "pkg:cargo/cargo_metadata@0.19.2",
+      "version": "0.23.1",
+      "purl": "pkg:cargo/cargo_metadata@0.23.1",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -2748,10 +2453,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/cargo-platform@0.1.9",
+      "bom-ref": "pkg:cargo/cargo-platform@0.3.2",
       "name": "cargo-platform",
-      "version": "0.1.9",
-      "purl": "pkg:cargo/cargo-platform@0.1.9",
+      "version": "0.3.2",
+      "purl": "pkg:cargo/cargo-platform@0.3.2",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -2815,30 +2520,6 @@
         {
           "type": "vcs",
           "url": "https://github.com/rust-lang/cc-rs"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:cargo/cesu8@1.1.0",
-      "name": "cesu8",
-      "version": "1.1.0",
-      "purl": "pkg:cargo/cesu8@1.1.0",
-      "properties": [
-        {
-          "name": "bitwarden:ecosystem",
-          "value": "cargo"
-        }
-      ],
-      "licenses": [
-        {
-          "expression": "Apache-2.0/MIT"
-        }
-      ],
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/emk/cesu8-rs"
         }
       ]
     },
@@ -4908,10 +4589,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/fs-err@2.11.0",
+      "bom-ref": "pkg:cargo/fs-err@3.3.1",
       "name": "fs-err",
-      "version": "2.11.0",
-      "purl": "pkg:cargo/fs-err@2.11.0",
+      "version": "3.3.1",
+      "purl": "pkg:cargo/fs-err@3.3.1",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -4920,7 +4601,7 @@
       ],
       "licenses": [
         {
-          "expression": "MIT/Apache-2.0"
+          "expression": "MIT OR Apache-2.0"
         }
       ],
       "externalReferences": [
@@ -5940,10 +5621,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/icu_collections@2.2.0",
+      "bom-ref": "pkg:cargo/icu_collections@2.3.0",
       "name": "icu_collections",
-      "version": "2.2.0",
-      "purl": "pkg:cargo/icu_collections@2.2.0",
+      "version": "2.3.0",
+      "purl": "pkg:cargo/icu_collections@2.3.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -5964,10 +5645,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/icu_locale_core@2.2.0",
+      "bom-ref": "pkg:cargo/icu_locale_core@2.3.0",
       "name": "icu_locale_core",
-      "version": "2.2.0",
-      "purl": "pkg:cargo/icu_locale_core@2.2.0",
+      "version": "2.3.0",
+      "purl": "pkg:cargo/icu_locale_core@2.3.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -5988,10 +5669,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/icu_normalizer_data@2.2.0",
+      "bom-ref": "pkg:cargo/icu_normalizer_data@2.3.0",
       "name": "icu_normalizer_data",
-      "version": "2.2.0",
-      "purl": "pkg:cargo/icu_normalizer_data@2.2.0",
+      "version": "2.3.0",
+      "purl": "pkg:cargo/icu_normalizer_data@2.3.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -6012,10 +5693,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/icu_normalizer@2.2.0",
+      "bom-ref": "pkg:cargo/icu_normalizer@2.3.0",
       "name": "icu_normalizer",
-      "version": "2.2.0",
-      "purl": "pkg:cargo/icu_normalizer@2.2.0",
+      "version": "2.3.0",
+      "purl": "pkg:cargo/icu_normalizer@2.3.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -6036,10 +5717,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/icu_properties_data@2.2.0",
+      "bom-ref": "pkg:cargo/icu_properties_data@2.3.0",
       "name": "icu_properties_data",
-      "version": "2.2.0",
-      "purl": "pkg:cargo/icu_properties_data@2.2.0",
+      "version": "2.3.0",
+      "purl": "pkg:cargo/icu_properties_data@2.3.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -6060,10 +5741,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/icu_properties@2.2.0",
+      "bom-ref": "pkg:cargo/icu_properties@2.3.0",
       "name": "icu_properties",
-      "version": "2.2.0",
-      "purl": "pkg:cargo/icu_properties@2.2.0",
+      "version": "2.3.0",
+      "purl": "pkg:cargo/icu_properties@2.3.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -6084,10 +5765,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/icu_provider@2.2.0",
+      "bom-ref": "pkg:cargo/icu_provider@2.3.1",
       "name": "icu_provider",
-      "version": "2.2.0",
-      "purl": "pkg:cargo/icu_provider@2.2.0",
+      "version": "2.3.1",
+      "purl": "pkg:cargo/icu_provider@2.3.1",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -6420,30 +6101,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/jni-sys@0.3.1",
-      "name": "jni-sys",
-      "version": "0.3.1",
-      "purl": "pkg:cargo/jni-sys@0.3.1",
-      "properties": [
-        {
-          "name": "bitwarden:ecosystem",
-          "value": "cargo"
-        }
-      ],
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/jni-rs/jni-sys"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:cargo/jni-sys@0.4.1",
       "name": "jni-sys",
       "version": "0.4.1",
@@ -6463,30 +6120,6 @@
         {
           "type": "vcs",
           "url": "https://github.com/jni-rs/jni-sys"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:cargo/jni@0.21.1",
-      "name": "jni",
-      "version": "0.21.1",
-      "purl": "pkg:cargo/jni@0.21.1",
-      "properties": [
-        {
-          "name": "bitwarden:ecosystem",
-          "value": "cargo"
-        }
-      ],
-      "licenses": [
-        {
-          "expression": "MIT/Apache-2.0"
-        }
-      ],
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/jni-rs/jni-rs"
         }
       ]
     },
@@ -8886,30 +8519,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/rustls-platform-verifier@0.6.2",
-      "name": "rustls-platform-verifier",
-      "version": "0.6.2",
-      "purl": "pkg:cargo/rustls-platform-verifier@0.6.2",
-      "properties": [
-        {
-          "name": "bitwarden:ecosystem",
-          "value": "cargo"
-        }
-      ],
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/rustls/rustls-platform-verifier"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:cargo/rustls-platform-verifier@0.7.0",
       "name": "rustls-platform-verifier",
       "version": "0.7.0",
@@ -8934,10 +8543,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/rustls-webpki@0.103.13",
+      "bom-ref": "pkg:cargo/rustls-webpki@0.103.15",
       "name": "rustls-webpki",
-      "version": "0.103.13",
-      "purl": "pkg:cargo/rustls-webpki@0.103.13",
+      "version": "0.103.15",
+      "purl": "pkg:cargo/rustls-webpki@0.103.15",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -8958,10 +8567,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/rustls@0.23.42",
+      "bom-ref": "pkg:cargo/rustls@0.23.45",
       "name": "rustls",
-      "version": "0.23.42",
-      "purl": "pkg:cargo/rustls@0.23.42",
+      "version": "0.23.45",
+      "purl": "pkg:cargo/rustls@0.23.45",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -10614,58 +10223,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/thiserror-impl@1.0.69",
-      "name": "thiserror-impl",
-      "version": "1.0.69",
-      "purl": "pkg:cargo/thiserror-impl@1.0.69",
-      "properties": [
-        {
-          "name": "bitwarden:ecosystem",
-          "value": "cargo"
-        }
-      ],
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/dtolnay/thiserror"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:cargo/thiserror-impl@2.0.19",
       "name": "thiserror-impl",
       "version": "2.0.19",
       "purl": "pkg:cargo/thiserror-impl@2.0.19",
-      "properties": [
-        {
-          "name": "bitwarden:ecosystem",
-          "value": "cargo"
-        }
-      ],
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/dtolnay/thiserror"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:cargo/thiserror@1.0.69",
-      "name": "thiserror",
-      "version": "1.0.69",
-      "purl": "pkg:cargo/thiserror@1.0.69",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -10782,10 +10343,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/tinystr@0.8.3",
+      "bom-ref": "pkg:cargo/tinystr@0.8.4",
       "name": "tinystr",
-      "version": "0.8.3",
-      "purl": "pkg:cargo/tinystr@0.8.3",
+      "version": "0.8.4",
+      "purl": "pkg:cargo/tinystr@0.8.4",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -10902,10 +10463,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/toml_datetime@0.7.5%2Bspec-1.1.0",
+      "bom-ref": "pkg:cargo/toml_datetime@1.1.1%2Bspec-1.1.0",
       "name": "toml_datetime",
-      "version": "0.7.5+spec-1.1.0",
-      "purl": "pkg:cargo/toml_datetime@0.7.5%2Bspec-1.1.0",
+      "version": "1.1.1+spec-1.1.0",
+      "purl": "pkg:cargo/toml_datetime@1.1.1%2Bspec-1.1.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -10974,10 +10535,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/toml@0.9.12%2Bspec-1.1.0",
+      "bom-ref": "pkg:cargo/toml@1.1.3%2Bspec-1.1.0",
       "name": "toml",
-      "version": "0.9.12+spec-1.1.0",
-      "purl": "pkg:cargo/toml@0.9.12%2Bspec-1.1.0",
+      "version": "1.1.3+spec-1.1.0",
+      "purl": "pkg:cargo/toml@1.1.3%2Bspec-1.1.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -11478,10 +11039,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/uniffi_bindgen@0.31.0",
+      "bom-ref": "pkg:cargo/uniffi_bindgen@0.32.0",
       "name": "uniffi_bindgen",
-      "version": "0.31.0",
-      "purl": "pkg:cargo/uniffi_bindgen@0.31.0",
+      "version": "0.32.0",
+      "purl": "pkg:cargo/uniffi_bindgen@0.32.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -11502,10 +11063,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/uniffi_build@0.31.0",
+      "bom-ref": "pkg:cargo/uniffi_build@0.32.0",
       "name": "uniffi_build",
-      "version": "0.31.0",
-      "purl": "pkg:cargo/uniffi_build@0.31.0",
+      "version": "0.32.0",
+      "purl": "pkg:cargo/uniffi_build@0.32.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -11526,10 +11087,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/uniffi_core@0.31.0",
+      "bom-ref": "pkg:cargo/uniffi_core@0.32.0",
       "name": "uniffi_core",
-      "version": "0.31.0",
-      "purl": "pkg:cargo/uniffi_core@0.31.0",
+      "version": "0.32.0",
+      "purl": "pkg:cargo/uniffi_core@0.32.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -11550,10 +11111,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/uniffi_internal_macros@0.31.0",
+      "bom-ref": "pkg:cargo/uniffi_internal_macros@0.32.0",
       "name": "uniffi_internal_macros",
-      "version": "0.31.0",
-      "purl": "pkg:cargo/uniffi_internal_macros@0.31.0",
+      "version": "0.32.0",
+      "purl": "pkg:cargo/uniffi_internal_macros@0.32.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -11574,10 +11135,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/uniffi_macros@0.31.0",
+      "bom-ref": "pkg:cargo/uniffi_macros@0.32.0",
       "name": "uniffi_macros",
-      "version": "0.31.0",
-      "purl": "pkg:cargo/uniffi_macros@0.31.0",
+      "version": "0.32.0",
+      "purl": "pkg:cargo/uniffi_macros@0.32.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -11598,10 +11159,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/uniffi_meta@0.31.0",
+      "bom-ref": "pkg:cargo/uniffi_meta@0.32.0",
       "name": "uniffi_meta",
-      "version": "0.31.0",
-      "purl": "pkg:cargo/uniffi_meta@0.31.0",
+      "version": "0.32.0",
+      "purl": "pkg:cargo/uniffi_meta@0.32.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -11622,10 +11183,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/uniffi_pipeline@0.31.0",
+      "bom-ref": "pkg:cargo/uniffi_pipeline@0.32.0",
       "name": "uniffi_pipeline",
-      "version": "0.31.0",
-      "purl": "pkg:cargo/uniffi_pipeline@0.31.0",
+      "version": "0.32.0",
+      "purl": "pkg:cargo/uniffi_pipeline@0.32.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -11646,10 +11207,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/uniffi_udl@0.31.0",
+      "bom-ref": "pkg:cargo/uniffi_udl@0.32.0",
       "name": "uniffi_udl",
-      "version": "0.31.0",
-      "purl": "pkg:cargo/uniffi_udl@0.31.0",
+      "version": "0.32.0",
+      "purl": "pkg:cargo/uniffi_udl@0.32.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -11670,10 +11231,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/uniffi@0.31.0",
+      "bom-ref": "pkg:cargo/uniffi@0.32.0",
       "name": "uniffi",
-      "version": "0.31.0",
-      "purl": "pkg:cargo/uniffi@0.31.0",
+      "version": "0.32.0",
+      "purl": "pkg:cargo/uniffi@0.32.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -12246,10 +11807,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/windows_aarch64_gnullvm@0.42.2",
+      "bom-ref": "pkg:cargo/windows_aarch64_gnullvm@0.48.5",
       "name": "windows_aarch64_gnullvm",
-      "version": "0.42.2",
-      "purl": "pkg:cargo/windows_aarch64_gnullvm@0.42.2",
+      "version": "0.48.5",
+      "purl": "pkg:cargo/windows_aarch64_gnullvm@0.48.5",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -12294,10 +11855,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/windows_aarch64_msvc@0.42.2",
+      "bom-ref": "pkg:cargo/windows_aarch64_msvc@0.48.5",
       "name": "windows_aarch64_msvc",
-      "version": "0.42.2",
-      "purl": "pkg:cargo/windows_aarch64_msvc@0.42.2",
+      "version": "0.48.5",
+      "purl": "pkg:cargo/windows_aarch64_msvc@0.48.5",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -12342,10 +11903,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/windows_i686_gnu@0.42.2",
+      "bom-ref": "pkg:cargo/windows_i686_gnu@0.48.5",
       "name": "windows_i686_gnu",
-      "version": "0.42.2",
-      "purl": "pkg:cargo/windows_i686_gnu@0.42.2",
+      "version": "0.48.5",
+      "purl": "pkg:cargo/windows_i686_gnu@0.48.5",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -12414,10 +11975,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/windows_i686_msvc@0.42.2",
+      "bom-ref": "pkg:cargo/windows_i686_msvc@0.48.5",
       "name": "windows_i686_msvc",
-      "version": "0.42.2",
-      "purl": "pkg:cargo/windows_i686_msvc@0.42.2",
+      "version": "0.48.5",
+      "purl": "pkg:cargo/windows_i686_msvc@0.48.5",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -12462,10 +12023,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/windows_x86_64_gnu@0.42.2",
+      "bom-ref": "pkg:cargo/windows_x86_64_gnu@0.48.5",
       "name": "windows_x86_64_gnu",
-      "version": "0.42.2",
-      "purl": "pkg:cargo/windows_x86_64_gnu@0.42.2",
+      "version": "0.48.5",
+      "purl": "pkg:cargo/windows_x86_64_gnu@0.48.5",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -12510,10 +12071,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/windows_x86_64_gnullvm@0.42.2",
+      "bom-ref": "pkg:cargo/windows_x86_64_gnullvm@0.48.5",
       "name": "windows_x86_64_gnullvm",
-      "version": "0.42.2",
-      "purl": "pkg:cargo/windows_x86_64_gnullvm@0.42.2",
+      "version": "0.48.5",
+      "purl": "pkg:cargo/windows_x86_64_gnullvm@0.48.5",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -12558,10 +12119,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/windows_x86_64_msvc@0.42.2",
+      "bom-ref": "pkg:cargo/windows_x86_64_msvc@0.48.5",
       "name": "windows_x86_64_msvc",
-      "version": "0.42.2",
-      "purl": "pkg:cargo/windows_x86_64_msvc@0.42.2",
+      "version": "0.48.5",
+      "purl": "pkg:cargo/windows_x86_64_msvc@0.48.5",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -12750,10 +12311,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/windows-sys@0.45.0",
+      "bom-ref": "pkg:cargo/windows-sys@0.48.0",
       "name": "windows-sys",
-      "version": "0.45.0",
-      "purl": "pkg:cargo/windows-sys@0.45.0",
+      "version": "0.48.0",
+      "purl": "pkg:cargo/windows-sys@0.48.0",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -12846,10 +12407,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/windows-targets@0.42.2",
+      "bom-ref": "pkg:cargo/windows-targets@0.48.5",
       "name": "windows-targets",
-      "version": "0.42.2",
-      "purl": "pkg:cargo/windows-targets@0.42.2",
+      "version": "0.48.5",
+      "purl": "pkg:cargo/windows-targets@0.48.5",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -12889,30 +12450,6 @@
         {
           "type": "vcs",
           "url": "https://github.com/microsoft/windows-rs"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:cargo/winnow@0.7.15",
-      "name": "winnow",
-      "version": "0.7.15",
-      "purl": "pkg:cargo/winnow@0.7.15",
-      "properties": [
-        {
-          "name": "bitwarden:ecosystem",
-          "value": "cargo"
-        }
-      ],
-      "licenses": [
-        {
-          "expression": "MIT"
-        }
-      ],
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/winnow-rs/winnow"
         }
       ]
     },
@@ -12990,10 +12527,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/writeable@0.6.3",
+      "bom-ref": "pkg:cargo/writeable@0.6.4",
       "name": "writeable",
-      "version": "0.6.3",
-      "purl": "pkg:cargo/writeable@0.6.3",
+      "version": "0.6.4",
+      "purl": "pkg:cargo/writeable@0.6.4",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -13254,10 +12791,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/zerotrie@0.2.4",
+      "bom-ref": "pkg:cargo/zerotrie@0.2.5",
       "name": "zerotrie",
-      "version": "0.2.4",
-      "purl": "pkg:cargo/zerotrie@0.2.4",
+      "version": "0.2.5",
+      "purl": "pkg:cargo/zerotrie@0.2.5",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -13278,10 +12815,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/zerovec-derive@0.11.3",
+      "bom-ref": "pkg:cargo/zerovec-derive@0.11.6",
       "name": "zerovec-derive",
-      "version": "0.11.3",
-      "purl": "pkg:cargo/zerovec-derive@0.11.3",
+      "version": "0.11.6",
+      "purl": "pkg:cargo/zerovec-derive@0.11.6",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -13302,10 +12839,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/zerovec@0.11.6",
+      "bom-ref": "pkg:cargo/zerovec@0.11.8",
       "name": "zerovec",
-      "version": "0.11.6",
-      "purl": "pkg:cargo/zerovec@0.11.6",
+      "version": "0.11.8",
+      "purl": "pkg:cargo/zerovec@0.11.8",
       "properties": [
         {
           "name": "bitwarden:ecosystem",
@@ -14447,10 +13984,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:npm/%40nestjs/common@11.1.28",
+      "bom-ref": "pkg:npm/%40nestjs/common@11.2.1",
       "name": "@nestjs/common",
-      "version": "11.1.28",
-      "purl": "pkg:npm/%40nestjs/common@11.1.28",
+      "version": "11.2.1",
+      "purl": "pkg:npm/%40nestjs/common@11.2.1",
       "scope": "optional",
       "properties": [
         {
@@ -14470,16 +14007,16 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "6d1226b3189b89ef8033bc6377072b9bf82be5879a708eb991204dcd3b9f6b521be62c3389a63f96a32d461f531eaea96d5e1ed473fd688d99c4652e9a799aa1"
+          "content": "48482d3fe33d0ea361424809225277a13a7781e9a8ffca30c92a2fccc1a6263da471f207d46e903f8e4001bf1d1386b722956272952f743032ed2ca4ede6e307"
         }
       ]
     },
     {
       "type": "library",
-      "bom-ref": "pkg:npm/%40nestjs/core@11.1.28",
+      "bom-ref": "pkg:npm/%40nestjs/core@11.2.1",
       "name": "@nestjs/core",
-      "version": "11.1.28",
-      "purl": "pkg:npm/%40nestjs/core@11.1.28",
+      "version": "11.2.1",
+      "purl": "pkg:npm/%40nestjs/core@11.2.1",
       "scope": "optional",
       "properties": [
         {
@@ -14499,7 +14036,7 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "d3a9badf12118fcfa5f2e39e87ff0b9d8ba91ae6e4caee1ff9b3ca21a75a4ae8babcaf4aa57828cfb1ef793d723952dc12dd0cd2808e116e44b845d990498105"
+          "content": "3393d6154f0d7514e05fd3e8e3d77b4d02a0edfe6df0601551afc4b32e2d99a31670aba04f3837673a497c3dcb10f32e4478dfb3afbca50620b6e3f6bb3deb0f"
         }
       ]
     },
@@ -14534,10 +14071,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:npm/%40openapitools/openapi-generator-cli@2.40.1",
+      "bom-ref": "pkg:npm/%40openapitools/openapi-generator-cli@2.41.0",
       "name": "@openapitools/openapi-generator-cli",
-      "version": "2.40.1",
-      "purl": "pkg:npm/%40openapitools/openapi-generator-cli@2.40.1",
+      "version": "2.41.0",
+      "purl": "pkg:npm/%40openapitools/openapi-generator-cli@2.41.0",
       "scope": "optional",
       "properties": [
         {
@@ -14557,7 +14094,7 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "719b0c6370e115db949532fd6b42f487830a34606f22eb71b99493193c9e52029b99878076b7f245874668fb5d3b794272ebb7a43b3abfdb2db991469186def7"
+          "content": "4ff7035b85de3b6309242811f937ae736cf78c8bb194895ba05c453cc0efa3d9bfea1a486a0b46188f99fae70cb9a3d501520cd7715d56bf998b3c2ae3150724"
         }
       ]
     },
@@ -15027,10 +14564,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:npm/axios@1.18.1",
+      "bom-ref": "pkg:npm/axios@1.20.0",
       "name": "axios",
-      "version": "1.18.1",
-      "purl": "pkg:npm/axios@1.18.1",
+      "version": "1.20.0",
+      "purl": "pkg:npm/axios@1.20.0",
       "scope": "optional",
       "properties": [
         {
@@ -15050,7 +14587,7 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "de74ef165be99fd66efd190752ab5cefff9a978529456e5acfbd5aa79cdc729e9ef1101813384c4de717f03cf5c160d8acfa54a01d4701010610012f52bed2f6"
+          "content": "afc68e87c8fd7062a981002aa73ad41e748873a6b9f58dd77ff72ff2ccb50eb1c29191f340612ea2ad6d01193aa92c8376d4064838296fd90596bbb33efae0c2"
         }
       ]
     },
@@ -15578,10 +15115,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:npm/concurrently@10.0.4",
+      "bom-ref": "pkg:npm/concurrently@10.0.5",
       "name": "concurrently",
-      "version": "10.0.4",
-      "purl": "pkg:npm/concurrently@10.0.4",
+      "version": "10.0.5",
+      "purl": "pkg:npm/concurrently@10.0.5",
       "scope": "optional",
       "properties": [
         {
@@ -15601,7 +15138,7 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "b6b66a97eee5ff4f96440b009c475cb6be3e8a2392e99ad5888e87f1059c085f4c152fcb4f474aa5ef2f96e075b68ea2b7e3b1488e15a2ca454c814c5bc0c947"
+          "content": "25a3ff0a87ed52b09c0055bf83ffd16e0106c257a59c469ee9c7c12e01fa65d3bab3c8cf927ea9f5207dbbaa5d571617a224a716ab1e3a51dfac47c5f364d53a"
         }
       ]
     },
@@ -17115,10 +16652,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:npm/lint-staged@17.2.0",
+      "bom-ref": "pkg:npm/lint-staged@17.3.0",
       "name": "lint-staged",
-      "version": "17.2.0",
-      "purl": "pkg:npm/lint-staged@17.2.0",
+      "version": "17.3.0",
+      "purl": "pkg:npm/lint-staged@17.3.0",
       "scope": "optional",
       "properties": [
         {
@@ -17138,7 +16675,7 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "15c8469c57b88b80750bf6b7e523d4f5b3463c41d20b5fb5895d2994b8f30662957bd92566b9517d280ae82c3855e1f2a8e5db2545cfd2f38deb5b917ed350d0"
+          "content": "c28652def35edd42aa05a2cfbdb2ceb4a458e2d2c03695908689b5d8c196a82f0c87594238ef96812c265f66a68c902a4d8f41917616f3b7c2507e47f4f87ac7"
         }
       ]
     },
@@ -19044,10 +18581,11 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/askama_derive@0.14.0",
+      "ref": "pkg:cargo/askama_derive@0.16.0",
       "dependsOn": [
-        "pkg:cargo/askama_parser@0.14.0",
+        "pkg:cargo/askama_parser@0.16.0",
         "pkg:cargo/basic-toml@0.1.10",
+        "pkg:cargo/glob@0.3.4",
         "pkg:cargo/memchr@2.8.3",
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
@@ -19058,18 +18596,25 @@
       ]
     },
     {
-      "ref": "pkg:cargo/askama_parser@0.14.0",
+      "ref": "pkg:cargo/askama_macros@0.16.0",
       "dependsOn": [
-        "pkg:cargo/memchr@2.8.3",
-        "pkg:cargo/serde@1.0.229",
-        "pkg:cargo/serde_derive@1.0.229",
-        "pkg:cargo/winnow@0.7.15"
+        "pkg:cargo/askama_derive@0.16.0"
       ]
     },
     {
-      "ref": "pkg:cargo/askama@0.14.0",
+      "ref": "pkg:cargo/askama_parser@0.16.0",
       "dependsOn": [
-        "pkg:cargo/askama_derive@0.14.0",
+        "pkg:cargo/rustc-hash@2.1.3",
+        "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/serde_derive@1.0.229",
+        "pkg:cargo/unicode-ident@1.0.24",
+        "pkg:cargo/winnow@1.0.4"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/askama@0.16.0",
+      "dependsOn": [
+        "pkg:cargo/askama_macros@0.16.0",
         "pkg:cargo/itoa@1.0.18",
         "pkg:cargo/percent-encoding@2.3.2",
         "pkg:cargo/serde@1.0.229",
@@ -19160,10 +18705,10 @@
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.151",
         "pkg:cargo/sha2@0.11.0",
-        "pkg:cargo/thiserror@1.0.69",
+        "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/url@2.5.8",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
@@ -19193,11 +18738,11 @@
         "pkg:cargo/http@1.4.2",
         "pkg:cargo/reqwest-middleware@0.5.2",
         "pkg:cargo/reqwest@0.13.4",
-        "pkg:cargo/rustls-platform-verifier@0.6.2",
-        "pkg:cargo/rustls@0.23.42",
+        "pkg:cargo/rustls-platform-verifier@0.7.0",
+        "pkg:cargo/rustls@0.23.45",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.151",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/url@2.5.8"
       ]
     },
@@ -19256,7 +18801,7 @@
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
         "pkg:cargo/wasm-bindgen@0.2.114"
@@ -19273,8 +18818,9 @@
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_repr@0.1.21",
         "pkg:cargo/thiserror@2.0.19",
+        "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
@@ -19300,6 +18846,7 @@
         "pkg:cargo/bitwarden-encoding@3.0.0",
         "pkg:cargo/bitwarden-error@3.0.0",
         "pkg:cargo/bitwarden-logging@3.0.0",
+        "pkg:cargo/bitwarden-managed-settings-types@3.0.0",
         "pkg:cargo/bitwarden-random@3.0.0",
         "pkg:cargo/bitwarden-state-bridge-macro@3.0.0",
         "pkg:cargo/bitwarden-state@3.0.0",
@@ -19326,7 +18873,7 @@
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/url@2.5.8",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
@@ -19341,7 +18888,7 @@
         "pkg:cargo/bitwarden-core@3.0.0",
         "pkg:cargo/bitwarden-crypto@3.0.0",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
     },
@@ -19354,10 +18901,11 @@
         "pkg:cargo/bitwarden-crypto@3.0.0",
         "pkg:cargo/bitwarden-sync@3.0.0",
         "pkg:cargo/serde@1.0.229",
-        "pkg:cargo/thiserror@1.0.69",
+        "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tokio@1.53.1",
+        "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
@@ -19406,7 +18954,7 @@
         "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
         "pkg:cargo/typenum@1.20.1",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen@0.2.114",
         "pkg:cargo/xaes-256-gcm@0.1.0-rc.3",
@@ -19425,7 +18973,7 @@
         "pkg:cargo/serde_json@1.0.151",
         "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
     },
@@ -19471,8 +19019,9 @@
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.151",
         "pkg:cargo/thiserror@2.0.19",
+        "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/url@2.5.8",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
@@ -19492,6 +19041,9 @@
       "ref": "pkg:cargo/bitwarden-ffi@3.0.0",
       "dependsOn": [
         "pkg:cargo/bitwarden-ffi-macro@3.0.0",
+        "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/serde_json@1.0.151",
+        "pkg:cargo/tsify@0.5.6",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
     },
@@ -19516,7 +19068,7 @@
         "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tracing@0.1.44",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/uuid@1.24.0"
       ]
     },
@@ -19535,28 +19087,50 @@
         "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
     },
     {
       "ref": "pkg:cargo/bitwarden-importers@3.0.0",
       "dependsOn": [
+        "pkg:cargo/aes-gcm@0.11.0",
+        "pkg:cargo/aes@0.9.2",
+        "pkg:cargo/async-trait@0.1.91",
         "pkg:cargo/bitwarden-api-api@3.0.0",
+        "pkg:cargo/bitwarden-api-base@3.0.0",
         "pkg:cargo/bitwarden-collections@3.0.0",
         "pkg:cargo/bitwarden-core@3.0.0",
         "pkg:cargo/bitwarden-crypto@3.0.0",
         "pkg:cargo/bitwarden-error@3.0.0",
         "pkg:cargo/bitwarden-exporters@3.0.0",
+        "pkg:cargo/bitwarden-random@3.0.0",
+        "pkg:cargo/bitwarden-ssh@3.0.0",
         "pkg:cargo/bitwarden-vault@3.0.0",
+        "pkg:cargo/cbc@0.2.1",
         "pkg:cargo/chrono@0.4.45",
+        "pkg:cargo/crypto-bigint@0.7.5",
         "pkg:cargo/data-encoding@2.11.0",
+        "pkg:cargo/hkdf@0.13.0",
+        "pkg:cargo/hmac@0.13.0",
+        "pkg:cargo/icu_normalizer@2.3.0",
+        "pkg:cargo/itertools@0.15.0",
         "pkg:cargo/keepass@0.13.17",
+        "pkg:cargo/p256@0.14.0",
+        "pkg:cargo/pbkdf2@0.13.0",
+        "pkg:cargo/rand@0.10.2",
+        "pkg:cargo/reqwest@0.13.4",
+        "pkg:cargo/rsa@0.10.0-rc.18",
         "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/serde_json@1.0.151",
+        "pkg:cargo/sha1@0.11.0",
+        "pkg:cargo/sha2@0.11.0",
+        "pkg:cargo/subtle@2.6.1",
         "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
+        "pkg:cargo/url@2.5.8",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
         "pkg:cargo/wasm-bindgen@0.2.114",
@@ -19610,6 +19184,41 @@
       ]
     },
     {
+      "ref": "pkg:cargo/bitwarden-managed-settings-types@3.0.0",
+      "dependsOn": [
+        "pkg:cargo/bitwarden-error@3.0.0",
+        "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/serde_json@1.0.151",
+        "pkg:cargo/thiserror@2.0.19",
+        "pkg:cargo/tsify@0.5.6",
+        "pkg:cargo/uniffi@0.32.0",
+        "pkg:cargo/wasm-bindgen@0.2.114"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/bitwarden-managed-settings@3.0.0",
+      "dependsOn": [
+        "pkg:cargo/bitwarden-core@3.0.0",
+        "pkg:cargo/bitwarden-managed-settings-types@3.0.0",
+        "pkg:cargo/tracing@0.1.44",
+        "pkg:cargo/wasm-bindgen@0.2.114"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/bitwarden-member-administration@3.0.0",
+      "dependsOn": [
+        "pkg:cargo/bitwarden-api-api@3.0.0",
+        "pkg:cargo/bitwarden-core@3.0.0",
+        "pkg:cargo/bitwarden-error@3.0.0",
+        "pkg:cargo/bitwarden-organizations@3.0.0",
+        "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/thiserror@2.0.19",
+        "pkg:cargo/tsify@0.5.6",
+        "pkg:cargo/wasm-bindgen-futures@0.4.64",
+        "pkg:cargo/wasm-bindgen@0.2.114"
+      ]
+    },
+    {
       "ref": "pkg:cargo/bitwarden-organization-crypto@3.0.0",
       "dependsOn": [
         "pkg:cargo/bitwarden-crypto@3.0.0",
@@ -19637,6 +19246,7 @@
         "pkg:cargo/bitwarden-error@3.0.0",
         "pkg:cargo/bitwarden-organization-crypto@3.0.0",
         "pkg:cargo/chrono@0.4.45",
+        "pkg:cargo/http@1.4.2",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tokio@1.53.1",
@@ -19650,11 +19260,12 @@
       "ref": "pkg:cargo/bitwarden-organizations@3.0.0",
       "dependsOn": [
         "pkg:cargo/bitwarden-core@3.0.0",
+        "pkg:cargo/bitwarden-uuid@3.0.0",
         "pkg:cargo/chrono@0.4.45",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_repr@0.1.21",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
@@ -19664,6 +19275,7 @@
       "dependsOn": [
         "pkg:cargo/async-trait@0.1.91",
         "pkg:cargo/bitwarden-auth@3.0.0",
+        "pkg:cargo/bitwarden-collections@3.0.0",
         "pkg:cargo/bitwarden-core@3.0.0",
         "pkg:cargo/bitwarden-crypto-cipher-suite@3.0.0",
         "pkg:cargo/bitwarden-crypto-sync-handler@3.0.0",
@@ -19672,6 +19284,8 @@
         "pkg:cargo/bitwarden-fido@3.0.0",
         "pkg:cargo/bitwarden-generators@3.0.0",
         "pkg:cargo/bitwarden-importers@3.0.0",
+        "pkg:cargo/bitwarden-managed-settings@3.0.0",
+        "pkg:cargo/bitwarden-member-administration@3.0.0",
         "pkg:cargo/bitwarden-organization-invite-link@3.0.0",
         "pkg:cargo/bitwarden-policies@3.0.0",
         "pkg:cargo/bitwarden-send@3.0.0",
@@ -19685,7 +19299,7 @@
         "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
@@ -19696,11 +19310,14 @@
         "pkg:cargo/bitwarden-api-api@3.0.0",
         "pkg:cargo/bitwarden-core@3.0.0",
         "pkg:cargo/bitwarden-organizations@3.0.0",
+        "pkg:cargo/bitwarden-uuid@3.0.0",
         "pkg:cargo/chrono@0.4.45",
         "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/serde_json@1.0.151",
         "pkg:cargo/serde_repr@0.1.21",
+        "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
         "pkg:cargo/wasm-bindgen@0.2.114"
@@ -19714,7 +19331,7 @@
         "pkg:cargo/rand@0.10.2",
         "pkg:cargo/snow@0.10.0",
         "pkg:cargo/thiserror@2.0.19",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
@@ -19722,6 +19339,7 @@
     {
       "ref": "pkg:cargo/bitwarden-send@3.0.0",
       "dependsOn": [
+        "pkg:cargo/async-trait@0.1.91",
         "pkg:cargo/bitwarden-api-api@3.0.0",
         "pkg:cargo/bitwarden-api-base@3.0.0",
         "pkg:cargo/bitwarden-core@3.0.0",
@@ -19729,17 +19347,21 @@
         "pkg:cargo/bitwarden-encoding@3.0.0",
         "pkg:cargo/bitwarden-error@3.0.0",
         "pkg:cargo/bitwarden-state@3.0.0",
+        "pkg:cargo/bitwarden-sync@3.0.0",
         "pkg:cargo/bitwarden-uuid@3.0.0",
+        "pkg:cargo/bitwarden-vault@3.0.0",
         "pkg:cargo/chrono@0.4.45",
         "pkg:cargo/reqwest@0.13.4",
         "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/serde_bytes@0.11.19",
         "pkg:cargo/serde_json@1.0.151",
         "pkg:cargo/serde_repr@0.1.21",
         "pkg:cargo/sha2@0.11.0",
         "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tokio@1.53.1",
+        "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
         "pkg:cargo/wasm-bindgen@0.2.114",
@@ -19751,7 +19373,7 @@
       "dependsOn": [
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.151",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
     },
@@ -19772,7 +19394,7 @@
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
@@ -19786,11 +19408,13 @@
         "pkg:cargo/bitwarden-encoding@3.0.0",
         "pkg:cargo/bitwarden-error@3.0.0",
         "pkg:cargo/bitwarden-ipc@3.0.0",
+        "pkg:cargo/bitwarden-shared-unlock@3.0.0",
         "pkg:cargo/bitwarden-threading@3.0.0",
         "pkg:cargo/js-sys@0.3.91",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tokio@1.53.1",
+        "pkg:cargo/tracing-subscriber@0.3.23",
         "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
@@ -19819,7 +19443,7 @@
         "pkg:cargo/ssh-key@0.7.0-rc.11",
         "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
     },
@@ -19846,7 +19470,7 @@
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0"
+        "pkg:cargo/uniffi@0.32.0"
       ]
     },
     {
@@ -19905,6 +19529,8 @@
         "pkg:cargo/bitwarden-fido@3.0.0",
         "pkg:cargo/bitwarden-generators@3.0.0",
         "pkg:cargo/bitwarden-importers@3.0.0",
+        "pkg:cargo/bitwarden-managed-settings-types@3.0.0",
+        "pkg:cargo/bitwarden-managed-settings@3.0.0",
         "pkg:cargo/bitwarden-organizations@3.0.0",
         "pkg:cargo/bitwarden-pm@3.0.0",
         "pkg:cargo/bitwarden-policies@3.0.0",
@@ -19918,16 +19544,16 @@
         "pkg:cargo/bitwarden-user-crypto-management@3.0.0",
         "pkg:cargo/bitwarden-vault@3.0.0",
         "pkg:cargo/chrono@0.4.45",
-        "pkg:cargo/jni@0.21.1",
+        "pkg:cargo/jni@0.22.4",
         "pkg:cargo/libloading@0.8.9",
-        "pkg:cargo/rustls-platform-verifier@0.6.2",
+        "pkg:cargo/rustls-platform-verifier@0.7.0",
         "pkg:cargo/serde_json@1.0.151",
         "pkg:cargo/thiserror@2.0.19",
         "pkg:cargo/tracing-android@0.2.0",
         "pkg:cargo/tracing-oslog@0.3.0",
         "pkg:cargo/tracing-subscriber@0.3.23",
         "pkg:cargo/tracing@0.1.44",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/uuid@1.24.0"
       ]
     },
@@ -19941,7 +19567,7 @@
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
         "pkg:cargo/wasm-bindgen@0.2.114"
       ]
@@ -19967,7 +19593,7 @@
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
         "pkg:cargo/wasm-bindgen@0.2.114"
@@ -20023,7 +19649,7 @@
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tracing@0.1.44",
         "pkg:cargo/tsify@0.5.6",
-        "pkg:cargo/uniffi@0.31.0",
+        "pkg:cargo/uniffi@0.32.0",
         "pkg:cargo/uuid@1.24.0",
         "pkg:cargo/wasm-bindgen-futures@0.4.64",
         "pkg:cargo/wasm-bindgen@0.2.114",
@@ -20041,6 +19667,8 @@
         "pkg:cargo/bitwarden-error@3.0.0",
         "pkg:cargo/bitwarden-ipc@3.0.0",
         "pkg:cargo/bitwarden-logging@3.0.0",
+        "pkg:cargo/bitwarden-managed-settings@3.0.0",
+        "pkg:cargo/bitwarden-member-administration@3.0.0",
         "pkg:cargo/bitwarden-organization-crypto@3.0.0",
         "pkg:cargo/bitwarden-organization-invite-link@3.0.0",
         "pkg:cargo/bitwarden-pm@3.0.0",
@@ -20140,10 +19768,10 @@
       ]
     },
     {
-      "ref": "pkg:cargo/cargo_metadata@0.19.2",
+      "ref": "pkg:cargo/cargo_metadata@0.23.1",
       "dependsOn": [
         "pkg:cargo/camino@1.2.4",
-        "pkg:cargo/cargo-platform@0.1.9",
+        "pkg:cargo/cargo-platform@0.3.2",
         "pkg:cargo/semver@1.0.28",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.151",
@@ -20151,9 +19779,10 @@
       ]
     },
     {
-      "ref": "pkg:cargo/cargo-platform@0.1.9",
+      "ref": "pkg:cargo/cargo-platform@0.3.2",
       "dependsOn": [
-        "pkg:cargo/serde@1.0.229"
+        "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/serde_core@1.0.229"
       ]
     },
     {
@@ -20168,10 +19797,6 @@
         "pkg:cargo/find-msvc-tools@0.1.9",
         "pkg:cargo/shlex@2.0.1"
       ]
-    },
-    {
-      "ref": "pkg:cargo/cesu8@1.1.0",
-      "dependsOn": []
     },
     {
       "ref": "pkg:cargo/cfg-if@1.0.4",
@@ -20703,6 +20328,7 @@
         "pkg:cargo/digest@0.11.3",
         "pkg:cargo/ff@0.14.0",
         "pkg:cargo/group@0.14.0",
+        "pkg:cargo/hkdf@0.13.0",
         "pkg:cargo/hybrid-array@0.4.13",
         "pkg:cargo/pkcs8@0.11.0",
         "pkg:cargo/rand_core@0.10.1",
@@ -20727,7 +20353,7 @@
       "ref": "pkg:cargo/errno@0.3.14",
       "dependsOn": [
         "pkg:cargo/libc@0.2.189",
-        "pkg:cargo/windows-sys@0.61.2"
+        "pkg:cargo/windows-sys@0.59.0"
       ]
     },
     {
@@ -20800,7 +20426,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/fs-err@2.11.0",
+      "ref": "pkg:cargo/fs-err@3.3.1",
       "dependsOn": [
         "pkg:cargo/autocfg@1.5.1"
       ]
@@ -21082,7 +20708,7 @@
         "pkg:cargo/http@1.4.2",
         "pkg:cargo/hyper-util@0.1.20",
         "pkg:cargo/hyper@1.11.0",
-        "pkg:cargo/rustls@0.23.42",
+        "pkg:cargo/rustls@0.23.45",
         "pkg:cargo/tokio-rustls@0.26.4",
         "pkg:cargo/tokio@1.53.1",
         "pkg:cargo/tower-service@0.3.3"
@@ -21145,66 +20771,68 @@
       ]
     },
     {
-      "ref": "pkg:cargo/icu_collections@2.2.0",
+      "ref": "pkg:cargo/icu_collections@2.3.0",
       "dependsOn": [
         "pkg:cargo/displaydoc@0.2.6",
         "pkg:cargo/potential_utf@0.1.5",
         "pkg:cargo/utf8_iter@1.0.4",
         "pkg:cargo/yoke@0.8.3",
         "pkg:cargo/zerofrom@0.1.8",
-        "pkg:cargo/zerovec@0.11.6"
+        "pkg:cargo/zerovec@0.11.8"
       ]
     },
     {
-      "ref": "pkg:cargo/icu_locale_core@2.2.0",
+      "ref": "pkg:cargo/icu_locale_core@2.3.0",
       "dependsOn": [
         "pkg:cargo/displaydoc@0.2.6",
         "pkg:cargo/litemap@0.8.2",
-        "pkg:cargo/tinystr@0.8.3",
-        "pkg:cargo/writeable@0.6.3",
-        "pkg:cargo/zerovec@0.11.6"
+        "pkg:cargo/tinystr@0.8.4",
+        "pkg:cargo/writeable@0.6.4",
+        "pkg:cargo/zerovec@0.11.8"
       ]
     },
     {
-      "ref": "pkg:cargo/icu_normalizer_data@2.2.0",
+      "ref": "pkg:cargo/icu_normalizer_data@2.3.0",
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/icu_normalizer@2.2.0",
+      "ref": "pkg:cargo/icu_normalizer@2.3.0",
       "dependsOn": [
-        "pkg:cargo/icu_collections@2.2.0",
-        "pkg:cargo/icu_normalizer_data@2.2.0",
-        "pkg:cargo/icu_properties@2.2.0",
-        "pkg:cargo/icu_provider@2.2.0",
+        "pkg:cargo/icu_collections@2.3.0",
+        "pkg:cargo/icu_normalizer_data@2.3.0",
+        "pkg:cargo/icu_properties@2.3.0",
+        "pkg:cargo/icu_provider@2.3.1",
         "pkg:cargo/smallvec@1.15.2",
-        "pkg:cargo/zerovec@0.11.6"
+        "pkg:cargo/utf8_iter@1.0.4",
+        "pkg:cargo/zerovec@0.11.8"
       ]
     },
     {
-      "ref": "pkg:cargo/icu_properties_data@2.2.0",
+      "ref": "pkg:cargo/icu_properties_data@2.3.0",
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/icu_properties@2.2.0",
-      "dependsOn": [
-        "pkg:cargo/icu_collections@2.2.0",
-        "pkg:cargo/icu_locale_core@2.2.0",
-        "pkg:cargo/icu_properties_data@2.2.0",
-        "pkg:cargo/icu_provider@2.2.0",
-        "pkg:cargo/zerotrie@0.2.4",
-        "pkg:cargo/zerovec@0.11.6"
-      ]
-    },
-    {
-      "ref": "pkg:cargo/icu_provider@2.2.0",
+      "ref": "pkg:cargo/icu_properties@2.3.0",
       "dependsOn": [
         "pkg:cargo/displaydoc@0.2.6",
-        "pkg:cargo/icu_locale_core@2.2.0",
-        "pkg:cargo/writeable@0.6.3",
+        "pkg:cargo/icu_collections@2.3.0",
+        "pkg:cargo/icu_locale_core@2.3.0",
+        "pkg:cargo/icu_properties_data@2.3.0",
+        "pkg:cargo/icu_provider@2.3.1",
+        "pkg:cargo/zerotrie@0.2.5",
+        "pkg:cargo/zerovec@0.11.8"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/icu_provider@2.3.1",
+      "dependsOn": [
+        "pkg:cargo/displaydoc@0.2.6",
+        "pkg:cargo/icu_locale_core@2.3.0",
+        "pkg:cargo/writeable@0.6.4",
         "pkg:cargo/yoke@0.8.3",
         "pkg:cargo/zerofrom@0.1.8",
-        "pkg:cargo/zerotrie@0.2.4",
-        "pkg:cargo/zerovec@0.11.6"
+        "pkg:cargo/zerotrie@0.2.5",
+        "pkg:cargo/zerovec@0.11.8"
       ]
     },
     {
@@ -21214,8 +20842,8 @@
     {
       "ref": "pkg:cargo/idna_adapter@1.2.2",
       "dependsOn": [
-        "pkg:cargo/icu_normalizer@2.2.0",
-        "pkg:cargo/icu_properties@2.2.0"
+        "pkg:cargo/icu_normalizer@2.3.0",
+        "pkg:cargo/icu_properties@2.3.0"
       ]
     },
     {
@@ -21297,28 +20925,9 @@
       ]
     },
     {
-      "ref": "pkg:cargo/jni-sys@0.3.1",
-      "dependsOn": [
-        "pkg:cargo/jni-sys@0.4.1"
-      ]
-    },
-    {
       "ref": "pkg:cargo/jni-sys@0.4.1",
       "dependsOn": [
         "pkg:cargo/jni-sys-macros@0.4.1"
-      ]
-    },
-    {
-      "ref": "pkg:cargo/jni@0.21.1",
-      "dependsOn": [
-        "pkg:cargo/cesu8@1.1.0",
-        "pkg:cargo/cfg-if@1.0.4",
-        "pkg:cargo/combine@4.6.7",
-        "pkg:cargo/jni-sys@0.3.1",
-        "pkg:cargo/log@0.4.33",
-        "pkg:cargo/thiserror@1.0.69",
-        "pkg:cargo/walkdir@2.5.0",
-        "pkg:cargo/windows-sys@0.45.0"
       ]
     },
     {
@@ -21513,7 +21122,7 @@
     {
       "ref": "pkg:cargo/nu-ansi-term@0.50.3",
       "dependsOn": [
-        "pkg:cargo/windows-sys@0.61.2"
+        "pkg:cargo/windows-sys@0.59.0"
       ]
     },
     {
@@ -21768,7 +21377,7 @@
     {
       "ref": "pkg:cargo/potential_utf@0.1.5",
       "dependsOn": [
-        "pkg:cargo/zerovec@0.11.6"
+        "pkg:cargo/zerovec@0.11.8"
       ]
     },
     {
@@ -21976,7 +21585,7 @@
         "pkg:cargo/pin-project-lite@0.2.17",
         "pkg:cargo/rustls-pki-types@1.15.1",
         "pkg:cargo/rustls-platform-verifier@0.7.0",
-        "pkg:cargo/rustls@0.23.42",
+        "pkg:cargo/rustls@0.23.45",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.151",
         "pkg:cargo/serde_urlencoded@0.7.1",
@@ -22080,7 +21689,7 @@
         "pkg:cargo/errno@0.3.14",
         "pkg:cargo/libc@0.2.189",
         "pkg:cargo/linux-raw-sys@0.12.1",
-        "pkg:cargo/windows-sys@0.61.2"
+        "pkg:cargo/windows-sys@0.59.0"
       ]
     },
     {
@@ -22103,24 +21712,6 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/rustls-platform-verifier@0.6.2",
-      "dependsOn": [
-        "pkg:cargo/core-foundation-sys@0.8.7",
-        "pkg:cargo/core-foundation@0.10.1",
-        "pkg:cargo/jni@0.21.1",
-        "pkg:cargo/log@0.4.33",
-        "pkg:cargo/once_cell@1.21.4",
-        "pkg:cargo/rustls-native-certs@0.8.4",
-        "pkg:cargo/rustls-platform-verifier-android@0.1.1",
-        "pkg:cargo/rustls-webpki@0.103.13",
-        "pkg:cargo/rustls@0.23.42",
-        "pkg:cargo/security-framework-sys@2.17.0",
-        "pkg:cargo/security-framework@3.7.0",
-        "pkg:cargo/webpki-root-certs@1.0.9",
-        "pkg:cargo/windows-sys@0.61.2"
-      ]
-    },
-    {
       "ref": "pkg:cargo/rustls-platform-verifier@0.7.0",
       "dependsOn": [
         "pkg:cargo/core-foundation-sys@0.8.7",
@@ -22130,16 +21721,16 @@
         "pkg:cargo/once_cell@1.21.4",
         "pkg:cargo/rustls-native-certs@0.8.4",
         "pkg:cargo/rustls-platform-verifier-android@0.1.1",
-        "pkg:cargo/rustls-webpki@0.103.13",
-        "pkg:cargo/rustls@0.23.42",
+        "pkg:cargo/rustls-webpki@0.103.15",
+        "pkg:cargo/rustls@0.23.45",
         "pkg:cargo/security-framework-sys@2.17.0",
         "pkg:cargo/security-framework@3.7.0",
         "pkg:cargo/webpki-root-certs@1.0.9",
-        "pkg:cargo/windows-sys@0.61.2"
+        "pkg:cargo/windows-sys@0.59.0"
       ]
     },
     {
-      "ref": "pkg:cargo/rustls-webpki@0.103.13",
+      "ref": "pkg:cargo/rustls-webpki@0.103.15",
       "dependsOn": [
         "pkg:cargo/ring@0.17.14",
         "pkg:cargo/rustls-pki-types@1.15.1",
@@ -22147,13 +21738,13 @@
       ]
     },
     {
-      "ref": "pkg:cargo/rustls@0.23.42",
+      "ref": "pkg:cargo/rustls@0.23.45",
       "dependsOn": [
         "pkg:cargo/log@0.4.33",
         "pkg:cargo/once_cell@1.21.4",
         "pkg:cargo/ring@0.17.14",
         "pkg:cargo/rustls-pki-types@1.15.1",
-        "pkg:cargo/rustls-webpki@0.103.13",
+        "pkg:cargo/rustls-webpki@0.103.15",
         "pkg:cargo/subtle@2.6.1",
         "pkg:cargo/zeroize@1.9.0"
       ]
@@ -22649,7 +22240,7 @@
         "pkg:cargo/getrandom@0.4.3",
         "pkg:cargo/once_cell@1.21.4",
         "pkg:cargo/rustix@1.1.4",
-        "pkg:cargo/windows-sys@0.61.2"
+        "pkg:cargo/windows-sys@0.59.0"
       ]
     },
     {
@@ -22663,25 +22254,11 @@
       ]
     },
     {
-      "ref": "pkg:cargo/thiserror-impl@1.0.69",
-      "dependsOn": [
-        "pkg:cargo/proc-macro2@1.0.107",
-        "pkg:cargo/quote@1.0.47",
-        "pkg:cargo/syn@2.0.119"
-      ]
-    },
-    {
       "ref": "pkg:cargo/thiserror-impl@2.0.19",
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
         "pkg:cargo/syn@3.0.3"
-      ]
-    },
-    {
-      "ref": "pkg:cargo/thiserror@1.0.69",
-      "dependsOn": [
-        "pkg:cargo/thiserror-impl@1.0.69"
       ]
     },
     {
@@ -22712,10 +22289,10 @@
       ]
     },
     {
-      "ref": "pkg:cargo/tinystr@0.8.3",
+      "ref": "pkg:cargo/tinystr@0.8.4",
       "dependsOn": [
         "pkg:cargo/displaydoc@0.2.6",
-        "pkg:cargo/zerovec@0.11.6"
+        "pkg:cargo/zerovec@0.11.8"
       ]
     },
     {
@@ -22729,7 +22306,7 @@
     {
       "ref": "pkg:cargo/tokio-rustls@0.26.4",
       "dependsOn": [
-        "pkg:cargo/rustls@0.23.42",
+        "pkg:cargo/rustls@0.23.45",
         "pkg:cargo/tokio@1.53.1"
       ]
     },
@@ -22757,7 +22334,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/toml_datetime@0.7.5%2Bspec-1.1.0",
+      "ref": "pkg:cargo/toml_datetime@1.1.1%2Bspec-1.1.0",
       "dependsOn": [
         "pkg:cargo/serde_core@1.0.229"
       ]
@@ -22773,15 +22350,15 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/toml@0.9.12%2Bspec-1.1.0",
+      "ref": "pkg:cargo/toml@1.1.3%2Bspec-1.1.0",
       "dependsOn": [
         "pkg:cargo/indexmap@2.14.0",
         "pkg:cargo/serde_core@1.0.229",
         "pkg:cargo/serde_spanned@1.1.1",
-        "pkg:cargo/toml_datetime@0.7.5%2Bspec-1.1.0",
+        "pkg:cargo/toml_datetime@1.1.1%2Bspec-1.1.0",
         "pkg:cargo/toml_parser@1.1.2%2Bspec-1.1.0",
         "pkg:cargo/toml_writer@1.1.2%2Bspec-1.1.0",
-        "pkg:cargo/winnow@0.7.15"
+        "pkg:cargo/winnow@1.0.4"
       ]
     },
     {
@@ -22936,13 +22513,13 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/uniffi_bindgen@0.31.0",
+      "ref": "pkg:cargo/uniffi_bindgen@0.32.0",
       "dependsOn": [
         "pkg:cargo/anyhow@1.0.104",
-        "pkg:cargo/askama@0.14.0",
+        "pkg:cargo/askama@0.16.0",
         "pkg:cargo/camino@1.2.4",
-        "pkg:cargo/cargo_metadata@0.19.2",
-        "pkg:cargo/fs-err@2.11.0",
+        "pkg:cargo/cargo_metadata@0.23.1",
+        "pkg:cargo/fs-err@3.3.1",
         "pkg:cargo/glob@0.3.4",
         "pkg:cargo/goblin@0.8.2",
         "pkg:cargo/heck@0.5.0",
@@ -22951,23 +22528,23 @@
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/tempfile@3.27.0",
         "pkg:cargo/textwrap@0.16.2",
-        "pkg:cargo/toml@0.9.12%2Bspec-1.1.0",
-        "pkg:cargo/uniffi_internal_macros@0.31.0",
-        "pkg:cargo/uniffi_meta@0.31.0",
-        "pkg:cargo/uniffi_pipeline@0.31.0",
-        "pkg:cargo/uniffi_udl@0.31.0"
+        "pkg:cargo/toml@1.1.3%2Bspec-1.1.0",
+        "pkg:cargo/uniffi_internal_macros@0.32.0",
+        "pkg:cargo/uniffi_meta@0.32.0",
+        "pkg:cargo/uniffi_pipeline@0.32.0",
+        "pkg:cargo/uniffi_udl@0.32.0"
       ]
     },
     {
-      "ref": "pkg:cargo/uniffi_build@0.31.0",
+      "ref": "pkg:cargo/uniffi_build@0.32.0",
       "dependsOn": [
         "pkg:cargo/anyhow@1.0.104",
         "pkg:cargo/camino@1.2.4",
-        "pkg:cargo/uniffi_bindgen@0.31.0"
+        "pkg:cargo/uniffi_bindgen@0.32.0"
       ]
     },
     {
-      "ref": "pkg:cargo/uniffi_core@0.31.0",
+      "ref": "pkg:cargo/uniffi_core@0.32.0",
       "dependsOn": [
         "pkg:cargo/anyhow@1.0.104",
         "pkg:cargo/async-compat@0.2.5",
@@ -22977,7 +22554,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/uniffi_internal_macros@0.31.0",
+      "ref": "pkg:cargo/uniffi_internal_macros@0.32.0",
       "dependsOn": [
         "pkg:cargo/anyhow@1.0.104",
         "pkg:cargo/indexmap@2.14.0",
@@ -22987,58 +22564,58 @@
       ]
     },
     {
-      "ref": "pkg:cargo/uniffi_macros@0.31.0",
+      "ref": "pkg:cargo/uniffi_macros@0.32.0",
       "dependsOn": [
         "pkg:cargo/camino@1.2.4",
-        "pkg:cargo/fs-err@2.11.0",
+        "pkg:cargo/fs-err@3.3.1",
         "pkg:cargo/once_cell@1.21.4",
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/syn@2.0.119",
-        "pkg:cargo/toml@0.9.12%2Bspec-1.1.0",
-        "pkg:cargo/uniffi_meta@0.31.0"
+        "pkg:cargo/toml@1.1.3%2Bspec-1.1.0",
+        "pkg:cargo/uniffi_meta@0.32.0"
       ]
     },
     {
-      "ref": "pkg:cargo/uniffi_meta@0.31.0",
+      "ref": "pkg:cargo/uniffi_meta@0.32.0",
       "dependsOn": [
         "pkg:cargo/anyhow@1.0.104",
         "pkg:cargo/siphasher@1.0.3",
-        "pkg:cargo/uniffi_internal_macros@0.31.0",
-        "pkg:cargo/uniffi_pipeline@0.31.0"
+        "pkg:cargo/uniffi_internal_macros@0.32.0",
+        "pkg:cargo/uniffi_pipeline@0.32.0"
       ]
     },
     {
-      "ref": "pkg:cargo/uniffi_pipeline@0.31.0",
+      "ref": "pkg:cargo/uniffi_pipeline@0.32.0",
       "dependsOn": [
         "pkg:cargo/anyhow@1.0.104",
         "pkg:cargo/heck@0.5.0",
         "pkg:cargo/indexmap@2.14.0",
         "pkg:cargo/tempfile@3.27.0",
-        "pkg:cargo/uniffi_internal_macros@0.31.0"
+        "pkg:cargo/uniffi_internal_macros@0.32.0"
       ]
     },
     {
-      "ref": "pkg:cargo/uniffi_udl@0.31.0",
+      "ref": "pkg:cargo/uniffi_udl@0.32.0",
       "dependsOn": [
         "pkg:cargo/anyhow@1.0.104",
         "pkg:cargo/textwrap@0.16.2",
-        "pkg:cargo/uniffi_meta@0.31.0",
+        "pkg:cargo/uniffi_meta@0.32.0",
         "pkg:cargo/weedle2@5.0.0"
       ]
     },
     {
-      "ref": "pkg:cargo/uniffi@0.31.0",
+      "ref": "pkg:cargo/uniffi@0.32.0",
       "dependsOn": [
         "pkg:cargo/anyhow@1.0.104",
         "pkg:cargo/camino@1.2.4",
-        "pkg:cargo/cargo_metadata@0.19.2",
-        "pkg:cargo/uniffi_bindgen@0.31.0",
-        "pkg:cargo/uniffi_build@0.31.0",
-        "pkg:cargo/uniffi_core@0.31.0",
-        "pkg:cargo/uniffi_macros@0.31.0",
-        "pkg:cargo/uniffi_pipeline@0.31.0"
+        "pkg:cargo/cargo_metadata@0.23.1",
+        "pkg:cargo/uniffi_bindgen@0.32.0",
+        "pkg:cargo/uniffi_build@0.32.0",
+        "pkg:cargo/uniffi_core@0.32.0",
+        "pkg:cargo/uniffi_macros@0.32.0",
+        "pkg:cargo/uniffi_pipeline@0.32.0"
       ]
     },
     {
@@ -23198,11 +22775,11 @@
     {
       "ref": "pkg:cargo/winapi-util@0.1.11",
       "dependsOn": [
-        "pkg:cargo/windows-sys@0.61.2"
+        "pkg:cargo/windows-sys@0.48.0"
       ]
     },
     {
-      "ref": "pkg:cargo/windows_aarch64_gnullvm@0.42.2",
+      "ref": "pkg:cargo/windows_aarch64_gnullvm@0.48.5",
       "dependsOn": []
     },
     {
@@ -23210,7 +22787,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/windows_aarch64_msvc@0.42.2",
+      "ref": "pkg:cargo/windows_aarch64_msvc@0.48.5",
       "dependsOn": []
     },
     {
@@ -23218,7 +22795,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/windows_i686_gnu@0.42.2",
+      "ref": "pkg:cargo/windows_i686_gnu@0.48.5",
       "dependsOn": []
     },
     {
@@ -23230,7 +22807,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/windows_i686_msvc@0.42.2",
+      "ref": "pkg:cargo/windows_i686_msvc@0.48.5",
       "dependsOn": []
     },
     {
@@ -23238,7 +22815,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/windows_x86_64_gnu@0.42.2",
+      "ref": "pkg:cargo/windows_x86_64_gnu@0.48.5",
       "dependsOn": []
     },
     {
@@ -23246,7 +22823,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/windows_x86_64_gnullvm@0.42.2",
+      "ref": "pkg:cargo/windows_x86_64_gnullvm@0.48.5",
       "dependsOn": []
     },
     {
@@ -23254,7 +22831,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/windows_x86_64_msvc@0.42.2",
+      "ref": "pkg:cargo/windows_x86_64_msvc@0.48.5",
       "dependsOn": []
     },
     {
@@ -23304,9 +22881,9 @@
       ]
     },
     {
-      "ref": "pkg:cargo/windows-sys@0.45.0",
+      "ref": "pkg:cargo/windows-sys@0.48.0",
       "dependsOn": [
-        "pkg:cargo/windows-targets@0.42.2"
+        "pkg:cargo/windows-targets@0.48.5"
       ]
     },
     {
@@ -23328,15 +22905,15 @@
       ]
     },
     {
-      "ref": "pkg:cargo/windows-targets@0.42.2",
+      "ref": "pkg:cargo/windows-targets@0.48.5",
       "dependsOn": [
-        "pkg:cargo/windows_aarch64_gnullvm@0.42.2",
-        "pkg:cargo/windows_aarch64_msvc@0.42.2",
-        "pkg:cargo/windows_i686_gnu@0.42.2",
-        "pkg:cargo/windows_i686_msvc@0.42.2",
-        "pkg:cargo/windows_x86_64_gnu@0.42.2",
-        "pkg:cargo/windows_x86_64_gnullvm@0.42.2",
-        "pkg:cargo/windows_x86_64_msvc@0.42.2"
+        "pkg:cargo/windows_aarch64_gnullvm@0.48.5",
+        "pkg:cargo/windows_aarch64_msvc@0.48.5",
+        "pkg:cargo/windows_i686_gnu@0.48.5",
+        "pkg:cargo/windows_i686_msvc@0.48.5",
+        "pkg:cargo/windows_x86_64_gnu@0.48.5",
+        "pkg:cargo/windows_x86_64_gnullvm@0.48.5",
+        "pkg:cargo/windows_x86_64_msvc@0.48.5"
       ]
     },
     {
@@ -23353,14 +22930,10 @@
       ]
     },
     {
-      "ref": "pkg:cargo/winnow@0.7.15",
+      "ref": "pkg:cargo/winnow@1.0.4",
       "dependsOn": [
         "pkg:cargo/memchr@2.8.3"
       ]
-    },
-    {
-      "ref": "pkg:cargo/winnow@1.0.4",
-      "dependsOn": []
     },
     {
       "ref": "pkg:cargo/wit-bindgen@0.57.1",
@@ -23375,7 +22948,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/writeable@0.6.3",
+      "ref": "pkg:cargo/writeable@0.6.4",
       "dependsOn": []
     },
     {
@@ -23453,7 +23026,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/zerotrie@0.2.4",
+      "ref": "pkg:cargo/zerotrie@0.2.5",
       "dependsOn": [
         "pkg:cargo/displaydoc@0.2.6",
         "pkg:cargo/yoke@0.8.3",
@@ -23461,19 +23034,19 @@
       ]
     },
     {
-      "ref": "pkg:cargo/zerovec-derive@0.11.3",
+      "ref": "pkg:cargo/zerovec-derive@0.11.6",
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
-        "pkg:cargo/syn@2.0.119"
+        "pkg:cargo/syn@3.0.3"
       ]
     },
     {
-      "ref": "pkg:cargo/zerovec@0.11.6",
+      "ref": "pkg:cargo/zerovec@0.11.8",
       "dependsOn": [
         "pkg:cargo/yoke@0.8.3",
         "pkg:cargo/zerofrom@0.1.8",
-        "pkg:cargo/zerovec-derive@0.11.3"
+        "pkg:cargo/zerovec-derive@0.11.6"
       ]
     },
     {

@@ -21,10 +21,10 @@ const aliasSdkInternal = packageJson.dependencies["@bitwarden/alias-sdk-internal
 const commercialSdkInternal = commercialOverlay.package?.version;
 
 const canonicalAliasArtifact =
-  "file:vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.1.tgz";
+  "file:vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.2.tgz";
 const canonicalAliasArtifactSha256 =
-  "1f40d1c145056b014184b678b57c61ac8c173efc2499f178066737ebb1647394";
-const sdkVersion = sdkInternal === canonicalAliasArtifact ? "0.2.0-main.971" : sdkInternal;
+  "d294d0e22b8627f61f2c7faa2c90baf44c2def92fbf0d7230aac574656df8470";
+const sdkVersion = sdkInternal === canonicalAliasArtifact ? "0.2.0-main.1051" : sdkInternal;
 
 if (
   packageJson.dependencies["@bitwarden/commercial-sdk-internal"] !== undefined ||

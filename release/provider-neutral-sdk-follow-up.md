@@ -1,13 +1,15 @@
-# Provider-neutral alias SDK follow-up
+# Provider-neutral alias SDK compatibility
 
-The provider-neutral alias wire and schema are owned by the public SDK source branch
-`integration/provider-neutral-alias-upstream-sync`. This client state is based on upstream commit
-`b52a472fccba2727cba9cd22257d551599c43e4f` and pins the provenance-complete
-`0.3.0-alias-provider-neutral.1` candidate from SDK commit
-`106aad00f85fb0766c2d5ede534a39b792f48789`, release-candidate run `32362581586`, and candidate
-artifact `9405727965`. The candidate preserves the provider-neutral v1 alias contract and includes
-the compatibility APIs from upstream SDK `0.2.0-main.971`. It does not substitute Bitwarden's
-unqualified SDK package or define a competing wire format.
+The canonical SDK is `0.3.0-alias-provider-neutral.2` from public source
+`5562c7eafe6826594e4096d6d0d77ac9668b8bfe` on `integration/alias-sdk-launch-20260926`,
+[hosted run 36289197668](https://github.com/mateoltd/bitwarden-sdk-internal/actions/runs/36289197668),
+artifact `10922176671`. Its signed provenance and exact package bytes are pinned together in
+`release/alias-client-release.json`. This clients branch retains frozen upstream
+`45eb0013dc413dab78932c418d209d89371febf6` and the current `.1051` SDK API requirements.
+The provider-neutral alias v1 contract remains unchanged.
+
+The following checklist records the earlier `.971` compatibility migration; its package/source
+coordinates are historical, not the current pin. Current clients retain the newer upstream APIs.
 
 The compatibility repin updates these client boundaries together:
 

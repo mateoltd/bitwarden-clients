@@ -201,7 +201,7 @@ for (const packageName of [sdk.package, "@bitwarden/alias-sdk-internal"]) {
   assert(lockEntry?.integrity === sdk.integrity, `${packageName} lock integrity differs`);
 }
 assert(
-  sdk.publicRef === "refs/heads/integration/provider-neutral-alias-upstream-sync",
+  sdk.publicRef === "refs/heads/integration/alias-sdk-launch-20260926",
   "SDK public ref differs",
 );
 const expectedRepository = sdk.sourceRepository.replace(/\.git$/, "");

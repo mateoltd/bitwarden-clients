@@ -3,14 +3,14 @@
   "evidenceType": "client-sdk-toolchain-handoff",
   "sdkProducer": {
     "evidence": {
-      "path": "vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.1.build-environment.txt",
-      "sha256": "4e24693338c63ddaf041235bdbf890b81892c41a734e09881fc5277c0298d530"
+      "path": "vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.2.build-environment.txt",
+      "sha256": "e9264476d59ca495b38984afd09d0dad9bd0d30d4beb7b6ced32c3aae0a28849"
     },
     "toolchain": {
-      "runnerImage": "ubuntu24-20260816.277.1",
+      "runnerImage": "ubuntu24-20260920.314.1",
       "node": "24.17.0",
       "npm": "11.13.0",
-      "rust": "1.97.1",
+      "rust": "1.98.0",
       "wasmOpt": "131"
     }
   },

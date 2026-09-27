@@ -61,7 +61,7 @@
     "^artifacts/"
   ],
   "allowedArtifacts": {
-    "vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.1.tgz": "1f40d1c145056b014184b678b57c61ac8c173efc2499f178066737ebb1647394"
+    "vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.2.tgz": "d294d0e22b8627f61f2c7faa2c90baf44c2def92fbf0d7230aac574656df8470"
   },
   "allowedLicensePatterns": [
     "^0BSD$",
