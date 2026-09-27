@@ -32,7 +32,7 @@ env:
   PROVIDER_REPOSITORY: ${{ inputs.provider_repository || 'mateoltd/simplelogin-owned-provider' }}
   PROVIDER_OPERATIONS_COMMIT: ${{ inputs.provider_operations_ref || 'e157b6804f7b1b60e149207cebe2d414f6e4a73f' }}
   PROVIDER_UPSTREAM_COMMIT: ${{ inputs.provider_upstream_ref || 'dbc45fcce4e8e6b4fa615cc729ca95a67bf75266' }}
-  BITWARDEN_IMAGE: ghcr.io/bitwarden/lite:2026.7.2@sha256:ca1007fb3a8e973692ca1b92b87e52d2101976ef9bdf76d8639682485a5866dc
+  BITWARDEN_IMAGE: ghcr.io/bitwarden/lite:2026.9.0@sha256:616624bf9a2e1bae68a6a7735732339db41b831e38593846f0c2b4983af34bb9
   VAULTWARDEN_IMAGE: docker.io/vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8
 
 jobs:

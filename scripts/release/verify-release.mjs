@@ -70,7 +70,7 @@ assert(
   officialBitwarden.repository === "https://github.com/bitwarden/server.git" &&
     /^[0-9a-f]{40}$/.test(officialBitwarden.sourceCommit) &&
     officialBitwarden.image ===
-      `ghcr.io/bitwarden/lite:${officialBitwarden.version}@sha256:ca1007fb3a8e973692ca1b92b87e52d2101976ef9bdf76d8639682485a5866dc`,
+      `ghcr.io/bitwarden/lite:${officialBitwarden.version}@sha256:616624bf9a2e1bae68a6a7735732339db41b831e38593846f0c2b4983af34bb9`,
   "Official Bitwarden test server is not pinned to the maintained Lite image",
 );
 for (const expected of [

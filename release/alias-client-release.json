@@ -104,9 +104,9 @@
     },
     "officialBitwarden": {
       "repository": "https://github.com/bitwarden/server.git",
-      "sourceCommit": "ffc280d2891270f7248812263aa1140e49f9c776",
-      "version": "2026.7.2",
-      "image": "ghcr.io/bitwarden/lite:2026.7.2@sha256:ca1007fb3a8e973692ca1b92b87e52d2101976ef9bdf76d8639682485a5866dc",
+      "sourceCommit": "6fcd3b71f5f2eb0881dd4a3b587fa8afe5957da1",
+      "version": "2026.9.0",
+      "image": "ghcr.io/bitwarden/lite:2026.9.0@sha256:616624bf9a2e1bae68a6a7735732339db41b831e38593846f0c2b4983af34bb9",
       "containerName": "alias-client-release-bitwarden"
     },
     "vault": {

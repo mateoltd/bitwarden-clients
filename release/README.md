@@ -47,7 +47,7 @@ container for `npm ci`; `release:verify-sdk-install` then requires both SDK depe
 physical installs and loads the pinned WASM package from browser, web, desktop, CLI, and common
 library package contexts.
 
-The positive headed lane uses official Bitwarden Lite `2026.7.2` at the exact image digest and
+The positive headed lane uses official Bitwarden Lite `2026.9.0` at the exact image digest and
 source commit in the manifest. Its own Admin service creates the SQLite schema before a local-only
 account is bootstrapped. Browser, web, desktop/Electron, encrypted sync, restart/unlock,
 send/reply, and 10,000-record cross-device suites all run against that server.
