@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
+import { createRequire } from "node:module";
+
+import { satisfies } from "semver";
 import path from "node:path";
 
 import { assert, parseArgs, readJson, repositoryRoot, run } from "./lib.mjs";
@@ -35,14 +38,55 @@ const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "bitwarden-comm
 const archivePath = path.join(temporaryDirectory, "commercial-sdk.tgz");
 try {
   fs.writeFileSync(archivePath, archive);
-  run("npm", [
-    "install",
-    "--no-save",
-    "--package-lock=false",
-    "--ignore-scripts",
-    "--legacy-peer-deps",
-    archivePath,
-  ]);
+  // Overlay one verified package without re-resolving or pruning the frozen public graph.
+  run("tar", ["-xzf", archivePath, "-C", temporaryDirectory]);
+  const unpacked = path.join(temporaryDirectory, "package");
+  const candidate = readJson(path.join(unpacked, "package.json"));
+  assert(
+    candidate.name === overlay.package.name &&
+      candidate.version === overlay.package.version &&
+      candidate.license === overlay.package.license,
+    "Commercial SDK archive identity differs from the explicit overlay",
+  );
+  const lock = readJson(path.join(repositoryRoot, "package-lock.json"));
+  function copyFrozenDependencies(manifest, source, target, ancestry = []) {
+    const require = createRequire(path.join(source, "package.json"));
+    for (const [name, range] of Object.entries(manifest.dependencies ?? {})) {
+      const dependencyPath = require.resolve
+        .paths(name)
+        .map((directory) => path.join(directory, name, "package.json"))
+        .find(
+          (file) =>
+            file.startsWith(path.join(repositoryRoot, "node_modules") + path.sep) &&
+            fs.existsSync(file),
+        );
+      assert(dependencyPath, `Frozen dependency ${name} is missing`);
+      const directory = path.dirname(dependencyPath);
+      const dependency = readJson(dependencyPath);
+      const locked = lock.packages[path.relative(repositoryRoot, directory)];
+      assert(
+        locked?.integrity &&
+          locked.version === dependency.version &&
+          satisfies(dependency.version, range),
+        `Frozen dependency ${name} does not satisfy the SDK overlay or lockfile`,
+      );
+      assert(!ancestry.includes(directory), `Cyclic overlay dependency ${name}`);
+      const destination = path.join(target, "node_modules", name);
+      fs.cpSync(directory, destination, {
+        recursive: true,
+        filter: (file) => file === directory || path.basename(file) !== "node_modules",
+      });
+      copyFrozenDependencies(dependency, directory, destination, [...ancestry, directory]);
+    }
+  }
+  copyFrozenDependencies(
+    candidate,
+    path.join(repositoryRoot, "node_modules/@bitwarden/sdk-internal"),
+    unpacked,
+  );
+  const destination = path.join(repositoryRoot, "node_modules/@bitwarden/commercial-sdk-internal");
+  fs.rmSync(destination, { recursive: true, force: true });
+  fs.cpSync(unpacked, destination, { recursive: true });
 } finally {
   fs.rmSync(temporaryDirectory, { recursive: true, force: true });
 }
