@@ -118,6 +118,9 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Install verified SDK overlay for mixed-source tests
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
+
       - name: Run tests - ${{ matrix.test-group.name }}
         # maxWorkers is a workaround for a memory leak that crashes tests in CI:
         # https://github.com/facebook/jest/issues/9430#issuecomment-1149882002
