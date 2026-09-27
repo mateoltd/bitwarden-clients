@@ -360,7 +360,7 @@ try {
   await vaultItem.getByRole("button", { name: "More options" }).click();
   await captureEvidence(popup, "alias-bound-menu.png");
   await popup.getByRole("menuitem", { name: "Manage bound alias", exact: true }).click();
-  await popup.waitForURL(new RegExp(`#\/email-aliases\/${alias.id}$`));
+  const boundConnectionId = await waitForBoundAliasRoute(popup, alias.id);
   await popup.waitForFunction(
     (address) =>
       document.querySelector('[data-testid="alias-address"]')?.textContent?.trim() === address,
@@ -431,7 +431,7 @@ try {
     .locator("xpath=ancestor::bit-item");
   await restartedVaultItem.getByRole("button", { name: "More options" }).click();
   await popup.getByRole("menuitem", { name: "Manage bound alias", exact: true }).click();
-  await popup.waitForURL(new RegExp(`#\/email-aliases\/${alias.id}$`));
+  assert.equal(await waitForBoundAliasRoute(popup, alias.id), boundConnectionId);
   await popup.getByTestId("alias-address").filter({ hasText: aliasAddress }).waitFor();
 
   const restartedBrowserStorage = JSON.stringify(
@@ -656,6 +656,19 @@ function assertServiceLogsDoNotContain(secret) {
   );
   assert.equal(logs.status, 0, "SimpleLogin logs must be readable for leakage checks");
   assert.equal(`${logs.stdout}${logs.stderr}`.includes(secret), false);
+}
+
+async function waitForBoundAliasRoute(page, aliasId) {
+  await page.waitForURL((url) => {
+    const route = new URL(url.hash.slice(1), "https://extension.invalid");
+    return (
+      route.pathname === `/email-aliases/${aliasId}` && !!route.searchParams.get("connectionId")
+    );
+  });
+  const route = new URL(new URL(page.url()).hash.slice(1), "https://extension.invalid");
+  const connectionId = route.searchParams.get("connectionId");
+  assert.match(connectionId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  return connectionId;
 }
 
 async function permanentlyDeleteBitwardenCipher(authorization, cipherId) {
