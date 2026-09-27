@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 
 import {
   EncString,
+  ManagedSettingsClient,
   PasswordManagerClient,
   PureCrypto,
   TokenProvider,
@@ -34,7 +35,8 @@ describe("alias binding SDK encryption", () => {
   let client: PasswordManagerClient;
 
   beforeAll(async () => {
-    client = new PasswordManagerClient(new EmptyTokenProvider());
+    using managedSettings = new ManagedSettingsClient();
+    client = new PasswordManagerClient(new EmptyTokenProvider(), undefined, managedSettings);
     const userKeyBytes = randomBytes(64);
     const userKey = userKeyBytes.toString("base64");
     const wrappedPrivateKey = PureCrypto.symmetric_encrypt_bytes(
@@ -51,7 +53,7 @@ describe("alias binding SDK encryption", () => {
     await client.crypto().initialize_org_crypto({ organizationKeys: new Map() });
   });
 
-  afterAll(() => client.free());
+  afterAll(() => client?.free());
 
   it("encrypts login.aliasReference and recovers it after decrypt and restart", async () => {
     const original = new CipherView();

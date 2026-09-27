@@ -12,7 +12,12 @@ import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
 import { CipherRequest } from "@bitwarden/common/vault/models/request/cipher.request";
 import { CipherResponse } from "@bitwarden/common/vault/models/response/cipher.response";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
-import { ClientSettings, PasswordManagerClient, TokenProvider } from "@bitwarden/sdk-internal";
+import {
+  ClientSettings,
+  ManagedSettingsClient,
+  PasswordManagerClient,
+  TokenProvider,
+} from "@bitwarden/sdk-internal";
 
 import { SimpleLoginForwarder } from "../engine/simple-login-forwarder";
 import { SimpleLogin } from "../integration/simple-login";
@@ -71,8 +76,9 @@ async function authenticateBitwardenClient(
   password: string,
 ): Promise<AuthenticatedClient> {
   const tokenProvider = new MutableTokenProvider();
-  const client = new PasswordManagerClient(tokenProvider, bitwardenSettings);
-  const loginClient = client.auth().login(bitwardenSettings);
+  using managedSettings = new ManagedSettingsClient();
+  const client = new PasswordManagerClient(tokenProvider, bitwardenSettings, managedSettings);
+  const loginClient = client.auth().login();
   const prelogin = await loginClient.get_password_prelogin(email);
   const response = await loginClient.login_via_password({
     loginRequest: {
@@ -213,7 +219,12 @@ describeIntegration("real SimpleLogin to Bitwarden encrypted alias binding", () 
         method: "POST",
         body: serializedCreateRequest,
       });
-      expect(created.response.status).toBe(200);
+      if (created.response.status !== 200) {
+        const validation = created.json?.validationErrors ?? created.json?.ValidationErrors ?? {};
+        throw new Error(
+          `Cipher create HTTP ${created.response.status}; validation fields: ${Object.keys(validation).join(", ")}; message: ${created.json?.message ?? created.json?.Message ?? "absent"}`,
+        );
+      }
       cipherId = new CipherResponse(created.json).id;
       expect(cipherId).toEqual(expect.any(String));
       expect(created.text).not.toContain(generated.credential);

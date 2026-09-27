@@ -30,7 +30,12 @@ import { CipherRequest } from "@bitwarden/common/vault/models/request/cipher.req
 import { CipherResponse } from "@bitwarden/common/vault/models/response/cipher.response";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { createSimpleLoginAliasService } from "@bitwarden/generator-core";
-import { ClientSettings, PasswordManagerClient, TokenProvider } from "@bitwarden/sdk-internal";
+import {
+  ClientSettings,
+  ManagedSettingsClient,
+  PasswordManagerClient,
+  TokenProvider,
+} from "@bitwarden/sdk-internal";
 
 const integrationEnabled =
   process.env["ALIAS_CROSS_DEVICE_INTEGRATION"] === "1" &&
@@ -87,8 +92,9 @@ async function authenticateBitwardenProfile(
   directory: string,
 ): Promise<AuthenticatedProfile> {
   const tokenProvider = new MutableTokenProvider();
-  const client = new PasswordManagerClient(tokenProvider, bitwardenSettings);
-  const loginClient = client.auth().login(bitwardenSettings);
+  using managedSettings = new ManagedSettingsClient();
+  const client = new PasswordManagerClient(tokenProvider, bitwardenSettings, managedSettings);
+  const loginClient = client.auth().login();
   const prelogin = await loginClient.get_password_prelogin(email);
   const response = await loginClient.login_via_password({
     loginRequest: {

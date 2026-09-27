@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { SensitiveString } from "@bitwarden/alias-sdk-internal";
 import {
   EncString,
+  ManagedSettingsClient,
   PasswordManagerClient,
   PureCrypto,
   TokenProvider,
@@ -51,7 +52,8 @@ describe("alias connection vault carrier", () => {
   let client: PasswordManagerClient;
 
   beforeAll(async () => {
-    client = new PasswordManagerClient(new EmptyTokenProvider());
+    using managedSettings = new ManagedSettingsClient();
+    client = new PasswordManagerClient(new EmptyTokenProvider(), undefined, managedSettings);
     const userKeyBytes = randomBytes(64);
     const userKey = userKeyBytes.toString("base64");
     const wrappedPrivateKey = PureCrypto.symmetric_encrypt_bytes(
@@ -68,7 +70,7 @@ describe("alias connection vault carrier", () => {
     await client.crypto().initialize_org_crypto({ organizationKeys: new Map() });
   });
 
-  afterAll(() => client.free());
+  afterAll(() => client?.free());
 
   it("does not hide an ordinary secure note that happens to use the reserved name", () => {
     const ordinary = new CipherView();
