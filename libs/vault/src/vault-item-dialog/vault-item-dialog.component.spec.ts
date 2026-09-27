@@ -26,6 +26,7 @@ import { MessagingService } from "@bitwarden/common/platform/abstractions/messag
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { PremiumUpgradePromptService } from "@bitwarden/common/vault/abstractions/premium-upgrade-prompt.service";
+import { bindGeneratedAlias } from "@bitwarden/common/vault/alias-binding";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
@@ -177,7 +178,10 @@ describe("VaultItemDialogComponent", () => {
       cipher = new CipherView();
       cipher.type = CipherType.Login;
       cipher.login.username = alias.address;
-      cipher.aliasBinding = alias;
+      bindGeneratedAlias(cipher, {
+        credential: alias.address,
+        metadata: { kind: "email-alias", alias },
+      });
       onManageAlias = jest.fn();
       component.setTestCipher(cipher);
       component.setTestParams({ mode: "view", onManageAlias });
