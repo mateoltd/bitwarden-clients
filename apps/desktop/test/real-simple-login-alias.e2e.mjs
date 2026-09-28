@@ -334,13 +334,41 @@ async function launchDesktop() {
               timeout: 5_000,
             });
             assert.equal(windows.status, 0, "Task-owned desktop window must be visible");
-            const ids = windows.stdout.trim().split(/\s+/);
+            // X11 also exposes the tray icon as a visible window of this process.
+            // Use the main window's minimum dimensions from WindowMain.initWindow.
+            const ids = windows.stdout
+              .trim()
+              .split(/\s+/)
+              .filter((id) => {
+                const geometry = spawnSync(xdotool, ["getwindowgeometry", "--shell", id], {
+                  encoding: "utf8",
+                  timeout: 5_000,
+                });
+                assert.equal(geometry.status, 0, "Task-owned window geometry must be readable");
+                const width = Number(geometry.stdout.match(/^WIDTH=(\d+)$/m)?.[1]);
+                const height = Number(geometry.stdout.match(/^HEIGHT=(\d+)$/m)?.[1]);
+                return width >= 600 && height >= 500;
+              });
             assert.equal(ids.length, 1, "Never send shortcuts to an ambiguous window");
-            const pressed = spawnSync(
-              xdotool,
-              ["windowfocus", "--sync", ids[0], "key", "--clearmodifiers", shortcut],
-              { encoding: "utf8", timeout: 5_000 },
+            const activated = spawnSync(xdotool, ["windowfocus", "--sync", ids[0]], {
+              encoding: "utf8",
+              timeout: 5_000,
+            });
+            assert.equal(activated.status, 0, "Task-owned desktop must be activated");
+            const focused = spawnSync(xdotool, ["getwindowfocus"], {
+              encoding: "utf8",
+              timeout: 5_000,
+            });
+            assert.equal(focused.status, 0, "Desktop focus must be readable");
+            assert.equal(
+              focused.stdout.trim(),
+              ids[0],
+              "Shortcut focus must remain on this test's window",
             );
+            const pressed = spawnSync(xdotool, ["key", "--clearmodifiers", shortcut], {
+              encoding: "utf8",
+              timeout: 5_000,
+            });
             assert.equal(pressed.status, 0, "Native desktop accelerator must be delivered");
           },
         },

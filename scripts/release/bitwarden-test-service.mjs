@@ -205,7 +205,10 @@ class OfficialBitwardenService extends DockerBitwardenService {
   }
 
   async start() {
-    fs.chmodSync(this.dataDirectory, 0o777);
+    // Lite takes ownership of this directory; keep restarts idempotent.
+    if ((fs.statSync(this.dataDirectory).mode & 0o777) !== 0o777) {
+      fs.chmodSync(this.dataDirectory, 0o777);
+    }
     await this.startWithRollback(async () => {
       this.startContainer([
         "--publish",
