@@ -63,7 +63,8 @@ try {
       assert(dependencyPath, `Frozen dependency ${name} is missing`);
       const directory = path.dirname(dependencyPath);
       const dependency = readJson(dependencyPath);
-      const locked = lock.packages[path.relative(repositoryRoot, directory)];
+      const locked =
+        lock.packages[path.relative(repositoryRoot, directory).split(path.sep).join("/")];
       assert(
         locked?.integrity &&
           locked.version === dependency.version &&
