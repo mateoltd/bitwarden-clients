@@ -265,13 +265,37 @@ try {
   }
   try {
     assert.ok(reusePoint, "the reuse action must be ready before the trusted UI click");
-    await reuse.mouse.click(reusePoint.x, reusePoint.y);
+    const reuseFrame = reuse
+      .frames()
+      .find((frame) => frame.url().includes("/overlay/menu-list.html"));
+    assert.ok(reuseFrame);
+    const reuseAction = await reuseFrame.evaluateHandle(() =>
+      document
+        .querySelector("autofill-inline-menu-list")
+        ?.inlineMenuListContainer?.querySelector("[data-email-alias-action]"),
+    );
+    try {
+      assert.ok(reuseAction.asElement(), "The real reuse action must be an element");
+      // ElementHandle keeps Playwright's visibility/stability checks inside the closed shadow root.
+      await reuseAction.asElement().click();
+    } finally {
+      await reuseAction.dispose();
+    }
     await reuse.waitForFunction(
       (address) => document.querySelector("#email")?.value === address,
       aliasAddress,
       { timeout: 15_000 },
     );
   } catch (error) {
+    recordDiagnostic(
+      "REUSE_FAILURE",
+      JSON.stringify({
+        inputEmpty: (await reuse.locator("#email").inputValue()) === "",
+        inputMatches: (await reuse.locator("#email").inputValue()) === aliasAddress,
+        createRequests: simpleLoginCreateRequests,
+        documentFocused: await reuse.evaluate(() => document.hasFocus()),
+      }),
+    );
     await captureEvidence(reuse, "alias-reuse-failure-masked.png");
     throw error;
   }
@@ -384,6 +408,11 @@ try {
   assert.equal(persistedCipher.includes(aliasAddress), false);
 
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/vault`);
+  await popup.bringToFront();
+  await popup.locator("app-vault-search input").fill(marker);
+  await popup.waitForFunction(
+    () => document.querySelectorAll("app-item-more-options").length === 1,
+  );
   await popup.getByText(marker, { exact: true }).waitFor({ timeout: 20_000 });
   const vaultItem = popup.getByText(marker, { exact: true }).locator("xpath=ancestor::bit-item");
   await vaultItem.getByRole("button", { name: "More options" }).click();
@@ -454,6 +483,11 @@ try {
   await popup.getByRole("button", { name: "Unlock", exact: true }).click();
   await popup.waitForURL(/#\/tabs\//, { timeout: 30_000 });
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/vault`);
+  await popup.bringToFront();
+  await popup.locator("app-vault-search input").fill(marker);
+  await popup.waitForFunction(
+    () => document.querySelectorAll("app-item-more-options").length === 1,
+  );
   await popup.getByText(marker, { exact: true }).waitFor({ timeout: 20_000 });
   const restartedVaultItem = popup
     .getByText(marker, { exact: true })
