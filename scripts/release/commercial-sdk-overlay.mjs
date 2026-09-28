@@ -26,7 +26,24 @@ if (
   throw new Error("Commercial SDK overlay is invalid");
 }
 
-const response = await fetch(overlay.package.registryTarball);
+async function fetchOverlay(url) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    } catch (error) {
+      const transient =
+        error.name === "TimeoutError" ||
+        ["UND_ERR_CONNECT_TIMEOUT", "ECONNRESET", "ETIMEDOUT", "EAI_AGAIN"].includes(
+          error.cause?.code,
+        );
+      if (!transient || attempt === 3) throw error;
+      console.warn(`Commercial SDK connection failed; retrying (${attempt}/3)`);
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1_000));
+    }
+  }
+}
+
+const response = await fetchOverlay(overlay.package.registryTarball);
 assert(response.ok, `Commercial SDK download failed with HTTP ${response.status}`);
 const archive = Buffer.from(await response.arrayBuffer());
 const sha256 = createHash("sha256").update(archive).digest("hex");
