@@ -1,0 +1,1028 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import http from "node:http";
+import https from "node:https";
+import os from "node:os";
+import path from "node:path";
+
+import { chromium } from "playwright";
+
+const root = process.cwd();
+const extensionDirectory = path.resolve(
+  root,
+  process.env.BROWSER_EXTENSION_DIRECTORY ?? "dist/apps/browser/chrome-dev",
+);
+const registrationFixture = path.resolve(root, "apps/browser/test/alias-registration.html");
+const certificate = fs.readFileSync(path.resolve(root, "apps/web/dev-server.shared.pem"));
+const browserExecutable = process.env.CHROMIUM_PATH ?? chromium.executablePath();
+
+const bitwardenEmail = requiredEnvironment("BITWARDEN_EMAIL");
+const bitwardenPassword = requiredEnvironment("BITWARDEN_PASSWORD");
+const bitwardenApiUrl = new URL(process.env.BITWARDEN_API_URL ?? "http://localhost:4000");
+const bitwardenIdentityUrl = new URL(
+  process.env.BITWARDEN_IDENTITY_URL ?? "http://localhost:33656",
+);
+const vaultwarden = process.env.BITWARDEN_DB_DIALECT === "vaultwarden";
+const bitwardenApiBaseUrl = serviceBaseUrl(bitwardenApiUrl, vaultwarden ? "/api/" : "/");
+const bitwardenIdentityBaseUrl = serviceBaseUrl(
+  bitwardenIdentityUrl,
+  vaultwarden ? "/identity/" : "/",
+);
+const simpleLoginUrl = new URL(process.env.SIMPLELOGIN_URL ?? "http://127.0.0.1:32769");
+const simpleLoginEmail = requiredEnvironment("SIMPLELOGIN_EMAIL");
+const simpleLoginPassword = requiredEnvironment("SIMPLELOGIN_PASSWORD");
+
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), "bitwarden-alias-browser-e2e-"));
+const evidenceDirectory = process.env.ALIAS_E2E_EVIDENCE_DIRECTORY
+  ? path.resolve(process.env.ALIAS_E2E_EVIDENCE_DIRECTORY)
+  : fs.mkdtempSync(path.join(os.tmpdir(), "bitwarden-alias-evidence-"));
+fs.mkdirSync(evidenceDirectory, { recursive: true, mode: 0o700 });
+async function captureEvidence(page, name) {
+  // Credentials must not enter screenshots, including when a password is revealed.
+  const options = {
+    path: path.join(evidenceDirectory, name),
+    mask: [page.locator("input"), page.getByText(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)],
+  };
+  if (name === "alias-bound-menu.png") {
+    await page.getByRole("menu").screenshot(options);
+  } else {
+    await page.screenshot(options);
+  }
+}
+const servers = [];
+let context;
+let extensionId;
+let popup;
+let worker;
+let simpleLoginToken;
+let bitwardenAuthorization;
+let createdAliasId;
+let createdCipherId;
+let createdCipherAuthorization;
+let simpleLoginCreateRequests = 0;
+const safeDiagnostics = [];
+
+try {
+  simpleLoginToken = await authenticateSimpleLogin();
+  const apiProxy = await startHttpsProxy(bitwardenApiBaseUrl);
+  const identityProxy = await startHttpsProxy(bitwardenIdentityBaseUrl);
+  const registrationServer = await startRegistrationServer();
+  const registrationHostname = `alias-browser-${Date.now()}.test`;
+  const registrationUrl = new URL(registrationServer.url);
+  registrationUrl.hostname = registrationHostname;
+  servers.push(apiProxy.server, identityProxy.server, registrationServer.server);
+
+  const launchOptions = {
+    executablePath: browserExecutable,
+    headless: false,
+    ignoreHTTPSErrors: true,
+    args: [
+      "--ignore-certificate-errors",
+      `--disable-extensions-except=${extensionDirectory}`,
+      `--load-extension=${extensionDirectory}`,
+      `--host-resolver-rules=MAP ${registrationHostname} 127.0.0.1`,
+    ],
+  };
+  context = await chromium.launchPersistentContext(profile, launchOptions);
+  context.setDefaultTimeout(15_000);
+  observeContext(context, apiProxy);
+
+  worker =
+    context.serviceWorkers()[0] ??
+    (await context.waitForEvent("serviceworker", { timeout: 30_000 }));
+  observeWorker(worker);
+  extensionId = new URL(worker.url()).host;
+  popup = await context.newPage();
+
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html`);
+  const clickOnboardingButton = (label) =>
+    popup.evaluate((exactLabel) => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent?.trim() === exactLabel,
+      );
+      if (!(button instanceof HTMLButtonElement)) {
+        return false;
+      }
+      button.click();
+      return true;
+    }, label);
+  await popup
+    .locator("#email")
+    .or(popup.getByRole("button", { name: "Skip", exact: true }))
+    .or(popup.getByRole("button", { name: "Log in", exact: true }))
+    .first()
+    .waitFor({ timeout: 30_000 });
+  for (let step = 0; step < 8 && !(await popup.locator("#email").isVisible()); step++) {
+    // Fresh-install state can replace either prompt while Chrome's default-manager check settles.
+    // Resolve and click in one page evaluation so a detached locator cannot consume the timeout.
+    const progressed =
+      (await clickOnboardingButton("Skip")) || (await clickOnboardingButton("Log in"));
+    await popup.waitForTimeout(progressed ? 250 : 500);
+  }
+  try {
+    await popup.locator("#email").waitFor({ timeout: 30_000 });
+  } catch (error) {
+    await captureEvidence(popup, "alias-extension-login-unavailable.png");
+    recordDiagnostic(
+      "LOGIN_SCREEN_UNAVAILABLE",
+      `${popup.url()} ${(await popup.locator("body").innerText()).slice(0, 500)}`,
+    );
+    throw error;
+  }
+  await popup.locator("environment-selector").getByRole("button").last().click();
+  await popup.getByRole("menuitem", { name: /self-hosted/i }).click();
+  await popup.getByRole("button", { name: /Custom environment/i }).click();
+  await popup.locator("#self_hosted_env_settings_form_input_api_url").fill(apiProxy.url.toString());
+  await popup
+    .locator("#self_hosted_env_settings_form_input_identity_url")
+    .fill(identityProxy.url.toString());
+  await popup.getByRole("button", { name: "Save", exact: true }).click();
+  await popup.getByRole("dialog").waitFor({ state: "hidden" });
+
+  await popup.locator("#email").fill(bitwardenEmail);
+  await popup.getByRole("button", { name: "Continue", exact: true }).click();
+  await popup.locator('input[type="password"]').fill(bitwardenPassword);
+  await popup.getByRole("button", { name: "Log in", exact: true }).click();
+  await popup.waitForURL(/#\/tabs\//, { timeout: 30_000 });
+  assert.match(await popup.locator("body").innerText(), /Vault/i);
+
+  if (process.env.BITWARDEN_CLEANUP_CIPHER_ID) {
+    assert.ok(bitwardenAuthorization);
+    await permanentlyDeleteBitwardenCipher(
+      bitwardenAuthorization,
+      process.env.BITWARDEN_CLEANUP_CIPHER_ID,
+    );
+  }
+
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/generator`);
+  await popup.waitForTimeout(1_000);
+  await popup.getByText("Username", { exact: true }).click();
+  await popup.waitForTimeout(500);
+  await popup.getByTestId("username-type").click();
+  await popup.waitForTimeout(300);
+  await popup.getByText("Forwarded email alias", { exact: true }).click();
+  await popup.waitForTimeout(300);
+  await popup.getByTestId("email-forwarding-service").click();
+  await popup.getByText("SimpleLogin", { exact: true }).click();
+  await popup.waitForTimeout(300);
+  const tokenInput = popup.locator('tools-forwarder-settings input[type="password"]');
+  const baseUrlInput = popup.locator('tools-forwarder-settings input[formcontrolname="baseUrl"]');
+  await tokenInput.fill(simpleLoginToken);
+  await tokenInput.blur();
+  await popup.waitForTimeout(1_000);
+  assert.equal(await tokenInput.inputValue(), simpleLoginToken);
+  await baseUrlInput.fill(simpleLoginUrl.toString());
+  await baseUrlInput.blur();
+  await popup.waitForTimeout(2_000);
+  assert.equal(await tokenInput.inputValue(), simpleLoginToken);
+  assert.equal(await baseUrlInput.inputValue(), simpleLoginUrl.toString());
+
+  const browserStorage = JSON.stringify(
+    await worker.evaluate(() => new Promise((resolve) => chrome.storage.local.get(null, resolve))),
+  );
+  assert.equal(browserStorage.includes(simpleLoginToken), false);
+
+  const registration = await context.newPage();
+  registration.on("console", (message) => {
+    if (message.type() === "error") {
+      recordDiagnostic("REGISTRATION_CONSOLE_ERROR", message.text());
+    }
+  });
+  await registration.goto(registrationUrl.toString());
+  await registration.locator("#email").focus();
+  await registration.waitForTimeout(1_500);
+  const menuContainerFrame = registration
+    .frames()
+    .find((frame) => frame.url().includes("/overlay/menu.html"));
+  assert.ok(menuContainerFrame, "the extension menu container must be injected");
+  await registration.locator("#email").press("ArrowDown");
+  const hostileAttacks = await attemptHostileAliasMessages(registration);
+  await captureEvidence(registration, "alias-registration.png");
+  const hostileReplay = hostileAttacks.replay;
+  assert.ok(
+    hostileReplay.frameCount > 0,
+    `the hostile page must target an injected extension frame: ${JSON.stringify(hostileReplay)}`,
+  );
+  assert.ok(
+    hostileReplay.observedCount > 0,
+    `the hostile page must replay observed session material: ${JSON.stringify(hostileReplay)}`,
+  );
+  await registration.waitForTimeout(750);
+  assert.equal(await registration.locator("#email").inputValue(), "");
+  assert.equal(simpleLoginCreateRequests, 0, "host-parent replay must not mutate the provider");
+  const confusedDeputy = hostileAttacks.confusedDeputy;
+  assert.ok(
+    confusedDeputy.frameCount > 0,
+    "the hostile page must target an injected extension frame for the deputy attempt",
+  );
+  await registration.waitForTimeout(750);
+  assert.equal(await registration.locator("#email").inputValue(), "");
+  assert.equal(
+    simpleLoginCreateRequests,
+    0,
+    "confused-deputy messages must not mutate the provider",
+  );
+  await registration.goto(registrationUrl.toString());
+  await registration.locator("#email").focus();
+  await registration.waitForTimeout(1_500);
+  assert.ok(
+    registration.frames().some((frame) => frame.url().includes("/overlay/menu.html")),
+    "the extension menu container must be reinjected after hostile-message isolation",
+  );
+  await registration.locator("#email").press("ArrowDown");
+  await registration.waitForTimeout(300);
+  await registration.keyboard.press("Enter");
+  await registration.waitForFunction(() => document.querySelector("#email")?.value, undefined, {
+    timeout: 15_000,
+  });
+  const aliasAddress = await registration.locator("#email").inputValue();
+  assert.match(aliasAddress, /^[^@\s]+@[^@\s]+$/);
+
+  const alias = await findSimpleLoginAlias(simpleLoginToken, aliasAddress);
+  assert.equal(typeof alias.id, "number");
+  assert.equal(alias.email, aliasAddress);
+  createdAliasId = alias.id;
+  const persistedAlias = await getSimpleLoginAlias(simpleLoginToken, alias.id);
+  assert.equal(persistedAlias.email, aliasAddress);
+  assert.equal(simpleLoginCreateRequests, 1);
+
+  const reuse = await context.newPage();
+  await reuse.goto(registrationUrl.toString());
+  await reuse.bringToFront();
+  await reuse.locator("#email").focus();
+  await reuse.locator("#email").press("ArrowDown");
+  let reusePoint;
+  const reuseDeadline = Date.now() + 15_000;
+  while (!reusePoint && Date.now() < reuseDeadline) {
+    reusePoint = await getInlineMenuTargetPoint(reuse, {
+      framePath: "/overlay/menu-list.html",
+      hostSelector: "autofill-inline-menu-list",
+      targetProperty: "inlineMenuListContainer",
+      descendantSelector: "[data-email-alias-action]",
+    });
+    if (!reusePoint) await reuse.waitForTimeout(100);
+  }
+  try {
+    assert.ok(reusePoint, "the reuse action must be ready before the trusted UI click");
+    const reuseFrame = reuse
+      .frames()
+      .find((frame) => frame.url().includes("/overlay/menu-list.html"));
+    assert.ok(reuseFrame);
+    const reuseAction = await reuseFrame.evaluateHandle(() =>
+      document
+        .querySelector("autofill-inline-menu-list")
+        ?.inlineMenuListContainer?.querySelector("[data-email-alias-action]"),
+    );
+    try {
+      assert.ok(reuseAction.asElement(), "The real reuse action must be an element");
+      // ElementHandle keeps Playwright's visibility/stability checks inside the closed shadow root.
+      await reuseAction.asElement().click();
+    } finally {
+      await reuseAction.dispose();
+    }
+    await reuse.waitForFunction(
+      (address) => document.querySelector("#email")?.value === address,
+      aliasAddress,
+      { timeout: 15_000 },
+    );
+  } catch (error) {
+    recordDiagnostic(
+      "REUSE_FAILURE",
+      JSON.stringify({
+        inputEmpty: (await reuse.locator("#email").inputValue()) === "",
+        inputMatches: (await reuse.locator("#email").inputValue()) === aliasAddress,
+        createRequests: simpleLoginCreateRequests,
+        documentFocused: await reuse.evaluate(() => document.hasFocus()),
+      }),
+    );
+    await captureEvidence(reuse, "alias-reuse-failure-masked.png");
+    throw error;
+  }
+  assert.equal(await reuse.locator("#email").inputValue(), aliasAddress);
+  assert.equal(simpleLoginCreateRequests, 1, "hostname reuse must not create a second alias");
+
+  const marker = `Alias browser e2e ${Date.now()}`;
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/generator`);
+  await popup.locator("bit-toggle").filter({ hasText: "Password" }).click();
+  const loginPassword = (await popup.locator("bit-color-password").textContent())?.trim() ?? "";
+  assert.ok(loginPassword.length >= 12, "the extension must render a generated password");
+  await registration.bringToFront();
+  await registration.locator("#password").fill(loginPassword);
+  const addLoginSelector = ".save-login, #new-item-button";
+  let addLoginPoint;
+  let inlineMenuButtonClicks = 0;
+  const addLoginDeadline = Date.now() + 15_000;
+  while (!addLoginPoint && Date.now() < addLoginDeadline) {
+    await registration.locator("#password").focus();
+    await registration.waitForTimeout(100);
+    await registration.locator("#email").focus();
+    await registration.waitForTimeout(250);
+    const inlineMenuButtonPoint = await getInlineMenuTargetPoint(registration, {
+      framePath: "/overlay/menu-button.html",
+      hostSelector: "autofill-inline-menu-button",
+      targetProperty: "buttonElement",
+    });
+    if (!inlineMenuButtonPoint) {
+      continue;
+    }
+    await registration.mouse.click(inlineMenuButtonPoint.x, inlineMenuButtonPoint.y);
+    inlineMenuButtonClicks += 1;
+    await registration.waitForTimeout(500);
+    addLoginPoint = await getInlineMenuTargetPoint(registration, {
+      framePath: "/overlay/menu-list.html",
+      hostSelector: "autofill-inline-menu-list",
+      targetProperty: "inlineMenuListContainer",
+      descendantSelector: addLoginSelector,
+    });
+  }
+  assert.ok(
+    addLoginPoint,
+    `an inline add-login action must be visible after ${inlineMenuButtonClicks} button clicks`,
+  );
+  await captureEvidence(registration, "alias-registration-save.png");
+  const addEditPagePromise = context.waitForEvent("page");
+  await registration.mouse.click(addLoginPoint.x, addLoginPoint.y);
+  const addEditPage = await addEditPagePromise;
+  await addEditPage.waitForLoadState();
+  await addEditPage.waitForTimeout(1_000);
+  await reuse.close();
+
+  assert.equal(
+    await addEditPage.getByLabel("Username", { exact: true }).inputValue(),
+    aliasAddress,
+  );
+  assert.equal(
+    await addEditPage.getByLabel("Password", { exact: true }).inputValue(),
+    loginPassword,
+  );
+  assert.equal(
+    await addEditPage.getByLabel("Website (URI)", { exact: true }).inputValue(),
+    registrationUrl.toString(),
+  );
+  await addEditPage.locator('input[formcontrolname="name"]').fill(marker);
+  await captureEvidence(addEditPage, "alias-login-binding.png");
+
+  const cipherResponsePromise = context.waitForEvent(
+    "response",
+    (response) =>
+      response.request().method() === "POST" && /\/ciphers\/?(?:\?|$)/.test(response.url()),
+  );
+  await addEditPage.getByRole("button", { name: "Save", exact: true }).click();
+  const cipherResponse = await cipherResponsePromise;
+  const cipherRequest = cipherResponse.request().postDataJSON();
+  const requestShape = valueFreeCipherRequestShape(cipherRequest, [
+    simpleLoginToken,
+    aliasAddress,
+    loginPassword,
+    marker,
+  ]);
+  console.log("BITWARDEN_CIPHER_REQUEST_SHAPE", JSON.stringify(requestShape));
+  assert.equal(requestShape.data, "non-empty-string");
+  assert.equal(requestShape.sensitivePlaintext, "absent");
+  assert.equal(requestShape.login, "absent");
+  assert.equal(requestShape.fields, "absent");
+  assert.equal(cipherRequest.data.includes(simpleLoginToken), false);
+  assert.equal(cipherRequest.data.includes(aliasAddress), false);
+  assert.equal(cipherResponse.ok(), true);
+  const encryptedCipher = await cipherResponse.json();
+  const cipherId = encryptedCipher.id;
+  assert.equal(typeof cipherId, "string");
+  createdCipherId = cipherId;
+  createdCipherAuthorization = bitwardenAuthorization;
+  const encryptedVaultPayload = JSON.stringify(encryptedCipher);
+  assert.equal(encryptedVaultPayload.includes(simpleLoginToken), false);
+  assert.equal(encryptedVaultPayload.includes(aliasAddress), false);
+  assert.equal(
+    encryptedCipher.fields?.length ?? 0,
+    0,
+    "The encrypted cipher must not contain a hidden alias-binding field",
+  );
+
+  const persistedCipherResponse = await fetch(new URL(`ciphers/${cipherId}`, bitwardenApiBaseUrl), {
+    headers: { authorization: bitwardenAuthorization },
+  });
+  assert.equal(persistedCipherResponse.ok, true);
+  const persistedCipher = await persistedCipherResponse.text();
+  assert.equal(persistedCipher.includes(simpleLoginToken), false);
+  assert.equal(persistedCipher.includes(aliasAddress), false);
+
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/vault`);
+  await popup.bringToFront();
+  await popup.locator("app-vault-search input").fill(marker);
+  await popup.waitForFunction(
+    () => document.querySelectorAll("app-item-more-options").length === 1,
+  );
+  await popup.getByText(marker, { exact: true }).waitFor({ timeout: 20_000 });
+  const vaultItem = popup.getByText(marker, { exact: true }).locator("xpath=ancestor::bit-item");
+  await vaultItem.getByRole("button", { name: "More options" }).click();
+  await captureEvidence(popup, "alias-bound-menu.png");
+  await popup.getByRole("menuitem", { name: "Manage bound alias", exact: true }).click();
+  const boundConnectionId = await waitForBoundAliasRoute(popup, alias.id);
+  await popup.waitForFunction(
+    (address) =>
+      document.querySelector('[data-testid="alias-address"]')?.textContent?.trim() === address,
+    aliasAddress,
+  );
+  assert.equal((await popup.getByTestId("alias-address").textContent())?.trim(), aliasAddress);
+  await popup.getByText("No reverse aliases yet.", { exact: true }).waitFor();
+
+  const reverseContact = `alias-browser-${Date.now()}@example.com`;
+  const createdContact = await createSimpleLoginContact(simpleLoginToken, alias.id, reverseContact);
+  assert.equal(createdContact.contact, reverseContact);
+  await popup.reload();
+  await popup.getByText(reverseContact, { exact: true }).waitFor();
+
+  const deleteContactResponse = context.waitForEvent(
+    "response",
+    (response) =>
+      response.request().method() === "DELETE" &&
+      response.url().includes(`/api/contacts/${createdContact.id}`),
+  );
+  await popup
+    .getByText(reverseContact, { exact: true })
+    .locator("xpath=ancestor::bit-item")
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  const deleteContactDialog = popup.getByRole("dialog");
+  await deleteContactDialog.waitFor();
+  await deleteContactDialog.getByRole("button", { name: "Delete", exact: true }).click();
+  assert.equal((await deleteContactResponse).ok(), true);
+  await popup.getByText(reverseContact, { exact: true }).waitFor({ state: "detached" });
+
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/account-security`);
+  const unlockWithPin = popup.getByRole("checkbox", { name: "Unlock with PIN", exact: true });
+  await unlockWithPin.waitFor();
+  await unlockWithPin.check();
+  const setPinDialog = popup.getByRole("dialog");
+  await setPinDialog.locator('input[type="password"]').fill(bitwardenPassword);
+  await setPinDialog.getByRole("button", { name: "Set PIN", exact: true }).click();
+  await setPinDialog.waitFor({ state: "hidden" });
+  assert.equal(await unlockWithPin.isChecked(), true, "the supported unlock method must be set");
+
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/account-switcher`);
+  const lockNow = popup.getByRole("button", { name: "Lock now", exact: true });
+  await lockNow.waitFor();
+  assert.equal(await lockNow.isEnabled(), true, "the account must be lockable before restart");
+  await lockNow.click();
+  await context.close().catch(() => undefined);
+  context = await chromium.launchPersistentContext(profile, launchOptions);
+  context.setDefaultTimeout(15_000);
+  observeContext(context, apiProxy);
+  worker =
+    context.serviceWorkers()[0] ??
+    (await context.waitForEvent("serviceworker", { timeout: 30_000 }));
+  observeWorker(worker);
+  assert.equal(new URL(worker.url()).host, extensionId);
+  popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html`);
+  await popup.waitForURL(/#\/lock$/);
+  assert.match(await popup.locator("body").innerText(), /vault is locked/i);
+  await captureEvidence(popup, "alias-extension-locked.png");
+  await popup.locator('input[type="password"]').fill(bitwardenPassword);
+  await popup.getByRole("button", { name: "Unlock", exact: true }).click();
+  await popup.waitForURL(/#\/tabs\//, { timeout: 30_000 });
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/vault`);
+  await popup.bringToFront();
+  await popup.locator("app-vault-search input").fill(marker);
+  await popup.waitForFunction(
+    () => document.querySelectorAll("app-item-more-options").length === 1,
+  );
+  await popup.getByText(marker, { exact: true }).waitFor({ timeout: 20_000 });
+  const restartedVaultItem = popup
+    .getByText(marker, { exact: true })
+    .locator("xpath=ancestor::bit-item");
+  await restartedVaultItem.getByRole("button", { name: "More options" }).click();
+  await popup.getByRole("menuitem", { name: "Manage bound alias", exact: true }).click();
+  assert.equal(await waitForBoundAliasRoute(popup, alias.id), boundConnectionId);
+  await popup.getByTestId("alias-address").filter({ hasText: aliasAddress }).waitFor();
+
+  const restartedBrowserStorage = JSON.stringify(
+    await worker.evaluate(() => new Promise((resolve) => chrome.storage.local.get(null, resolve))),
+  );
+  assert.equal(restartedBrowserStorage.includes(simpleLoginToken), false);
+
+  if (process.env.WEB_URL) {
+    await assertIndependentWebSync(marker, aliasAddress, alias.id, boundConnectionId);
+    console.log("REAL_EXTENSION_TO_WEB_SYNC_RETAINED_BINDING");
+  }
+
+  if (process.env.DESKTOP_SYNC_ACCEPTANCE === "1") {
+    const fixture = path.join(evidenceDirectory, "desktop-saved-login.private.json");
+    fs.writeFileSync(
+      fixture,
+      JSON.stringify({ marker, aliasAddress, aliasId: alias.id, connectionId: boundConnectionId }),
+      { mode: 0o600 },
+    );
+    try {
+      const desktop = spawnSync(
+        process.execPath,
+        ["apps/desktop/test/real-simple-login-alias.e2e.mjs"],
+        {
+          env: { ...process.env, DESKTOP_SAVED_LOGIN_FIXTURE: fixture },
+          stdio: "inherit",
+          timeout: 240_000,
+        },
+      );
+      assert.equal(desktop.status, 0, "Packaged desktop saved-alias acceptance must pass");
+    } finally {
+      fs.rmSync(fixture, { force: true });
+    }
+  }
+
+  // Inject a genuine network outage, then retry against the same live provider.
+  const boundUrl = popup.url();
+  await context.setOffline(true);
+  try {
+    await popup.reload();
+    await popup.getByRole("alert").waitFor();
+    assert.equal(await popup.getByTestId("alias-address").count(), 0);
+  } finally {
+    await context.setOffline(false);
+  }
+  await popup.reload();
+  await popup.getByTestId("alias-address").filter({ hasText: aliasAddress }).waitFor();
+  assert.equal(await waitForBoundAliasRoute(popup, alias.id), boundConnectionId);
+  assert.equal(
+    simpleLoginCreateRequests,
+    1,
+    "read failure and retry must not create another alias",
+  );
+  console.log("REAL_OFFLINE_RETRY_RETAINED_BINDING");
+
+  if (process.env.BITWARDEN_SECOND_EMAIL && process.env.BITWARDEN_SECOND_PASSWORD) {
+    await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/account-switcher`);
+    await popup.getByRole("button", { name: "Add account", exact: true }).click();
+    await popup.locator("#email").fill(process.env.BITWARDEN_SECOND_EMAIL);
+    await popup.getByRole("button", { name: "Continue", exact: true }).click();
+    await popup.locator('input[type="password"]').fill(process.env.BITWARDEN_SECOND_PASSWORD);
+    await popup.getByRole("button", { name: "Log in", exact: true }).click();
+    await popup.waitForURL(/#\/tabs\//, { timeout: 30_000 });
+    assert.equal(await popup.getByText(marker, { exact: true }).count(), 0);
+    await popup.goto(boundUrl);
+    await popup.getByRole("alert").waitFor();
+    assert.equal(await popup.getByTestId("alias-address").count(), 0);
+    assert.equal((await popup.locator("body").innerText()).includes(simpleLoginToken), false);
+    await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/account-switcher`);
+    await popup
+      .locator("auth-account")
+      .filter({ hasText: bitwardenEmail })
+      .getByRole("button")
+      .click();
+    await popup.waitForURL(/#\/(tabs\/|lock)/, { timeout: 30_000 });
+    if (new URL(popup.url()).hash === "#/lock") {
+      await popup.locator('input[type="password"]').fill(bitwardenPassword);
+      await popup.getByRole("button", { name: "Unlock", exact: true }).click();
+      await popup.waitForURL(/#\/tabs\//, { timeout: 30_000 });
+    }
+    await popup.goto(boundUrl);
+    await popup.getByTestId("alias-address").filter({ hasText: aliasAddress }).waitFor();
+    assert.equal(await waitForBoundAliasRoute(popup, alias.id), boundConnectionId);
+    assert.equal(simpleLoginCreateRequests, 1);
+    console.log("REAL_ACCOUNT_SWITCH_ISOLATED");
+  }
+
+  await permanentlyDeleteBitwardenCipher(createdCipherAuthorization, cipherId);
+  createdCipherId = undefined;
+
+  const bitwardenAccessToken = bitwardenAuthorization?.replace(/^Bearer\s+/i, "");
+  const serializedDiagnostics = JSON.stringify(safeDiagnostics);
+  assert.equal(serializedDiagnostics.includes(simpleLoginToken), false);
+  if (bitwardenAccessToken) {
+    assert.equal(serializedDiagnostics.includes(bitwardenAccessToken), false);
+  }
+  assertServiceLogsDoNotContain(simpleLoginToken);
+
+  console.log("REAL_ALIAS_CREATED_WITH_STABLE_ID");
+  console.log("HOSTILE_PARENT_REPLAY_REJECTED");
+  console.log("CONFUSED_DEPUTY_REJECTED");
+  console.log("REAL_LOGIN_BOUND_AND_ENCRYPTED");
+  console.log("REAL_ALIAS_REUSED");
+  console.log("REAL_EXTENSION_RESTART_UNLOCKED");
+  console.log("REAL_STATE_CLEANED");
+} finally {
+  if (createdCipherAuthorization && createdCipherId) {
+    try {
+      await permanentlyDeleteBitwardenCipher(createdCipherAuthorization, createdCipherId);
+    } catch (error) {
+      recordDiagnostic(
+        "BITWARDEN_CLEANUP_FAILED",
+        error instanceof Error ? error.message : "error",
+      );
+    }
+  }
+  await context?.close();
+  if (simpleLoginToken && createdAliasId) {
+    await deleteSimpleLoginAlias(simpleLoginToken, createdAliasId);
+  }
+  await Promise.all(servers.map((server) => closeServer(server)));
+  fs.rmSync(profile, { recursive: true, force: true });
+}
+
+function observeContext(browserContext, apiProxy) {
+  browserContext.on("request", (request) => {
+    if (request.url().startsWith(simpleLoginUrl.origin)) {
+      if (request.method() === "POST" && request.url().includes("/api/alias/random/new")) {
+        simpleLoginCreateRequests += 1;
+      }
+      console.log("SIMPLELOGIN_REQUEST", request.method(), request.url());
+    }
+    if (request.url().startsWith(apiProxy.url.origin)) {
+      bitwardenAuthorization = request.headers().authorization ?? bitwardenAuthorization;
+    }
+  });
+  browserContext.on("requestfailed", (request) => {
+    if (request.url().startsWith(apiProxy.url.origin)) {
+      recordDiagnostic(
+        "BITWARDEN_REQUEST_FAILED",
+        `${request.method()} ${new URL(request.url()).pathname} ${request.failure()?.errorText ?? "unknown"}`,
+      );
+    }
+  });
+}
+
+function observeWorker(serviceWorker) {
+  serviceWorker.on("console", (message) => {
+    if (message.type() === "error") {
+      recordDiagnostic("WORKER_CONSOLE_ERROR", message.text());
+    }
+  });
+}
+
+async function getInlineMenuTargetPoint(
+  page,
+  { framePath, hostSelector, targetProperty, descendantSelector },
+) {
+  for (const frame of page.frames().filter((candidate) => candidate.url().includes(framePath))) {
+    try {
+      const target = await frame.evaluate(
+        (options) => {
+          const host = document.querySelector(options.hostSelector);
+          const root = host?.[options.targetProperty];
+          const element = options.descendantSelector
+            ? root?.querySelector(options.descendantSelector)
+            : root;
+          if (!(element instanceof HTMLElement)) {
+            return undefined;
+          }
+          const rect = element.getBoundingClientRect();
+          return {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            viewportWidth: globalThis.innerWidth,
+            viewportHeight: globalThis.innerHeight,
+          };
+        },
+        { hostSelector, targetProperty, descendantSelector },
+      );
+      if (
+        !target ||
+        target.width <= 0 ||
+        target.height <= 0 ||
+        target.viewportWidth <= 0 ||
+        target.viewportHeight <= 0
+      ) {
+        continue;
+      }
+      const frameElement = await frame.frameElement();
+      try {
+        const frameBox = await frameElement.boundingBox();
+        if (!frameBox || frameBox.width <= 0 || frameBox.height <= 0) {
+          continue;
+        }
+        return {
+          x:
+            frameBox.x + (target.left + target.width / 2) * (frameBox.width / target.viewportWidth),
+          y:
+            frameBox.y +
+            (target.top + target.height / 2) * (frameBox.height / target.viewportHeight),
+        };
+      } finally {
+        await frameElement.dispose();
+      }
+    } catch {
+      // Field and button transitions can replace an inline-menu frame during inspection.
+    }
+  }
+  return undefined;
+}
+
+async function attemptHostileAliasMessages(page) {
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    const frame = page
+      .frames()
+      .find((candidate) => candidate.url().includes("/overlay/menu-list.html"));
+    if (frame) {
+      try {
+        const session = await frame.evaluate(() => {
+          const list = document.querySelector("autofill-inline-menu-list");
+          const portKey = list?.portKey;
+          const token = list?.token;
+          return typeof portKey === "string" && typeof token === "string"
+            ? { portKey, token }
+            : undefined;
+        });
+        const containerFrame = frame.parentFrame();
+        if (!session || !containerFrame) {
+          await page.waitForTimeout(50);
+          continue;
+        }
+        const containerElement = await containerFrame.frameElement();
+        try {
+          return await containerElement.evaluate((iframe, observedSession) => {
+            const target = iframe.contentWindow;
+            if (!target) {
+              throw new Error("the injected alias container has no content window");
+            }
+            target.postMessage(
+              {
+                command: "fillEmailAlias",
+                ...observedSession,
+                emailAliasFillCapability: "a".repeat(32),
+              },
+              "*",
+            );
+            target.postMessage(
+              {
+                command: "updateAutofillInlineMenuEmailAliasRecommendation",
+                ...observedSession,
+                emailAliasRecommendation: {
+                  hostname: location.hostname,
+                  canCreate: true,
+                },
+              },
+              "*",
+            );
+            target.postMessage({ command: "fillEmailAlias", ...observedSession }, "*");
+            return {
+              replay: { frameCount: 1, observedCount: 1 },
+              confusedDeputy: { frameCount: 1, observedCount: 1 },
+            };
+          }, session);
+        } finally {
+          await containerElement.dispose();
+        }
+      } catch {
+        // The button-to-list transition can detach a frame between discovery and evaluation.
+      }
+    }
+    await page.waitForTimeout(50);
+  }
+  throw new Error("the rendered alias list could not receive hostile parent messages");
+}
+
+function recordDiagnostic(kind, message) {
+  let safe = String(message)
+    .replace(/([?&]access_token(?:%3[dD]|=))[^&\s"']*/gi, "$1[REDACTED]")
+    .replace(
+      /\b(authorization|authentication)(\s*[:=]\s*)(?:bearer\s+)?[^,;\s"']+/gi,
+      "$1$2[REDACTED]",
+    );
+  for (const secret of [simpleLoginToken, bitwardenAuthorization?.replace(/^Bearer\s+/i, "")]) {
+    if (secret) {
+      safe = safe.split(secret).join("[REDACTED]");
+    }
+  }
+  safe = safe.slice(0, 1_000);
+  safeDiagnostics.push(`${kind} ${safe}`);
+  console.log(kind, safe);
+}
+
+function assertServiceLogsDoNotContain(secret) {
+  const logs = spawnSync(
+    process.env.SIMPLELOGIN_SYSTEMD_UNIT ? "journalctl" : "docker",
+    process.env.SIMPLELOGIN_SYSTEMD_UNIT
+      ? ["--user", "--unit", process.env.SIMPLELOGIN_SYSTEMD_UNIT, "--no-pager", "--output=cat"]
+      : ["logs", process.env.SIMPLELOGIN_APP_CONTAINER ?? "alias-core-sl-app"],
+    { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
+  );
+  assert.equal(logs.status, 0, "SimpleLogin logs must be readable for leakage checks");
+  assert.ok(logs.stdout.trim() || logs.stderr.trim(), "SimpleLogin logs must not be empty");
+  assert.equal(`${logs.stdout}${logs.stderr}`.includes(secret), false);
+}
+
+async function waitForBoundAliasRoute(page, aliasId) {
+  await page.waitForURL((url) => {
+    const route = new URL(url.hash.slice(1), "https://extension.invalid");
+    return (
+      route.pathname === `/email-aliases/${aliasId}` && !!route.searchParams.get("connectionId")
+    );
+  });
+  const route = new URL(new URL(page.url()).hash.slice(1), "https://extension.invalid");
+  const connectionId = route.searchParams.get("connectionId");
+  assert.match(connectionId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  return connectionId;
+}
+
+async function permanentlyDeleteBitwardenCipher(authorization, cipherId) {
+  const response = await fetch(new URL(`ciphers/${cipherId}`, bitwardenApiBaseUrl), {
+    method: "DELETE",
+    headers: { authorization },
+  });
+  if (!response.ok && response.status !== 400 && response.status !== 404) {
+    assert.fail(`Bitwarden delete returned HTTP ${response.status}`);
+  }
+  await waitForCipherApiDeletion(authorization, cipherId);
+}
+
+async function waitForCipherApiDeletion(authorization, cipherId) {
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    const response = await fetch(new URL(`ciphers/${cipherId}`, bitwardenApiBaseUrl), {
+      headers: { authorization },
+    });
+    if (response.status === 400 || response.status === 404) {
+      return;
+    }
+    assert.equal(response.ok, true, `Bitwarden deletion check failed (${response.status})`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Bitwarden cipher ${cipherId} remained visible after deletion`);
+}
+
+async function createSimpleLoginContact(token, aliasId, contact) {
+  const response = await fetch(new URL(`api/aliases/${aliasId}/contacts`, simpleLoginUrl), {
+    method: "POST",
+    headers: { Authentication: token, "content-type": "application/json" },
+    body: JSON.stringify({ contact }),
+  });
+  assert.equal(response.ok, true);
+  return response.json();
+}
+
+function requiredEnvironment(name) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
+}
+
+function valueFreeCipherRequestShape(request, sensitiveValues) {
+  const data = typeof request?.data === "string" ? request.data : undefined;
+  return {
+    data: data?.length > 0 ? "non-empty-string" : data == null ? "absent" : "empty-string",
+    fields: Object.hasOwn(request ?? {}, "fields")
+      ? Array.isArray(request.fields)
+        ? `array:${request.fields.length}`
+        : typeof request.fields
+      : "absent",
+    login: Object.hasOwn(request ?? {}, "login") ? typeof request.login : "absent",
+    sensitivePlaintext:
+      data && sensitiveValues.some((value) => value.length > 0 && data.includes(value))
+        ? "present"
+        : "absent",
+  };
+}
+
+async function authenticateSimpleLogin() {
+  const response = await fetch(new URL("api/auth/login", simpleLoginUrl), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: simpleLoginEmail,
+      password: simpleLoginPassword,
+      device: `bitwarden-browser-e2e-${Date.now()}`,
+    }),
+  });
+  assert.equal(response.ok, true, `SimpleLogin authentication failed (${response.status})`);
+  const json = await response.json();
+  assert.equal(typeof json.api_key, "string");
+  assert.ok(json.api_key.length > 0);
+  return json.api_key;
+}
+
+async function getSimpleLoginAlias(token, id) {
+  const response = await fetch(new URL(`api/aliases/${id}`, simpleLoginUrl), {
+    headers: { Authentication: token },
+  });
+  assert.equal(response.ok, true, `SimpleLogin detail failed (${response.status})`);
+  return response.json();
+}
+
+async function findSimpleLoginAlias(token, address) {
+  const response = await fetch(new URL("api/v2/aliases?page_id=0", simpleLoginUrl), {
+    method: "POST",
+    headers: { Authentication: token, "content-type": "application/json" },
+    body: JSON.stringify({ query: address }),
+  });
+  assert.equal(response.ok, true, `SimpleLogin search failed (${response.status})`);
+  const json = await response.json();
+  const alias = json.aliases?.find((candidate) => candidate.email === address);
+  assert.ok(alias, `SimpleLogin search must return ${address}`);
+  return alias;
+}
+
+async function deleteSimpleLoginAlias(token, id) {
+  const response = await fetch(new URL(`api/aliases/${id}`, simpleLoginUrl), {
+    method: "DELETE",
+    headers: { Authentication: token },
+  });
+  assert.equal(response.ok, true, `SimpleLogin cleanup failed (${response.status})`);
+}
+
+function serviceBaseUrl(target, fallbackPath) {
+  const path = target.pathname === "/" ? fallbackPath : `${target.pathname.replace(/\/+$/, "")}/`;
+  return new URL(path, target.origin);
+}
+
+async function startHttpsProxy(target) {
+  const server = https.createServer(
+    { key: certificate, cert: certificate },
+    (request, response) => {
+      const upstream = http.request(
+        new URL((request.url ?? "/").replace(/^\//, ""), target),
+        {
+          method: request.method,
+          headers: { ...request.headers, host: target.host },
+        },
+        (upstreamResponse) => {
+          if ((upstreamResponse.statusCode ?? 500) >= 400) {
+            recordDiagnostic(
+              "BITWARDEN_PROXY_RESPONSE",
+              `${request.method} ${request.url ?? "/"} ${upstreamResponse.statusCode ?? 502}`,
+            );
+          }
+          response.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.headers);
+          upstreamResponse.pipe(response);
+        },
+      );
+      upstream.on("error", (error) => {
+        recordDiagnostic("BITWARDEN_PROXY_ERROR", error.message);
+        response.writeHead(502, { "Content-Type": "text/plain" });
+        response.end(error.message);
+      });
+      request.pipe(upstream);
+    },
+  );
+  await listen(server);
+  return { server, url: new URL(`https://localhost:${server.address().port}`) };
+}
+
+async function startRegistrationServer() {
+  const fixture = fs.readFileSync(registrationFixture);
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    response.end(fixture);
+  });
+  await listen(server);
+  return { server, url: new URL(`http://127.0.0.1:${server.address().port}/register`) };
+}
+
+function listen(server) {
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+}
+
+function closeServer(server) {
+  return new Promise((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+    server.closeAllConnections?.();
+  });
+}
+
+async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectionId) {
+  // A fresh browser context receives the saved login only through the real vault sync API.
+  const browser = await chromium.launch({ executablePath: browserExecutable, headless: false });
+  try {
+    const webContext = await browser.newContext({ ignoreHTTPSErrors: true });
+    const page = await webContext.newPage();
+    page.setDefaultTimeout(30_000);
+    const webUrl = new URL(process.env.WEB_URL);
+    await page.goto(new URL("#/login", webUrl).toString());
+    await page.locator("#email").fill(bitwardenEmail);
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.locator('input[type="password"]:visible').fill(bitwardenPassword);
+    await page.getByRole("button", { name: "Log in", exact: true }).click();
+    await page.waitForURL(/#\/(vault|setup-extension)$/, { timeout: 60_000 });
+    if (new URL(page.url()).hash === "#/setup-extension") {
+      await page.getByRole("button", { name: "Add it later", exact: true }).click();
+      await page.getByRole("dialog").getByText("Skip to web app", { exact: true }).click();
+    }
+    await page.waitForURL(/#\/vault$/, { timeout: 60_000 });
+    const skip = page.getByRole("dialog").getByRole("button", { name: "Skip", exact: true });
+    if (await skip.isVisible()) await skip.click();
+    const row = page.getByRole("row").filter({ hasText: marker });
+    await row.waitFor();
+    assert.equal((await row.innerText()).includes(aliasAddress), true);
+    await row.getByRole("button", { name: "More options", exact: true }).click();
+    const link = page.getByRole("menuitem").filter({ hasText: /Manage.*alias/i });
+    const href = await link.getAttribute("href");
+    assert.ok(href);
+    const route = new URL(new URL(href, webUrl).hash.slice(1), webUrl);
+    assert.equal(route.pathname, "/tools/aliases");
+    assert.equal(route.searchParams.get("aliasId"), String(aliasId));
+    assert.equal(route.searchParams.get("connectionId"), connectionId);
+    await page.getByRole("menu").screenshot({
+      path: path.join(evidenceDirectory, "alias-web-synced-menu.png"),
+      mask: [page.locator("input"), page.getByText(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)],
+    });
+  } finally {
+    await browser.close();
+  }
+}

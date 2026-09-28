@@ -4,7 +4,7 @@ import { ChangeDetectionStrategy, Component, Inject, signal } from "@angular/cor
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { UnionOfValues } from "@bitwarden/common/vault/types/union-of-values";
 import { DIALOG_DATA, DialogRef, ButtonModule, DialogModule } from "@bitwarden/components";
-import { AlgorithmInfo } from "@bitwarden/generator-core";
+import { AlgorithmInfo, GeneratedCredential } from "@bitwarden/generator-core";
 import { I18nPipe } from "@bitwarden/ui-common";
 import { CipherFormGeneratorComponent } from "@bitwarden/vault";
 
@@ -72,8 +72,8 @@ export class SendGeneratorDialogComponent {
     });
   };
 
-  readonly onValueGenerated = (value: string) => {
-    this.generatedValue.set(value);
+  readonly onValueGenerated = (value: GeneratedCredential) => {
+    this.generatedValue.set(value.credential);
   };
 
   readonly onAlgorithmSelected = (selected?: AlgorithmInfo) => {

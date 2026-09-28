@@ -2,6 +2,7 @@ import { mock, MockProxy, mockReset } from "jest-mock-extended";
 import { BehaviorSubject, of, Subject } from "rxjs";
 import { map } from "rxjs/operators";
 
+import { SensitiveString } from "@bitwarden/alias-sdk-internal";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
@@ -46,11 +47,17 @@ import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault
 import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
-import { CredentialGeneratorService } from "@bitwarden/generator-core";
+import {
+  CredentialGeneratorService,
+  GeneratedCredential as CoreGeneratedCredential,
+  SimpleLoginAlias,
+  SimpleLoginAliasError,
+} from "@bitwarden/generator-core";
 import { GeneratedCredential, GeneratorHistoryService } from "@bitwarden/generator-history";
 
 import { BrowserApi } from "../../platform/browser/browser-api";
 import { BrowserPlatformUtilsService } from "../../platform/services/platform-utils/browser-platform-utils.service";
+import { BrowserSimpleLoginAliasService } from "../../tools/alias/browser-simple-login-alias.service";
 import {
   AutofillOverlayElement,
   AutofillOverlayPort,
@@ -131,6 +138,7 @@ describe("OverlayBackground", () => {
   let totpService: MockProxy<TotpService>;
   let generatorService: MockProxy<CredentialGeneratorService>;
   let generatorHistoryService: MockProxy<GeneratorHistoryService>;
+  let emailAliasService: MockProxy<BrowserSimpleLoginAliasService>;
   let overlayBackground: OverlayBackground;
   // A real channel rather than a mock: what is under test is that the class reads the
   // channel's own messages, which no mocked listener would demonstrate.
@@ -256,6 +264,7 @@ describe("OverlayBackground", () => {
     );
     generatorHistoryService = mock<GeneratorHistoryService>();
     generatorHistoryService.track.mockResolvedValue(null);
+    emailAliasService = mock<BrowserSimpleLoginAliasService>();
     overlayBackground = new OverlayBackground(
       logService,
       cipherService,
@@ -274,6 +283,7 @@ describe("OverlayBackground", () => {
       accountService,
       generatorHistoryService,
       generatorService,
+      emailAliasService,
       configService,
       intraprocessMessageSender,
       // Wired as `MainBackground` wires it, so ingest tagging is exercised rather than faked.
@@ -448,6 +458,149 @@ describe("OverlayBackground", () => {
 
       expect(pageDetailsForTabSpy[tabId]).toBeUndefined();
       expect(portKeyForTabSpy[tabId]).toBeUndefined();
+    });
+
+    it("clears generated alias state immediately when the vault locks", () => {
+      overlayBackground["generatedEmailAliases"].set(
+        1,
+        new CoreGeneratedCredential("private@sl.test", "email", new Date()),
+      );
+      overlayBackground["emailAliasFillInFlight"].set(1, Symbol());
+      overlayBackground["emailAliasRecommendationInFlight"].set(1, Symbol());
+
+      activeAccountStatusMock$.next(AuthenticationStatus.Locked);
+
+      expect(overlayBackground["generatedEmailAliases"].size).toBe(0);
+      expect(overlayBackground["emailAliasFillInFlight"].size).toBe(0);
+      expect(overlayBackground["emailAliasRecommendationInFlight"].size).toBe(0);
+    });
+
+    it("discards an alias recommendation that finishes after an account switch", async () => {
+      const tab = createChromeTabMock({ id: 1, url: "https://registration.test" });
+      const port = createPortSpyMock(AutofillOverlayPort.List);
+      port.sender = mock<chrome.runtime.MessageSender>({ tab });
+      overlayBackground["focusedFieldData"] = createFocusedFieldDataMock({ tabId: tab.id });
+      jest.spyOn(overlayBackground as any, "shouldShowEmailAliasAction").mockReturnValue(true);
+
+      let resolveRecommendation!: (
+        recommendation: Awaited<ReturnType<BrowserSimpleLoginAliasService["recommend"]>>,
+      ) => void;
+      emailAliasService.recommend.mockReturnValue(
+        new Promise((resolve) => {
+          resolveRecommendation = resolve;
+        }),
+      );
+      const pending = overlayBackground["postEmailAliasRecommendation"](port, tab);
+      await flushPromises();
+
+      accountService.activeAccountSubject.next({
+        id: Utils.newGuid() as UserId,
+        name: "other",
+        email: "other@example.test",
+        emailVerified: true,
+        creationDate: new Date(),
+      });
+      resolveRecommendation({
+        hostname: "registration.test",
+        canCreate: false,
+        prefixSuggestion: "registration",
+        suffixes: [],
+        alias: mock<SimpleLoginAlias>({ address: "private-first-account@sl.test" }),
+      });
+      await pending;
+
+      expect(port.postMessage).not.toHaveBeenCalled();
+    });
+
+    it("logs only classified provider failure data", () => {
+      const secret = "provider-token-must-not-leak";
+
+      overlayBackground["logAliasOperationFailure"](
+        "Email alias fill failed",
+        new SimpleLoginAliasError(`request exposed ${secret}`, "invalid-credentials", 401),
+      );
+
+      const logged = logService.error.mock.calls.flat().join(" ");
+      expect(logged).toContain("invalid-credentials (401)");
+      expect(logged).not.toContain(secret);
+    });
+
+    describe("email alias fill capabilities", () => {
+      const capability = "a".repeat(32);
+
+      function prepareAliasFill(port: chrome.runtime.Port) {
+        const tab = createChromeTabMock({ id: 1, url: "https://registration.test/signup" });
+        port.sender = mock<chrome.runtime.MessageSender>({ tab });
+        overlayBackground["focusedFieldData"] = createFocusedFieldDataMock({
+          tabId: tab.id,
+          frameId: 0,
+          focusedFieldOpid: "registration-email",
+        });
+        pageDetailsForTabSpy[tab.id] = new Map([[0, createPageDetailMock({ tab })]]);
+        jest.spyOn(overlayBackground as any, "shouldShowEmailAliasAction").mockReturnValue(true);
+        emailAliasService.recommendOrCreate.mockResolvedValue(
+          new CoreGeneratedCredential("private@sl.test", "email", new Date()),
+        );
+      }
+
+      it("rejects missing, incorrect, and replayed capabilities before provider mutation", async () => {
+        const port = createPortSpyMock(AutofillOverlayPort.ListMessageConnector);
+        prepareAliasFill(port);
+
+        await overlayBackground["fillEmailAlias"]({ command: "fillEmailAlias" }, port);
+        overlayBackground["registerEmailAliasFillCapability"](
+          { command: "registerEmailAliasFillCapability", emailAliasFillCapability: capability },
+          port,
+        );
+        await overlayBackground["fillEmailAlias"](
+          { command: "fillEmailAlias", emailAliasFillCapability: "b".repeat(32) },
+          port,
+        );
+        await overlayBackground["fillEmailAlias"](
+          { command: "fillEmailAlias", emailAliasFillCapability: capability },
+          port,
+        );
+
+        expect(emailAliasService.recommendOrCreate).not.toHaveBeenCalled();
+      });
+
+      it("consumes a matching capability at the provider mutation boundary", async () => {
+        const port = createPortSpyMock(AutofillOverlayPort.ListMessageConnector);
+        prepareAliasFill(port);
+        overlayBackground["registerEmailAliasFillCapability"](
+          { command: "registerEmailAliasFillCapability", emailAliasFillCapability: capability },
+          port,
+        );
+
+        await overlayBackground["fillEmailAlias"](
+          { command: "fillEmailAlias", emailAliasFillCapability: capability },
+          port,
+        );
+        await overlayBackground["fillEmailAlias"](
+          { command: "fillEmailAlias", emailAliasFillCapability: capability },
+          port,
+        );
+
+        expect(emailAliasService.recommendOrCreate).toHaveBeenCalledTimes(1);
+      });
+
+      it("binds capabilities to the extension runtime port that registered them", async () => {
+        const authorizedPort = createPortSpyMock(AutofillOverlayPort.ListMessageConnector);
+        const deputyPort = createPortSpyMock(AutofillOverlayPort.ListMessageConnector);
+        prepareAliasFill(authorizedPort);
+        prepareAliasFill(deputyPort);
+        overlayBackground["registerEmailAliasFillCapability"](
+          { command: "registerEmailAliasFillCapability", emailAliasFillCapability: capability },
+          authorizedPort,
+        );
+
+        await overlayBackground["fillEmailAlias"](
+          { command: "fillEmailAlias", emailAliasFillCapability: capability },
+          deputyPort,
+        );
+
+        expect(emailAliasService.recommendOrCreate).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -1821,6 +1974,55 @@ describe("OverlayBackground", () => {
 
         expect(cipherService.setAddEditCipherInfo).toHaveBeenCalled();
         expect(openAddEditVaultItemPopoutSpy).toHaveBeenCalled();
+      });
+
+      it("binds a one-click generated alias to the captured login without persisting credentials", async () => {
+        const aliasAddress = "registration@sl.test";
+        overlayBackground["generatedEmailAliases"].set(
+          1,
+          new CoreGeneratedCredential(
+            aliasAddress,
+            "email",
+            new Date(),
+            "browser-email-alias",
+            "https://top-frame-test.com/register",
+            {
+              kind: "email-alias",
+              alias: {
+                version: 1,
+                connectionId: "11111111-1111-4111-8111-111111111111",
+                aliasId: "741",
+                address: aliasAddress as SensitiveString,
+              },
+            },
+          ),
+        );
+
+        sendMockExtensionMessage(
+          {
+            command: "autofillOverlayAddNewVaultItem",
+            addNewCipherType: CipherType.Login,
+            login: {
+              uri: "https://top-frame-test.com/register",
+              hostname: "top-frame-test.com",
+              username: aliasAddress,
+              password: "generated-password",
+            },
+          },
+          sender,
+        );
+        jest.advanceTimersByTime(100);
+        await flushPromises();
+
+        const savedCipher = cipherService.setAddEditCipherInfo.mock.calls[0][0].cipher;
+        expect(savedCipher.aliasBinding).toEqual({
+          version: 1,
+          connectionId: "11111111-1111-4111-8111-111111111111",
+          aliasId: "741",
+          address: aliasAddress,
+        });
+        expect(JSON.stringify(savedCipher)).not.toContain("provider-token");
+        expect(overlayBackground["generatedEmailAliases"].has(1)).toBe(false);
       });
 
       it("creates a new card cipher", async () => {

@@ -1,0 +1,305 @@
+name: Alias headed provider E2E
+
+on:
+  push:
+    branches: [integration/provider-neutral-alias-upstream-sync]
+  workflow_dispatch:
+    inputs:
+      provider_repository:
+        description: Public repository containing the owned-provider operations harness
+        type: string
+        default: mateoltd/simplelogin-owned-provider
+      provider_operations_ref:
+        description: Exact owned-provider operations commit
+        type: string
+        default: e157b6804f7b1b60e149207cebe2d414f6e4a73f
+      provider_upstream_ref:
+        description: Exact SimpleLogin upstream commit asserted by the harness
+        type: string
+        default: dbc45fcce4e8e6b4fa615cc729ca95a67bf75266
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alias-headed-e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 24.17.0
+  NPM_VERSION: 11.18.0
+  PYTHON_VERSION: 3.14.2
+  PROVIDER_REPOSITORY: ${{ inputs.provider_repository || 'mateoltd/simplelogin-owned-provider' }}
+  PROVIDER_OPERATIONS_COMMIT: ${{ inputs.provider_operations_ref || 'e157b6804f7b1b60e149207cebe2d414f6e4a73f' }}
+  PROVIDER_UPSTREAM_COMMIT: ${{ inputs.provider_upstream_ref || 'dbc45fcce4e8e6b4fa615cc729ca95a67bf75266' }}
+  BITWARDEN_IMAGE: ghcr.io/bitwarden/lite:2026.9.0@sha256:616624bf9a2e1bae68a6a7735732339db41b831e38593846f0c2b4983af34bb9
+  VAULTWARDEN_IMAGE: docker.io/vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8
+
+jobs:
+  browser-and-desktop:
+    name: Browser autofill and desktop lifecycle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out clients
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out pinned real provider
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.PROVIDER_REPOSITORY }}
+          ref: ${{ env.PROVIDER_OPERATIONS_COMMIT }}
+          path: provider
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with: { python-version: 3.14.2 }
+      - run: npm install --global "npm@${NPM_VERSION}"
+      - name: Verify pinned provider ancestry
+        run: |
+          test "$(git -C provider rev-parse HEAD)" = "$PROVIDER_OPERATIONS_COMMIT"
+          test "$(tr -d '[:space:]' < provider/ops/owned-provider/UPSTREAM_COMMIT)" = "$PROVIDER_UPSTREAM_COMMIT"
+          git -C provider merge-base --is-ancestor "$PROVIDER_UPSTREAM_COMMIT" "$PROVIDER_OPERATIONS_COMMIT"
+      - name: Prepare OSS client source
+        run: |
+          scripts/release/export-oss-source.sh "$RUNNER_TEMP/source"
+          cd "$RUNNER_TEMP/source"
+          docker build \
+            --file scripts/release/pinned-toolchain.Dockerfile \
+            --tag alias-client-pinned-toolchain \
+            . > "$RUNNER_TEMP/pinned-toolchain-build.log" 2>&1 || {
+              tail -160 "$RUNNER_TEMP/pinned-toolchain-build.log"
+              exit 1
+            }
+          tail -40 "$RUNNER_TEMP/pinned-toolchain-build.log"
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --env HOME=/tmp/alias-toolchain-home \
+            --env npm_config_cache=/tmp/alias-toolchain-npm-cache \
+            --volume "$RUNNER_TEMP/source:/workspace" \
+            --workdir /workspace \
+            alias-client-pinned-toolchain \
+            bash -c 'HUSKY=0 npm ci && npm run release:verify-sdk-install' \
+            > "$RUNNER_TEMP/pinned-toolchain-install.log" 2>&1 || {
+              tail -160 "$RUNNER_TEMP/pinned-toolchain-install.log"
+              exit 1
+            }
+          tail -60 "$RUNNER_TEMP/pinned-toolchain-install.log"
+          sha256sum \
+            "$RUNNER_TEMP/pinned-toolchain-build.log" \
+            "$RUNNER_TEMP/pinned-toolchain-install.log"
+          chromium_path="$(node scripts/release/install-browser-runtime.mjs --output "$RUNNER_TEMP/playwright-chromium")"
+          test -x "$chromium_path"
+          echo "CHROMIUM_PATH=$chromium_path" >> "$GITHUB_ENV"
+          "$chromium_path" --version
+          sudo apt-get update
+          audio_package=libasound2
+          if apt-cache show libasound2t64 >/dev/null 2>&1; then audio_package=libasound2t64; fi
+          sudo apt-get install --yes acl pkg-config libxss-dev "$audio_package" xvfb
+      - name: Start pinned real provider
+        run: |
+          provider/ops/owned-provider/bin/owned-provider init
+          provider_password="$(tr -d '\r\n' < provider/.owned-provider/secrets/admin_password)"
+          echo "::add-mask::$provider_password"
+          echo "SIMPLELOGIN_PASSWORD=$provider_password" >> "$GITHUB_ENV"
+          restore_secret_acls() {
+            find provider/.owned-provider/secrets -type f -exec setfacl -x u:65532 {} +
+          }
+          trap restore_secret_acls EXIT
+          find provider/.owned-provider/secrets -type f -exec setfacl -m u:65532:r-- {} +
+          provider/ops/owned-provider/bin/owned-provider up
+          restore_secret_acls
+          trap - EXIT
+      - name: Start pinned official Bitwarden Lite
+        run: |
+          service_runtime="$RUNNER_TEMP/bitwarden-test-service"
+          mkdir -p "$service_runtime"
+          cd "$RUNNER_TEMP/source"
+          node scripts/release/bitwarden-test-service.mjs start-official \
+            --runtime-directory "$service_runtime"
+          vault_password="$(openssl rand -base64 30 | tr -d '\r\n')"
+          echo "::add-mask::$vault_password"
+          {
+            echo "BITWARDEN_PASSWORD=$vault_password"
+            echo "BITWARDEN_EMAIL=alias-release-${GITHUB_RUN_ID}@mailbox.lan"
+            echo "BITWARDEN_RUNTIME_DIRECTORY=$service_runtime"
+          } >> "$GITHUB_ENV"
+      - name: Bootstrap client-generated vault keys
+        env:
+          BITWARDEN_WEB_URL: https://localhost:18443
+          BITWARDEN_HEADED: "1"
+        run: |
+          cd "$RUNNER_TEMP/source"
+          xvfb-run -a node scripts/release/bootstrap-test-vault.mjs
+      - name: Build headed test clients
+        run: |
+          cd "$RUNNER_TEMP/source"
+          npx nx run browser:build --configuration=chrome-dev
+          node apps/desktop/desktop_native/build.js --target=x86_64-unknown-linux-gnu --release
+          npm run build --workspace apps/desktop
+          node -e '
+            const fs = require("node:fs");
+            fs.writeFileSync("apps/web/config/local.json", JSON.stringify({
+              dev: {
+                port: 8080,
+                proxyApi: "http://127.0.0.1:18080/api",
+                proxyIdentity: "http://127.0.0.1:18080/identity",
+                proxyEvents: "http://127.0.0.1:18080/events",
+                proxyNotifications: "http://127.0.0.1:18080/notifications",
+                simpleLoginConnectSrc: "http://127.0.0.1:*"
+              }
+            }));
+          '
+          npx nx serve web --configuration=oss-dev --host=localhost --port=8080 \
+            > "$RUNNER_TEMP/web.log" 2>&1 &
+          for attempt in $(seq 1 120); do
+            if curl --insecure --silent --fail https://localhost:8080/ >/dev/null; then break; fi
+            if [[ "$attempt" == 120 ]]; then cat "$RUNNER_TEMP/web.log"; exit 1; fi
+            sleep 1
+          done
+      - name: Browser create, autofill, lock, restart, and unlock
+        env: &alias-e2e-environment
+          BITWARDEN_API_URL: http://127.0.0.1:18080/api
+          BITWARDEN_IDENTITY_URL: http://127.0.0.1:18080/identity
+          BITWARDEN_DB_DIALECT: bitwarden
+          BITWARDEN_HEADED: "1"
+          SIMPLELOGIN_URL: http://127.0.0.1:17777
+          SIMPLELOGIN_EMAIL: admin@mailbox.lan
+          SIMPLELOGIN_APP_CONTAINER: simplelogin-owned-provider-app-1
+        run: |
+          cd "$RUNNER_TEMP/source"
+          xvfb-run -a node apps/browser/test/real-simple-login-alias.e2e.mjs
+      - name: Desktop and Electron create, send, reply, lock, restart, and unlock
+        env: *alias-e2e-environment
+        run: |
+          cd "$RUNNER_TEMP/source"
+          docker exec simplelogin-owned-provider-redis-1 redis-cli --scan --pattern 'LIMITS:*' |
+            while IFS= read -r key; do
+              docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
+            done
+          xvfb-run -a node apps/desktop/test/real-simple-login-alias.e2e.mjs
+      - name: Headed web alias lifecycle through the real application route
+        env: *alias-e2e-environment
+        run: |
+          cd "$RUNNER_TEMP/source"
+          docker exec simplelogin-owned-provider-redis-1 redis-cli --scan --pattern 'LIMITS:*' |
+            while IFS= read -r key; do
+              docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
+            done
+          WEB_URL=https://localhost:8080 \
+            xvfb-run -a node apps/web/test/real-simple-login-alias.e2e.mjs
+      - name: Real provider, encrypted vault, and 10,000-record cross-device suites
+        env:
+          ALIAS_CROSS_DEVICE_INTEGRATION: "1"
+          ALIAS_SYNC_FIXTURE_SIZE: "10000"
+          BITWARDEN_API_URL: http://127.0.0.1:18080/api
+          BITWARDEN_DB_DIALECT: bitwarden
+          BITWARDEN_IDENTITY_URL: http://127.0.0.1:18080/identity
+          BITWARDEN_SERVER_INTEGRATION: "1"
+          SIMPLELOGIN_BASE_URL: http://127.0.0.1:17777
+          SIMPLELOGIN_DB_CONTAINER: simplelogin-owned-provider-postgres-1
+          SIMPLELOGIN_EMAIL: admin@mailbox.lan
+          SIMPLELOGIN_INTEGRATION: "1"
+          SIMPLELOGIN_APP_CONTAINER: simplelogin-owned-provider-app-1
+          SIMPLELOGIN_REDIS_CONTAINER: simplelogin-owned-provider-redis-1
+          SIMPLELOGIN_URL: http://127.0.0.1:17777
+        run: |
+          cd "$RUNNER_TEMP/source"
+          docker exec simplelogin-owned-provider-redis-1 redis-cli --scan --pattern 'LIMITS:*' |
+            while IFS= read -r key; do
+              docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
+            done
+          npx jest --runInBand \
+            --projects \
+              apps/cli/jest.config.js \
+              apps/desktop/jest.config.js \
+              apps/web/jest.config.js \
+              libs/tools/generator/core/jest.config.js \
+            --runTestsByPath \
+            libs/tools/generator/core/src/alias/simple-login-alias.integration.spec.ts \
+            libs/tools/generator/core/src/alias/alias-binding-server.integration.spec.ts \
+            apps/web/src/app/tools/email-aliases/email-aliases.integration.spec.ts \
+            apps/desktop/src/app/tools/aliases/desktop-alias.integration.spec.ts \
+            apps/cli/src/tools/alias-reconciliation/alias-reconciliation.integration.spec.ts
+      - name: Real provider rate-limit classification
+        env:
+          SIMPLELOGIN_BASE_URL: http://127.0.0.1:17777
+          SIMPLELOGIN_EMAIL: admin@mailbox.lan
+          SIMPLELOGIN_INTEGRATION: "1"
+          SIMPLELOGIN_RATE_LIMIT_INTEGRATION: "1"
+        run: |
+          cd "$RUNNER_TEMP/source"
+          docker exec simplelogin-owned-provider-redis-1 redis-cli --scan --pattern 'LIMITS:*' |
+            while IFS= read -r key; do
+              docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
+            done
+          npx jest --runInBand \
+            --projects libs/tools/generator/core/jest.config.js \
+            --runTestsByPath \
+            libs/tools/generator/core/src/alias/simple-login-alias.integration.spec.ts
+      - name: Preserve Vaultwarden 1.37.1 encrypted-data incompatibility evidence
+        run: |
+          cd "$RUNNER_TEMP/source"
+          docker logs alias-client-release-bitwarden \
+            > "$BITWARDEN_RUNTIME_DIRECTORY/official-bitwarden.log" 2>&1
+          node scripts/release/bitwarden-test-service.mjs start-vaultwarden \
+            --runtime-directory "$BITWARDEN_RUNTIME_DIRECTORY"
+          compatibility_password="$(openssl rand -base64 30 | tr -d '\r\n')"
+          echo "::add-mask::$compatibility_password"
+          export BITWARDEN_PASSWORD="$compatibility_password"
+          export BITWARDEN_EMAIL="alias-vaultwarden-${GITHUB_RUN_ID}@mailbox.lan"
+          export BITWARDEN_DB_DIALECT=vaultwarden
+          export BITWARDEN_WEB_URL=https://localhost:18443
+          export BITWARDEN_API_URL=http://127.0.0.1:18080/api
+          export BITWARDEN_IDENTITY_URL=http://127.0.0.1:18080/identity
+          export BITWARDEN_HEADED=1
+          export SIMPLELOGIN_URL=http://127.0.0.1:17777
+          export SIMPLELOGIN_EMAIL=admin@mailbox.lan
+          export SIMPLELOGIN_APP_CONTAINER=simplelogin-owned-provider-app-1
+          xvfb-run -a node scripts/release/bootstrap-test-vault.mjs
+          docker exec simplelogin-owned-provider-redis-1 redis-cli --scan --pattern 'LIMITS:*' |
+            while IFS= read -r key; do
+              docker exec simplelogin-owned-provider-redis-1 redis-cli DEL "$key" >/dev/null
+            done
+          set +e
+          xvfb-run -a node apps/browser/test/real-simple-login-alias.e2e.mjs \
+            > "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-browser.log" 2>&1
+          browser_exit=$?
+          set -e
+          docker logs alias-client-release-vault \
+            > "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-server.log" 2>&1
+          node scripts/release/verify-vaultwarden-rejection.mjs \
+            --browser-exit "$browser_exit" \
+            --browser-log "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-browser.log" \
+            --server-log "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-server.log"
+          tail -80 "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-browser.log"
+          tail -80 "$BITWARDEN_RUNTIME_DIRECTORY/vaultwarden-server.log"
+      - name: Capture diagnostics
+        if: always()
+        run: |
+          mkdir -p diagnostics
+          docker logs alias-client-release-bitwarden > diagnostics/official-bitwarden-live.log 2>&1 || true
+          docker logs alias-client-release-vault > diagnostics/vaultwarden-live.log 2>&1 || true
+          docker logs simplelogin-owned-provider-app-1 > diagnostics/provider.log 2>&1 || true
+          cp "$RUNNER_TEMP/web.log" diagnostics/web.log 2>/dev/null || true
+          cp "$RUNNER_TEMP"/pinned-toolchain-*.log diagnostics/ 2>/dev/null || true
+          cp "$RUNNER_TEMP"/bitwarden-test-service/*.log diagnostics/ 2>/dev/null || true
+          find /tmp -maxdepth 1 -name 'alias-*.png' -exec cp {} diagnostics/ \; || true
+      - name: Stop contained test services
+        if: always()
+        run: |
+          cd "$RUNNER_TEMP/source"
+          node scripts/release/bitwarden-test-service.mjs stop \
+            --runtime-directory "$RUNNER_TEMP/bitwarden-test-service"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: alias-headed-e2e-diagnostics
+          path: diagnostics
+          if-no-files-found: warn

@@ -10,6 +10,7 @@ import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { AuditService } from "@bitwarden/common/abstractions/audit.service";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { bindGeneratedAlias, reconcileAliasBinding } from "@bitwarden/common/vault/alias-binding";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import {
@@ -139,6 +140,7 @@ export class LoginDetailsSectionComponent implements OnInit {
             password: value.password,
             totp: value.totp?.trim(),
           } as LoginView);
+          reconcileAliasBinding(cipher);
 
           return cipher;
         });
@@ -261,7 +263,7 @@ export class LoginDetailsSectionComponent implements OnInit {
     const newPassword = await this.generationService.generatePassword();
 
     if (newPassword) {
-      this.loginDetailsForm.controls.password.patchValue(newPassword);
+      this.loginDetailsForm.controls.password.patchValue(newPassword.credential);
       this.newPasswordGenerated = true;
     }
   };
@@ -275,7 +277,11 @@ export class LoginDetailsSectionComponent implements OnInit {
       this.cipherFormContainer.website,
     );
     if (newUsername) {
-      this.loginDetailsForm.controls.username.patchValue(newUsername);
+      this.loginDetailsForm.controls.username.patchValue(newUsername.credential);
+      this.cipherFormContainer.patchCipher((cipher) => {
+        bindGeneratedAlias(cipher, newUsername);
+        return cipher;
+      });
     }
   };
 

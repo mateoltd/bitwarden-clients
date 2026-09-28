@@ -57,6 +57,7 @@ import {
   FormFieldModule,
 } from "@bitwarden/components";
 import {
+  SimpleLoginAliasError,
   AlgorithmInfo,
   CredentialGeneratorService,
   GenerateRequest,
@@ -294,14 +295,20 @@ export class UsernameGeneratorComponent implements OnInit, OnChanges, OnDestroy 
       })
       .pipe(
         catchError((error: unknown, generator) => {
-          if (typeof error === "string") {
+          if (error instanceof SimpleLoginAliasError) {
+            const message =
+              error.code === "rate-limited" && error.retryAfterSeconds !== undefined
+                ? this.i18nService.t("aliasRateLimited", error.retryAfterSeconds.toString())
+                : this.i18nService.t("aliasUnknownError");
+            this.toastService.showToast({ message, variant: "error", title: "" });
+          } else if (typeof error === "string") {
+            this.toastService.showToast({ message: error, variant: "error", title: "" });
+          } else {
             this.toastService.showToast({
-              message: error,
+              message: this.i18nService.t("unexpectedError"),
               variant: "error",
               title: "",
             });
-          } else {
-            this.logService.error(error);
           }
 
           // continue with origin stream

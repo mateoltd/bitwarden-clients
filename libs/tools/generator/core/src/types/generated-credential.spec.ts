@@ -2,6 +2,8 @@
 import { TextEncoder, TextDecoder } from "util";
 Object.assign(global, { TextDecoder, TextEncoder });
 
+import { SensitiveString } from "@bitwarden/alias-sdk-internal";
+
 import { Type } from "../metadata";
 
 import { GeneratedCredential } from "./generated-credential";
@@ -34,7 +36,22 @@ describe("GeneratedCredential", () => {
   });
 
   it("toJSON converts from a credential into a JSON object", () => {
-    const credential = new GeneratedCredential("example", Type.password, new Date(100));
+    const credential = new GeneratedCredential(
+      "example",
+      Type.password,
+      new Date(100),
+      "test",
+      "https://example.test",
+      {
+        kind: "email-alias",
+        alias: {
+          version: 1,
+          connectionId: "11111111-1111-4111-8111-111111111111",
+          aliasId: "42",
+          address: "alias@sl.test" as SensitiveString,
+        },
+      },
+    );
 
     const result = credential.toJSON();
 
@@ -43,6 +60,7 @@ describe("GeneratedCredential", () => {
       category: Type.password,
       generationDate: 100,
     });
+    expect(JSON.stringify(result)).not.toContain("simplelogin");
   });
 
   it("fromJSON converts Json objects into credentials", () => {

@@ -48,6 +48,9 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Install verified SDK overlay for mixed-source typechecking
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
+
       # We use isolatedModules: true which disables typechecking in tests
       # Tests in apps/ are typechecked when their app is built, so we just do it here for libs/
       # See https://bitwarden.atlassian.net/browse/EC-497
@@ -114,6 +117,9 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+
+      - name: Install verified SDK overlay for mixed-source tests
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
 
       - name: Run tests - ${{ matrix.test-group.name }}
         # maxWorkers is a workaround for a memory leak that crashes tests in CI:

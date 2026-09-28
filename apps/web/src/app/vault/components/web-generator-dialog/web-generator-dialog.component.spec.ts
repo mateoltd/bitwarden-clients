@@ -7,7 +7,7 @@ import { mock, MockProxy } from "jest-mock-extended";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { DIALOG_DATA, DialogRef } from "@bitwarden/components";
-import { AlgorithmInfo } from "@bitwarden/generator-core";
+import { AlgorithmInfo, GeneratedCredential } from "@bitwarden/generator-core";
 import { CipherFormGeneratorComponent } from "@bitwarden/vault";
 
 import {
@@ -36,8 +36,10 @@ class MockCipherFormGenerator {
   @Input() uri?: string;
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-output-emitter-ref
-  @Output() valueGenerated = new EventEmitter<string>();
+  @Output() valueGenerated = new EventEmitter<GeneratedCredential>();
 }
+
+const generatedPassword = { credential: "test-password" } as GeneratedCredential;
 
 describe("WebVaultGeneratorDialogComponent", () => {
   let component: WebVaultGeneratorDialogComponent;
@@ -79,7 +81,7 @@ describe("WebVaultGeneratorDialogComponent", () => {
     ).componentInstance;
 
     generator.algorithmSelected.emit({ useGeneratedValue: "Use Password" } as any);
-    generator.valueGenerated.emit("test-password");
+    generator.valueGenerated.emit(generatedPassword);
     fixture.detectChanges();
 
     const button = fixture.debugElement.query(By.css("[data-testid='select-button']"));
@@ -103,7 +105,7 @@ describe("WebVaultGeneratorDialogComponent", () => {
       By.css("vault-cipher-form-generator"),
     ).componentInstance;
 
-    generator.valueGenerated.emit("test-password");
+    generator.valueGenerated.emit(generatedPassword);
     fixture.detectChanges();
 
     const button = fixture.debugElement.query(By.css("[data-testid='select-button']"));
@@ -115,7 +117,7 @@ describe("WebVaultGeneratorDialogComponent", () => {
       By.css("vault-cipher-form-generator"),
     ).componentInstance;
     generator.algorithmSelected.emit({ useGeneratedValue: "Use Password" } as any);
-    generator.valueGenerated.emit("test-password");
+    generator.valueGenerated.emit(generatedPassword);
     fixture.detectChanges();
 
     fixture.debugElement.query(By.css("[data-testid='select-button']")).nativeElement.click();
@@ -123,6 +125,7 @@ describe("WebVaultGeneratorDialogComponent", () => {
     expect(dialogRef.close).toHaveBeenCalledWith({
       action: WebVaultGeneratorDialogAction.Selected,
       generatedValue: "test-password",
+      generatedCredential: generatedPassword,
     });
   });
 

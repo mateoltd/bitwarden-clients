@@ -72,11 +72,12 @@ describe("CipherFormGeneratorComponent", () => {
 
     it("invokes `valueGenerated` with the generated credential", () => {
       jest.spyOn(component.valueGenerated, "emit");
+      const generated = { credential: "new-cred-password!" };
 
-      passwordGenerator.onGenerated.emit({ credential: "new-cred-password!" });
+      passwordGenerator.onGenerated.emit(generated);
 
       expect(component.valueGenerated.emit).toHaveBeenCalledTimes(1);
-      expect(component.valueGenerated.emit).toHaveBeenCalledWith("new-cred-password!");
+      expect(component.valueGenerated.emit).toHaveBeenCalledWith(generated);
     });
   });
 
@@ -99,11 +100,12 @@ describe("CipherFormGeneratorComponent", () => {
 
     it("invokes `valueGenerated` with the generated credential", () => {
       jest.spyOn(component.valueGenerated, "emit");
+      const generated = { credential: "new-cred-username!" };
 
-      usernameGenerator.onGenerated.emit({ credential: "new-cred-username!" });
+      usernameGenerator.onGenerated.emit(generated);
 
       expect(component.valueGenerated.emit).toHaveBeenCalledTimes(1);
-      expect(component.valueGenerated.emit).toHaveBeenCalledWith("new-cred-username!");
+      expect(component.valueGenerated.emit).toHaveBeenCalledWith(generated);
     });
   });
 });

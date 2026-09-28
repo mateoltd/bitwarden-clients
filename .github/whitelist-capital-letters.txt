@@ -32,3 +32,5 @@
 ./SECURITY.md
 ./libs/nx-plugin/src/generators/files/README.md__tmpl__
 ./libs/components/CONTRIBUTING.md
+./scripts/release/pinned-toolchain.Dockerfile
+./vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.2.candidate.SHA256SUMS

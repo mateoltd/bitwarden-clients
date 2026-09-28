@@ -258,6 +258,11 @@ jobs:
         run: npm ci
         working-directory: ./
 
+      - name: Install verified commercial SDK overlay
+        if: matrix.license_type == 'commercial'
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
+        working-directory: ./
+
       - name: Download SDK Artifacts
         if: ${{ inputs.sdk_branch != '' && matrix.license_type != 'commercial' }}
         uses: bitwarden/gh-actions/download-artifacts@main
@@ -451,6 +456,11 @@ jobs:
         run: npm ci
         working-directory: ./
 
+      - name: Install verified commercial SDK overlay
+        if: matrix.license_type == 'commercial'
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
+        working-directory: ./
+
       - name: Download SDK Artifacts
         if: ${{ inputs.sdk_branch != '' && matrix.license_type != 'commercial' }}
         uses: bitwarden/gh-actions/download-artifacts@main
@@ -639,6 +649,11 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+        working-directory: ./
+
+      - name: Install verified commercial SDK overlay
+        if: matrix.license_type == 'commercial'
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
         working-directory: ./
 
       - name: Download SDK Artifacts
@@ -978,6 +993,11 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+        working-directory: ./
+
+      - name: Install verified commercial SDK overlay
+        if: matrix.license_type == 'commercial'
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
         working-directory: ./
 
       - name: Download SDK Artifacts
@@ -1406,6 +1426,11 @@ jobs:
         run: npm ci
         working-directory: ./
 
+      - name: Install verified commercial SDK overlay
+        if: matrix.license_type == 'commercial'
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
+        working-directory: ./
+
       - name: Download SDK Artifacts
         if: ${{ inputs.sdk_branch != '' && needs.setup.outputs.has_secrets == 'true' && matrix.license_type != 'commercial' }}
         uses: bitwarden/gh-actions/download-artifacts@main
@@ -1649,6 +1674,11 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+        working-directory: ./
+
+      - name: Install verified commercial SDK overlay
+        if: matrix.license_type == 'commercial'
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
         working-directory: ./
 
       - name: Download SDK Artifacts
@@ -1916,6 +1946,11 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+        working-directory: ./
+
+      - name: Install verified commercial SDK overlay
+        if: matrix.license_type == 'commercial'
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
         working-directory: ./
 
       - name: Download SDK Artifacts
@@ -2205,6 +2240,11 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+        working-directory: ./
+
+      - name: Install verified commercial SDK overlay
+        if: matrix.license_type == 'commercial'
+        run: node scripts/release/commercial-sdk-overlay.mjs --install
         working-directory: ./
 
       - name: Download SDK Artifacts

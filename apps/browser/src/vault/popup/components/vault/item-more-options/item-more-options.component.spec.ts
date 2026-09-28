@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed, waitForAsync } from "@angular/core/testing";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { Router } from "@angular/router";
 import { mock } from "jest-mock-extended";
-import { BehaviorSubject, of } from "rxjs";
+import { BehaviorSubject, firstValueFrom, of } from "rxjs";
 
 import { CollectionService } from "@bitwarden/admin-console/common";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
@@ -42,6 +42,7 @@ describe("ItemMoreOptionsComponent", () => {
     open: jest.fn(),
   };
   const cipherService = {
+    cipherView$: jest.fn(),
     getFullCipherView: jest.fn(),
     encrypt: jest.fn(),
     updateWithServer: jest.fn(),
@@ -87,6 +88,7 @@ describe("ItemMoreOptionsComponent", () => {
     jest.clearAllMocks();
 
     cipherService.getFullCipherView.mockImplementation(async (c) => ({ ...baseCipher, ...c }));
+    cipherService.cipherView$.mockReturnValue(of(baseCipher));
 
     TestBed.configureTestingModule({
       imports: [ItemMoreOptionsComponent, NoopAnimationsModule],
@@ -146,6 +148,34 @@ describe("ItemMoreOptionsComponent", () => {
       .mockReturnValue({ closed: of(result) } as any);
     return openSpy;
   }
+
+  it("reacts to the decrypted cipher binding used by the vault list menu", async () => {
+    const aliasBinding = {
+      version: 1 as const,
+      connectionId: "11111111-1111-4111-8111-111111111111",
+      aliasId: "42",
+      address: "bound-alias@sl.test",
+    };
+    cipherService.cipherView$.mockReturnValue(of({ ...baseCipher, aliasBinding }));
+
+    await expect(firstValueFrom(component["boundAlias$"])).resolves.toEqual(aliasBinding);
+    expect(cipherService.cipherView$).toHaveBeenCalledWith("UserId", "cipher-1");
+  });
+
+  it("keeps the bound connection identity in the management route", async () => {
+    const aliasBinding = {
+      version: 1 as const,
+      connectionId: "11111111-1111-4111-8111-111111111111",
+      aliasId: "42",
+      address: "bound-alias@sl.test",
+    };
+    jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+    cipherService.getFullCipherView.mockResolvedValue({ ...baseCipher, aliasBinding });
+    await component["manageBoundAlias"]();
+    expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(["/email-aliases", "42"], {
+      queryParams: { connectionId: aliasBinding.connectionId },
+    });
+  });
 
   describe("doAutofill", () => {
     beforeEach(() => {

@@ -33,6 +33,11 @@ async function doBuild(context) {
 }
 
 async function notarizeBuild(context) {
+  if (process.env.RELEASE_CANDIDATE_UNSIGNED === "1") {
+    console.log("Unsigned release candidate: skipping unavailable signing and notarization");
+    return;
+  }
+
   if (["no", "off", "0", "disable", "false"].includes(process.env.APPLE_NOTARIZE?.toLowerCase())) {
     console.log(
       "### Notarizing: notarization disabled by APPLE_NOTARIZE environment variable. Skipping.",

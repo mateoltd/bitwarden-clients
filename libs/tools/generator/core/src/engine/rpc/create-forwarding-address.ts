@@ -1,20 +1,24 @@
 import { IntegrationContext } from "@bitwarden/common/tools/integration";
 import { JsonRpc, IntegrationRequest, ApiSettings } from "@bitwarden/common/tools/integration/rpc";
 
-import { ForwarderConfiguration } from "../forwarder-configuration";
+import { ForwarderConfiguration, ForwarderGenerationResult } from "../forwarder-configuration";
 import { ForwarderContext } from "../forwarder-context";
 
 export class CreateForwardingAddressRpc<
   Settings extends ApiSettings,
   Req extends IntegrationRequest = IntegrationRequest,
-> implements JsonRpc<Req, string> {
+> implements JsonRpc<Req, ForwarderGenerationResult> {
   constructor(
     readonly requestor: ForwarderConfiguration<Settings>,
     readonly context: ForwarderContext<Settings>,
   ) {}
 
   private get createForwardingEmail() {
-    return this.requestor.forwarder.createForwardingEmail;
+    const definition = this.requestor.forwarder.createForwardingEmail;
+    if (!definition) {
+      throw new Error(`Forwarder ${this.requestor.name} does not define an address endpoint`);
+    }
+    return definition;
   }
 
   toRequest(req: Req) {
@@ -55,7 +59,7 @@ export class CreateForwardingAddressRpc<
     return this.createForwardingEmail.hasJsonPayload(response, this.context);
   }
 
-  processJson(json: any): [string?, string?] {
+  processJson(json: any): [ForwarderGenerationResult?, string?] {
     return this.createForwardingEmail.processJson(json, this.context);
   }
 }

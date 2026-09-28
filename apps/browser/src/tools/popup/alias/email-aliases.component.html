@@ -1,0 +1,239 @@
+<popup-page [loading]="loading()" [attr.aria-busy]="working()">
+  <popup-header slot="header" [pageTitle]="'emailAliases' | i18n" showBackButton>
+    <ng-container slot="end"><app-pop-out /></ng-container>
+  </popup-header>
+
+  @if (error()) {
+    <bit-callout type="danger" [title]="'error' | i18n" [icon]="null" role="alert">{{
+      error()
+    }}</bit-callout>
+  }
+
+  @if (selectedAlias(); as alias) {
+    <div class="tw-flex tw-flex-col tw-gap-4">
+      <div>
+        <div class="tw-font-semibold tw-break-all" data-testid="alias-address">
+          {{ alias.address }}
+        </div>
+        <div class="tw-text-muted tw-text-sm">{{ "aliasIdentifier" | i18n: alias.id }}</div>
+      </div>
+
+      <form [formGroup]="editForm" (ngSubmit)="save()" class="tw-flex tw-flex-col tw-gap-3">
+        <bit-form-field>
+          <bit-label>{{ "name" | i18n }}</bit-label>
+          <input bitInput formControlName="name" />
+        </bit-form-field>
+        <bit-form-field>
+          <bit-label>{{ "note" | i18n }}</bit-label>
+          <textarea bitInput formControlName="note"></textarea>
+        </bit-form-field>
+        <button bitButton buttonType="primary" type="submit" [disabled]="working()">
+          {{ "saveAlias" | i18n }}
+        </button>
+      </form>
+
+      <div class="tw-flex tw-gap-2">
+        <button
+          bitButton
+          buttonType="secondary"
+          type="button"
+          [disabled]="working()"
+          (click)="toggleEnabled()"
+        >
+          {{ (alias.enabled ? "disableAlias" : "enableAlias") | i18n }}
+        </button>
+        <button
+          bitButton
+          buttonType="danger"
+          type="button"
+          [disabled]="working()"
+          (click)="deleteAlias()"
+        >
+          {{ "delete" | i18n }}
+        </button>
+      </div>
+
+      <section aria-labelledby="reverse-alias-heading">
+        <h2 id="reverse-alias-heading" class="tw-font-semibold tw-mb-2">
+          {{ "reverseAliases" | i18n }}
+        </h2>
+        <form
+          [formGroup]="reverseAliasForm"
+          (ngSubmit)="createReverseAlias()"
+          class="tw-flex tw-gap-2 tw-items-end"
+        >
+          <bit-form-field class="tw-flex-1" disableMargin>
+            <bit-label>{{ "contactEmail" | i18n }}</bit-label>
+            <input bitInput type="email" formControlName="contact" required />
+          </bit-form-field>
+          <button bitButton buttonType="primary" type="submit" [disabled]="working()">
+            {{ "create" | i18n }}
+          </button>
+        </form>
+
+        <bit-item-group class="tw-mt-3">
+          @for (contact of contacts(); track contact.id) {
+            <bit-item>
+              <button
+                bit-item-content
+                type="button"
+                [disabled]="working()"
+                (click)="toggleContact(contact)"
+              >
+                <span>{{ contact.address }}</span>
+                <span slot="secondary" class="tw-break-all">{{ contact.reverseAliasAddress }}</span>
+              </button>
+              <div slot="end" class="tw-flex tw-gap-1">
+                <button
+                  bitButton
+                  buttonType="secondary"
+                  type="button"
+                  [disabled]="working()"
+                  (click)="toggleContact(contact)"
+                >
+                  {{ (contact.blocked ? "unblockContact" : "blockContact") | i18n }}
+                </button>
+                <button
+                  bitButton
+                  buttonType="danger"
+                  type="button"
+                  [disabled]="working()"
+                  (click)="deleteContact(contact)"
+                >
+                  {{ "delete" | i18n }}
+                </button>
+              </div>
+            </bit-item>
+          } @empty {
+            <p class="tw-text-muted tw-mt-3">{{ "noReverseAliases" | i18n }}</p>
+          }
+        </bit-item-group>
+        <div class="tw-flex tw-justify-between tw-mt-2">
+          <button
+            bitButton
+            buttonType="secondary"
+            type="button"
+            [disabled]="contactsPage() === 0 || working()"
+            (click)="previousContacts()"
+          >
+            {{ "previous" | i18n }}
+          </button>
+          <button
+            bitButton
+            buttonType="secondary"
+            type="button"
+            [disabled]="contactsNextPage() === undefined || working()"
+            (click)="nextContacts()"
+          >
+            {{ "next" | i18n }}
+          </button>
+        </div>
+      </section>
+    </div>
+  } @else {
+    <div class="tw-flex tw-flex-col tw-gap-4">
+      @if (recommendation(); as recommendation) {
+        <bit-callout [title]="'emailAliasForSite' | i18n" [icon]="null">
+          @if (recommendation.alias) {
+            {{ "reuseAliasForSite" | i18n: recommendation.alias.address : recommendation.hostname }}
+          } @else if (recommendation.hostname) {
+            {{ "createAliasForSite" | i18n: recommendation.hostname }}
+          } @else {
+            {{ "createAliasForCurrentSite" | i18n }}
+          }
+          <button
+            slot="end"
+            bitButton
+            buttonType="primary"
+            type="button"
+            [disabled]="working()"
+            (click)="recommendOrCreate()"
+          >
+            {{ (recommendation.alias ? "reuseAlias" : "create") | i18n }}
+          </button>
+        </bit-callout>
+      }
+
+      <form [formGroup]="searchForm" (ngSubmit)="search()" class="tw-flex tw-gap-2 tw-items-end">
+        <bit-form-field class="tw-flex-1" disableMargin>
+          <bit-label>{{ "searchAliases" | i18n }}</bit-label>
+          <input bitInput type="search" formControlName="query" />
+        </bit-form-field>
+        <bit-form-field disableMargin>
+          <bit-label>{{ "status" | i18n }}</bit-label>
+          <select bitInput formControlName="filter">
+            <option value="all">{{ "all" | i18n }}</option>
+            <option value="enabled">{{ "enabled" | i18n }}</option>
+            <option value="disabled">{{ "disabled" | i18n }}</option>
+            <option value="pinned">{{ "pinned" | i18n }}</option>
+          </select>
+        </bit-form-field>
+        <button bitButton buttonType="secondary" type="submit" [disabled]="working()">
+          {{ "search" | i18n }}
+        </button>
+      </form>
+
+      <button
+        bitButton
+        buttonType="primary"
+        type="button"
+        [disabled]="working()"
+        (click)="createRandom()"
+      >
+        {{ "createRandomAlias" | i18n }}
+      </button>
+
+      <bit-item-group>
+        @for (alias of aliases(); track alias.id) {
+          <bit-item>
+            <button bit-item-content type="button" [disabled]="working()" (click)="open(alias)">
+              <span class="tw-break-all">{{ alias.address }}</span>
+              <span slot="secondary" class="tw-flex tw-gap-2">
+                <span>{{ (alias.enabled ? "enabled" : "disabled") | i18n }}</span>
+                <span class="tw-sr-only">, </span>
+                <span>{{ "aliasForwardedCount" | i18n: alias.forwardedCount }}</span>
+              </span>
+            </button>
+          </bit-item>
+        } @empty {
+          <p class="tw-text-muted">{{ "noAliasesMatchSearch" | i18n }}</p>
+        }
+      </bit-item-group>
+
+      <div class="tw-flex tw-justify-between">
+        <button
+          bitButton
+          buttonType="secondary"
+          type="button"
+          [disabled]="page() === 0 || working()"
+          (click)="previous()"
+        >
+          {{ "previous" | i18n }}
+        </button>
+        <span class="tw-self-center">{{ "pageNumber" | i18n: page() + 1 }}</span>
+        <button
+          bitButton
+          buttonType="secondary"
+          type="button"
+          [disabled]="nextPage() === undefined || working()"
+          (click)="next()"
+        >
+          {{ "next" | i18n }}
+        </button>
+      </div>
+
+      <section aria-labelledby="alias-domains-heading">
+        <h2 id="alias-domains-heading" class="tw-font-semibold">
+          {{ "availableAliasDomains" | i18n }}
+        </h2>
+        <p class="tw-text-muted tw-break-words">
+          @if (domainNames) {
+            {{ domainNames }}
+          } @else {
+            {{ "noneAvailable" | i18n }}
+          }
+        </p>
+      </section>
+    </div>
+  }
+</popup-page>

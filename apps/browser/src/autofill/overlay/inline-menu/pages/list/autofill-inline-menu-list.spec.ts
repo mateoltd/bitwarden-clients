@@ -16,7 +16,11 @@ import {
   createAutofillOverlayCipherDataMock,
   createInitAutofillInlineMenuListMessageMock,
 } from "../../../../spec/autofill-mocks";
-import { flushPromises, postWindowMessage } from "../../../../spec/testing-utils";
+import {
+  flushPromises,
+  installTestMessageChannel,
+  postWindowMessage,
+} from "../../../../spec/testing-utils";
 import { EventSecurity } from "../../../../utils/event-security";
 
 import { AutofillInlineMenuList } from "./autofill-inline-menu-list";
@@ -54,6 +58,10 @@ describe("AutofillInlineMenuList", () => {
   const expectedOrigin = BrowserApi.getRuntimeURL("")?.slice(0, -1) || "chrome-extension://id";
   const events: { eventName: any; callback: any }[] = [];
 
+  beforeAll(() => {
+    installTestMessageChannel();
+  });
+
   beforeEach(() => {
     jest.spyOn(EventSecurity, "isEventTrusted").mockReturnValue(true);
     const oldEv = globalThis.addEventListener;
@@ -75,6 +83,32 @@ describe("AutofillInlineMenuList", () => {
   });
 
   describe("initAutofillInlineMenuList", () => {
+    it("preserves an alias recommendation that arrives before initialization finishes", async () => {
+      const initialization = autofillInlineMenuList["initAutofillInlineMenuList"](
+        createInitAutofillInlineMenuListMessageMock({
+          authStatus: AuthenticationStatus.Unlocked,
+          ciphers: [],
+          portKey,
+          showInlineMenuAccountCreation: true,
+        }),
+      );
+
+      autofillInlineMenuList["handleUpdateAutofillInlineMenuEmailAliasRecommendation"]({
+        command: "updateAutofillInlineMenuEmailAliasRecommendation",
+        emailAliasRecommendation: {
+          hostname: "registration.example",
+          canCreate: true,
+        },
+      });
+      await initialization;
+
+      expect(
+        autofillInlineMenuList["inlineMenuListContainer"].querySelector(
+          "[data-email-alias-action]",
+        ),
+      ).not.toBeNull();
+    });
+
     it("adds the no-animations class to the container when showAnimations is false", async () => {
       postWindowMessage(
         createInitAutofillInlineMenuListMessageMock({
@@ -515,6 +549,35 @@ describe("AutofillInlineMenuList", () => {
         expect(
           autofillInlineMenuList["inlineMenuListContainer"].querySelectorAll("ul").length,
         ).toBe(0);
+      });
+
+      it("keeps one alias action alongside the Lit list across cipher updates", async () => {
+        postWindowMessage(
+          createInitAutofillInlineMenuListMessageMock({
+            authStatus: AuthenticationStatus.Unlocked,
+            ciphers: [createAutofillOverlayCipherDataMock(1)],
+            portKey,
+            useLitComponents: true,
+            emailAliasRecommendation: {
+              hostname: "registration.example",
+              canCreate: true,
+            },
+          }),
+        );
+        await flushPromises();
+
+        postWindowMessage({
+          command: "updateAutofillInlineMenuListCiphers",
+          ciphers: [createAutofillOverlayCipherDataMock(2)],
+          token: "test-token",
+        });
+        await flushPromises();
+
+        expect(
+          autofillInlineMenuList["inlineMenuListContainer"].querySelectorAll(
+            "[data-email-alias-action]",
+          ),
+        ).toHaveLength(1);
       });
 
       it("renders only the first page of Lit ciphers", async () => {
@@ -1692,6 +1755,70 @@ describe("AutofillInlineMenuList", () => {
       await flushPromises();
 
       expect(autofillInlineMenuList["inlineMenuListContainer"]).toMatchSnapshot();
+    });
+  });
+
+  describe("email alias user activation", () => {
+    let userActionChannel: MessageChannel;
+
+    beforeEach(async () => {
+      postWindowMessage(
+        createInitAutofillInlineMenuListMessageMock({
+          authStatus: AuthenticationStatus.Unlocked,
+          ciphers: [],
+          portKey,
+          emailAliasRecommendation: {
+            hostname: "registration.example",
+            canCreate: true,
+          },
+        }),
+      );
+      await flushPromises();
+      userActionChannel = new MessageChannel();
+      const userActionChannelEvent = new MessageEvent("message", {
+        data: {
+          command: "initAutofillInlineMenuUserActionChannel",
+          token: "test-token",
+        },
+        origin: expectedOrigin,
+        source: globalThis.parent,
+      });
+      Object.defineProperty(userActionChannelEvent, "ports", {
+        value: [userActionChannel.port1],
+      });
+      globalThis.dispatchEvent(userActionChannelEvent);
+    });
+
+    afterEach(() => {
+      userActionChannel.port1.close();
+      userActionChannel.port2.close();
+    });
+
+    it("sends a trusted keyboard or pointer activation only over the private channel", () => {
+      const privatePostMessage = jest.spyOn(userActionChannel.port1, "postMessage");
+      const action = autofillInlineMenuList["inlineMenuListContainer"].querySelector(
+        "[data-email-alias-action]",
+      );
+
+      action.dispatchEvent(new MouseEvent("click"));
+
+      expect(privatePostMessage).toHaveBeenCalledWith({ command: "fillEmailAlias" });
+      expect(globalThis.parent.postMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ command: "fillEmailAlias" }),
+        expect.anything(),
+      );
+    });
+
+    it("rejects synthetic alias activation", () => {
+      jest.spyOn(EventSecurity, "isEventTrusted").mockReturnValue(false);
+      const privatePostMessage = jest.spyOn(userActionChannel.port1, "postMessage");
+      const action = autofillInlineMenuList["inlineMenuListContainer"].querySelector(
+        "[data-email-alias-action]",
+      );
+
+      action.dispatchEvent(new MouseEvent("click"));
+
+      expect(privatePostMessage).not.toHaveBeenCalled();
     });
   });
 

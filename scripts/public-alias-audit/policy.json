@@ -1,0 +1,90 @@
+{
+  "branch": "integration/alias-clients-launch-20260926",
+  "baseCommit": "45eb0013dc413dab78932c418d209d89371febf6",
+  "upstreamRebase": {
+    "sourceCommit": "ac3eb8c3c1ad2b74dda473a22cc044000fa96371",
+    "upstreamCommit": "45eb0013dc413dab78932c418d209d89371febf6",
+    "sourceMergeBaseCommit": "b52a472fccba2727cba9cd22257d551599c43e4f",
+    "strategy": "rebase-merges"
+  },
+  "downstreamTopology": {
+    "mergeCount": 1,
+    "mergeSubjects": ["merge: incorporate final public alias integration delta"]
+  },
+  "snapshotCommit": "cd1f5cb4456a27e4c75d2206c7993c7b2c1ed038",
+  "releaseCommit": "95c5655065172c7505d7f82428b8bf7b46792b82",
+  "arm64FixCommit": "0c4906ee61d1a5fd13c4a95560b3f69b0a8d10f8",
+  "sourceCommits": [
+    "ac3eb8c3c1ad2b74dda473a22cc044000fa96371",
+    "6f7f3d461b34315efe8df7d9c033149c4153947e",
+    "cd1f5cb4456a27e4c75d2206c7993c7b2c1ed038",
+    "95c5655065172c7505d7f82428b8bf7b46792b82",
+    "0c4906ee61d1a5fd13c4a95560b3f69b0a8d10f8"
+  ],
+  "portabilityCommits": [],
+  "protectedUpstreamPaths": [
+    "apps/browser/src/tools/popup/settings/import",
+    "apps/browser/src/tools/popup/settings/export",
+    "apps/cli/src/tools/import.command.ts",
+    "apps/cli/src/tools/export.command.ts",
+    "apps/desktop/src/app/tools/import",
+    "apps/desktop/src/app/tools/export",
+    "libs/importer",
+    "libs/tools/export-vault-ui"
+  ],
+  "requiredUpstreamPaths": [
+    "libs/importer/src/importers/protonpass/protonpass-json-importer.ts",
+    "libs/importer/src/importers/protonpass/protonpass-json-importer.spec.ts",
+    "libs/importer/src/importers/spec-data/bitwarden-json/account-encrypted.json.ts",
+    "libs/importer/src/importers/spec-data/bitwarden-json/password-protected.json.ts",
+    "libs/tools/export-vault-ui/src/enums/encrypted-export-type.enum.ts"
+  ],
+  "forbiddenPathPatterns": [
+    "(^|/)node_modules(/|$)",
+    "(^|/)(dist|coverage|\\.nx|\\.angular|\\.cache|playwright-report|test-results)(/|$)",
+    "(^|/)\\.eslintcache$"
+  ],
+  "forbiddenAddedTextPatterns": [
+    "ALIAS_MIGRATION_(?:INTEGRATION|FIXTURE_SIZE)",
+    "\\.integration-labs/first-class-aliases",
+    "process\\.env\\[\"(?:SIMPLELOGIN|BITWARDEN)_(?:EMAIL|PASSWORD)\"\\]\\s*\\?\\?",
+    "(?:john@wick\\.com|alias\\.lab@individual\\.example|alias-lab-password)",
+    "(?:legacyAlias|AliasMigration)",
+    "aliasReferenceSchemaVersion[\\\"']?\\s*[:=]\\s*2",
+    "alias[-_ ](?:reference[-_ ])?schema[-_ ]v2"
+  ],
+  "generatedPathPatterns": [
+    "(^|/)(node_modules|dist|coverage|\\.nx|\\.angular|\\.cache|playwright-report|test-results)(/|$)",
+    "(^|/)\\.eslintcache$",
+    "\\.(?:log|tmp|swp|orig|rej)$",
+    "^release-out/",
+    "^artifacts/"
+  ],
+  "allowedArtifacts": {
+    "vendor/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.2.tgz": "d294d0e22b8627f61f2c7faa2c90baf44c2def92fbf0d7230aac574656df8470"
+  },
+  "allowedLicensePatterns": [
+    "^0BSD$",
+    "^Apache-2\\.0$",
+    "^BSD(?:-2-Clause|-3-Clause)?$",
+    "^BlueOak-1\\.0\\.0$",
+    "^CC-BY-3\\.0$",
+    "^CC0-1\\.0$",
+    "^GPL-2\\.0$",
+    "^GPL-3\\.0(?:-only)?$",
+    "^ISC$",
+    "^MIT$",
+    "^MPL-2\\.0$",
+    "^Python-2\\.0$",
+    "^Unlicense$",
+    "^UNLICENSED$",
+    "^WTFPL$",
+    "^Zlib$",
+    "^\\(MIT OR WTFPL\\)$",
+    "^\\(MIT OR GPL-3\\.0-or-later\\)$",
+    "^\\(BSD-3-Clause OR GPL-2\\.0\\)$",
+    "^\\(MIT AND Zlib\\)$",
+    "^\\(BSD-2-Clause OR MIT OR Apache-2\\.0\\)$",
+    "^\\(MIT OR CC0-1\\.0\\)$"
+  ]
+}

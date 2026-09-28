@@ -214,9 +214,10 @@ export default tseslint.config(
                 "libs/common/src/!(platform)/**/*",
                 "libs/common/src/platform/!(state)/**/*",
               ],
-              from: ["./libs/common/src/platform/state/**/*"],
-              // allow module index import
-              except: ["**/state/index.ts"],
+              from: ["./libs/common/src/platform/state"],
+              // Resolve from the state directory so hidden worktree parents do not
+              // prevent the public barrel exception from matching.
+              except: ["index.ts"],
             },
             {
               target: ["libs/**/*"],
