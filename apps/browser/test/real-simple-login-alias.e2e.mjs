@@ -1086,10 +1086,13 @@ async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectio
     await page.waitForURL(/#\/tools\/aliases\?/);
     const detail = page.getByTestId("alias-detail");
     await detail.getByRole("heading", { name: aliasAddress, exact: true }).waitFor();
-    await detail.getByRole("button", { name: "Disable", exact: true }).click();
-    await detail.getByRole("button", { name: "Enable", exact: true }).waitFor();
-    await detail.getByRole("button", { name: "Enable", exact: true }).click();
-    await detail.getByRole("button", { name: "Disable", exact: true }).waitFor();
+    await detail.getByRole("button", { name: "Turn off", exact: true }).click();
+    await detail.getByRole("button", { name: "Turn on", exact: true }).waitFor();
+    assert.equal((await getSimpleLoginAlias(simpleLoginToken, aliasId)).enabled, false);
+    await detail.getByRole("button", { name: "Turn on", exact: true }).click();
+    await detail.getByRole("button", { name: "Turn off", exact: true }).waitFor();
+    assert.equal((await getSimpleLoginAlias(simpleLoginToken, aliasId)).enabled, true);
+    await detail.evaluate((element) => element.scrollIntoView({ block: "start" }));
     await captureEvidence(page, "alias-web-recovered-management.png", detail);
     console.log("REAL_WEB_BOUND_CONNECTION_RECOVERY");
   } catch (error) {
