@@ -1043,10 +1043,19 @@ async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectio
       await page.getByRole("dialog").getByText("Skip to web app", { exact: true }).click();
     }
     await page.waitForURL(/#\/vault$/, { timeout: 60_000 });
-    const skip = page.getByRole("dialog").getByRole("button", { name: "Skip", exact: true });
-    if (await skip.isVisible()) await skip.click();
     const row = page.getByRole("row").filter({ hasText: marker });
     await row.waitFor();
+    // The optional install prompt checks for an extension asynchronously after vault navigation.
+    const extensionPrompt = page.locator("web-vault-extension-prompt-dialog");
+    try {
+      await extensionPrompt.waitFor({ timeout: 5_000 });
+    } catch (error) {
+      if (error.name !== "TimeoutError") throw error;
+    }
+    if (await extensionPrompt.isVisible()) {
+      await extensionPrompt.getByRole("button", { name: "Skip", exact: true }).click();
+      await extensionPrompt.waitFor({ state: "hidden" });
+    }
     assert.equal((await row.innerText()).includes(aliasAddress), true);
     await row.getByRole("button", { name: "More options", exact: true }).click();
     const link = page.getByRole("menuitem").filter({ hasText: /Manage.*alias/i });
