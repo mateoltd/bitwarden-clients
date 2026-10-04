@@ -204,13 +204,6 @@ describe("alias connection vault carrier", () => {
         remote.set(created.id, clone(created));
         return clone(created);
       },
-      updateWithServer: async (cipher: CipherView) => {
-        if (!cipher.id || !remote.has(cipher.id)) {
-          throw new Error("missing remote carrier");
-        }
-        remote.set(cipher.id, clone(cipher));
-        return clone(cipher);
-      },
       clearCache: async (): Promise<void> => undefined,
     };
     const persisted = new Map<string, AliasSyncDocument>();

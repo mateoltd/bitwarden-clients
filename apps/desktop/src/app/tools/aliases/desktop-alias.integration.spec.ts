@@ -152,7 +152,7 @@ describeIntegration("Desktop alias rendered real SimpleLogin integration", () =>
     TestBed.resetTestingModule();
   });
 
-  it("renders lifecycle state and recovers after lock and restart", async () => {
+  it("renders provider lifecycle state after component recreation and facade recovery", async () => {
     const marker = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
     const created = await client.create({ hostname: `desktop-${marker}.integration.test` });
     aliasId = created.id;

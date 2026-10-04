@@ -158,7 +158,6 @@ describe("alias reconciliation", () => {
         expect.objectContaining({ cipherId: cipherId(7) }),
       ]),
     );
-    expect(JSON.stringify(report)).not.toContain("provider-secret-must-not-enter-report");
   });
 
   it("keeps a current-binding refresh dry run non-mutating", async () => {

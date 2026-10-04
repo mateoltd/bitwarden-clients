@@ -128,7 +128,7 @@ describe("EmailAliasesComponent", () => {
     },
   );
 
-  it("loads aliases, pagination, and domains from encrypted SimpleLogin configuration", async () => {
+  it("loads aliases, pagination, and domains from the configured facade", async () => {
     await component.ngOnInit();
 
     expect(component.configured).toBe(true);
@@ -138,7 +138,7 @@ describe("EmailAliasesComponent", () => {
     expect(aliasesService.list).toHaveBeenCalledWith(0, "", "all", undefined);
   });
 
-  it("recommends reuse and creates then opens a real lifecycle alias", async () => {
+  it("recommends reuse and opens the alias created by the facade", async () => {
     const recommendation: SimpleLoginAliasRecommendation = {
       hostname: "example.com",
       canCreate: true,
@@ -207,7 +207,7 @@ describe("EmailAliasesComponent", () => {
     expect(component.recommendation).toBeUndefined();
   });
 
-  it("creates, blocks, paginates, and deletes reverse aliases", async () => {
+  it("creates, blocks, and deletes reverse aliases", async () => {
     component.selected = alias();
     component.reverseAliasContact = " contact@example.com ";
     aliasesService.createReverseAlias.mockResolvedValue(contact);
@@ -278,7 +278,7 @@ describe("EmailAliasesComponent", () => {
       fixture.detectChanges();
     });
 
-    it("renders provider-backed aliases, domains, and lifecycle controls", () => {
+    it("renders configured aliases, domains, and lifecycle controls", () => {
       const text = fixture.nativeElement.textContent;
       expect(text).toContain("alias@sl.example");
       expect(text).toContain("sl.example");

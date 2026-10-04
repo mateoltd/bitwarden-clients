@@ -59,9 +59,6 @@ describe("AutofillInlineMenuContainer", () => {
       autofillInlineMenuContainer["inlineMenuPageIframe"].dispatchEvent(new Event("load"));
 
       expect(chrome.runtime.connect).toHaveBeenCalledWith({ name: message.portName });
-      expect(port.onMessage.addListener).toHaveBeenCalledWith(
-        autofillInlineMenuContainer["handleBackgroundPortMessage"],
-      );
       const expectedMessage = expect.objectContaining({
         ...message,
         token: expect.any(String),

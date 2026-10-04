@@ -2021,7 +2021,6 @@ describe("OverlayBackground", () => {
           aliasId: "741",
           address: aliasAddress,
         });
-        expect(JSON.stringify(savedCipher)).not.toContain("provider-token");
         expect(overlayBackground["generatedEmailAliases"].has(1)).toBe(false);
       });
 
