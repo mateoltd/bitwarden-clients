@@ -46,6 +46,14 @@ async function captureEvidence(page, name, region) {
   };
   const target = region ?? (name === "alias-bound-menu.png" ? page.getByRole("menu") : undefined);
   if (target) {
+    await target.evaluate(async (element) => {
+      await Promise.all(
+        element
+          .getAnimations({ subtree: true })
+          .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+          .map((animation) => animation.finished.catch(() => undefined)),
+      );
+    });
     const box = await target.boundingBox();
     const viewport = page.viewportSize();
     assert.ok(box && viewport, "the evidence region must be visible in the current viewport");
@@ -1044,16 +1052,18 @@ async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectio
       await page.getByRole("dialog").getByText("Skip to web app", { exact: true }).click();
     }
     await page.waitForURL(/#\/vault$/, { timeout: 60_000 });
-    // The optional install prompt checks for an extension asynchronously after vault navigation.
-    const extensionPrompt = page.locator("web-vault-extension-prompt-dialog");
-    try {
-      await extensionPrompt.waitFor({ timeout: 5_000 });
-    } catch (error) {
-      if (error.name !== "TimeoutError") throw error;
-    }
-    if (await extensionPrompt.isVisible()) {
-      await extensionPrompt.getByRole("button", { name: "Skip", exact: true }).click();
-      await extensionPrompt.waitFor({ state: "hidden" });
+    // Upstream displays welcome then install prompts asynchronously. Dismiss only these two.
+    for (const selector of ["app-vault-welcome-dialog", "web-vault-extension-prompt-dialog"]) {
+      const prompt = page.locator(selector);
+      try {
+        await prompt.waitFor({ timeout: 5_000 });
+      } catch (error) {
+        if (error.name !== "TimeoutError") throw error;
+      }
+      if (await prompt.isVisible()) {
+        await prompt.getByRole("button", { name: "Skip", exact: true }).click();
+        await prompt.waitFor({ state: "hidden" });
+      }
     }
     const row = page.getByRole("row").filter({ hasText: marker });
     await row.waitFor();
