@@ -451,6 +451,10 @@ try {
   await vaultItem.getByRole("button", { name: "More options" }).click();
   await popup.getByRole("menuitem", { name: "Manage bound alias", exact: true }).waitFor();
   await captureEvidence(popup, "alias-bound-menu.png");
+  // Capture can invalidate the overlay's viewport state. Activate a freshly opened menu.
+  await popup.keyboard.press("Escape");
+  await popup.getByRole("menu").waitFor({ state: "hidden" });
+  await vaultItem.getByRole("button", { name: "More options" }).click();
   await popup.getByRole("menuitem", { name: "Manage bound alias", exact: true }).click();
   const boundConnectionId = await waitForBoundAliasRoute(popup, alias.id);
   await popup.waitForFunction(
@@ -1053,6 +1057,9 @@ async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectio
     assert.equal(route.searchParams.get("aliasId"), String(aliasId));
     assert.equal(route.searchParams.get("connectionId"), connectionId);
     await captureEvidence(page, "alias-web-synced-menu.png", page.getByRole("menu"));
+    await page.keyboard.press("Escape");
+    await page.getByRole("menu").waitFor({ state: "hidden" });
+    await row.getByRole("button", { name: "More options", exact: true }).click();
     // This context has no provider settings. The saved login must select and recover its exact
     // encrypted connection before management can read or change the real provider alias.
     await link.click();
