@@ -179,7 +179,9 @@ function adapterFailure(error: unknown, mutation: boolean): AliasAdapterFailure 
       code = "sync-conflict";
       break;
     case "invalid-response":
-      code = "invalid-response";
+      // A rejected response does not prove a mutation was rejected by the provider. Keep its
+      // journal unresolved so a retry cannot create another identity after a successful POST.
+      code = mutation ? "outcome-unknown" : "invalid-response";
       break;
     default:
       code = mutation ? "outcome-unknown" : "offline";
@@ -213,10 +215,7 @@ type NativeSimpleLoginContact = Omit<SimpleLoginContact, "identity">;
 export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
   readonly connection: AliasConnection;
   private readonly aliases = new Map<string, SimpleLoginAlias>();
-  private readonly contacts = new Map<
-    string,
-    { alias: AliasIdentity; contact: NativeSimpleLoginContact }
-  >();
+  private readonly contacts = new Map<string, NativeSimpleLoginContact>();
   private readonly locks = new Map<string, Promise<void>>();
   private createIntent: CreateSimpleLoginAliasRequest | undefined;
   private listIntent: { query?: string; filter: SimpleLoginAliasFilter } | undefined;
@@ -268,7 +267,7 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
   }
 
   contactDetail(identityId: string): NativeSimpleLoginContact | undefined {
-    return this.contacts.get(identityId)?.contact;
+    return this.contacts.get(identityId);
   }
 
   takeFailureDetails(): { status?: number; retryAfterSeconds?: number } | undefined {
@@ -408,7 +407,7 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
     if (!Array.isArray(value.contacts)) {
       throw invalidResponse("contact page");
     }
-    const contacts = value.contacts.map((candidate) => this.parseContact(identity, candidate));
+    const contacts = value.contacts.map((candidate) => this.parseContact(candidate));
     if (new Set(contacts.map((contact) => contact.id)).size !== contacts.length) {
       throw invalidResponse("contact identifiers");
     }
@@ -421,7 +420,6 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
   ): Promise<NativeSimpleLoginContact> {
     const aliasId = this.numericIdentity(identity);
     return this.parseContact(
-      identity,
       await this.request("POST", `api/aliases/${aliasId}/contacts`, { contact: recipient }, true),
     );
   }
@@ -436,15 +434,6 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
       throw invalidResponse("contact deletion response");
     }
     this.contacts.delete(String(id));
-  }
-
-  async toggleCachedContact(contactId: string): Promise<boolean> {
-    const cached = this.contacts.get(contactId);
-    if (!cached) {
-      throw new SimpleLoginAliasError("SimpleLogin contact is not loaded", "conflict");
-    }
-    const updated = await this.setContactBlocked(cached.alias, contactId, !cached.contact.blocked);
-    return updated.blocked;
   }
 
   async create(request: CreateAliasRequest): Promise<AliasAdapterResult<Alias>> {
@@ -656,7 +645,7 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
     return alias;
   }
 
-  private parseContact(alias: AliasIdentity, value: unknown): NativeSimpleLoginContact {
+  private parseContact(value: unknown): NativeSimpleLoginContact {
     const candidate = record(value, "contact");
     const contact: NativeSimpleLoginContact = {
       id: integer(candidate.id, "contact id", 1),
@@ -675,7 +664,7 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
           ? false
           : booleanValue(candidate.existed, "contact existed state"),
     };
-    this.contacts.set(String(contact.id), { alias, contact });
+    this.contacts.set(String(contact.id), contact);
     return contact;
   }
 

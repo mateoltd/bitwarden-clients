@@ -47,12 +47,11 @@ function documentsEqual(left: AliasSyncDocument | undefined, right: AliasSyncDoc
 
 function createSubjectSyncStore(
   subject: UserStateSubject<ForwarderOptions>,
-  initial: ForwarderOptions,
   account: Account,
 ): AliasSyncStore {
-  let current = initial;
   return {
     async load() {
+      const current = await firstValueFrom(subject);
       let document: AliasSyncDocument;
       try {
         document = current.aliasSync
@@ -75,6 +74,9 @@ function createSubjectSyncStore(
       pendingSyncWrites.set(account.id, tail);
       await previous;
       try {
+        // Read after acquiring the account queue. Another store or the settings form may have
+        // persisted a newer journal or credential while this write was waiting.
+        const current = await firstValueFrom(subject);
         const stored = current.aliasSync
           ? parseAliasSyncDocument(current.aliasSync)
           : createAliasSyncDocument(parsed.replicaId);
@@ -86,8 +88,7 @@ function createSubjectSyncStore(
               filter((settings) => documentsEqual(settings.aliasSync, merged)),
             ),
           );
-          current = { ...current, aliasSync: merged };
-          subject.next(current);
+          subject.next({ ...current, aliasSync: merged });
           await persisted;
         }
       } finally {
@@ -107,9 +108,8 @@ export function attachSimpleLoginAliasSyncStore(
   account: Account,
   cipherService?: CipherService,
   syncService?: SyncService,
-  expectedConnectionId?: string,
 ): ForwarderOptions {
-  const local = createSubjectSyncStore(subject, settings, account);
+  const local = createSubjectSyncStore(subject, account);
   let store: AliasSyncStore = local;
   if (cipherService && settings.token?.trim() && isSimpleLoginConnectionId(settings.connectionId)) {
     const runtime = validateSimpleLoginRuntimeSettings(
@@ -145,18 +145,16 @@ function createGeneratorSyncStore(
   generatorService: CredentialGeneratorService,
   account: Account,
 ): AliasSyncStore {
-  const open = async () => {
+  const open = () => {
     const account$ = new ReplaySubject<Account>(1);
     account$.next(account);
     const subject = generatorService.settings<ForwarderOptions>(
       generatorService.forwarder(Vendor.simplelogin),
       { account$ },
     );
-    const current = await firstValueFrom(subject);
     return {
       account$,
       subject,
-      current,
       close() {
         account$.complete();
         subject.complete();
@@ -166,18 +164,18 @@ function createGeneratorSyncStore(
 
   return {
     async load() {
-      const handle = await open();
+      const handle = open();
       try {
-        const store = createSubjectSyncStore(handle.subject, handle.current, account);
+        const store = createSubjectSyncStore(handle.subject, account);
         return await store.load();
       } finally {
         handle.close();
       }
     },
     async save(document) {
-      const handle = await open();
+      const handle = open();
       try {
-        const store = createSubjectSyncStore(handle.subject, handle.current, account);
+        const store = createSubjectSyncStore(handle.subject, account);
         await store.save(document);
       } finally {
         handle.close();

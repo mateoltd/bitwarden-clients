@@ -11,12 +11,49 @@ import { CredentialGeneratorService } from "../abstractions";
 import { ForwarderOptions } from "../types";
 
 import {
+  attachSimpleLoginAliasSyncStore,
   createSimpleLoginConnectionId,
   isSimpleLoginConnectionId,
   readSimpleLoginAliasSettings,
+  simpleLoginAliasSyncStore,
 } from "./simple-login-connection-settings";
 
 describe("SimpleLogin schema-v1 connection identity", () => {
+  it("merges concurrent journal writes with the latest provider settings", async () => {
+    const account = { id: "11111111-1111-4111-8111-111111111111" as UserId } as Account;
+    const initial: ForwarderOptions = { token: "old-token" };
+    const subject = new BehaviorSubject(initial);
+    const first = simpleLoginAliasSyncStore(
+      attachSimpleLoginAliasSyncStore({ ...initial }, subject as never, account),
+    )!;
+    const second = simpleLoginAliasSyncStore(
+      attachSimpleLoginAliasSyncStore({ ...initial }, subject as never, account),
+    )!;
+    const connection = {
+      version: 1 as const,
+      connectionId: "22222222-2222-4222-8222-222222222222",
+    };
+    const firstDocument = appendAliasSyncEvent(await first.load(), {
+      kind: "connection-upsert",
+      connection,
+    });
+    const secondDocument = appendAliasSyncEvent(await second.load(), {
+      kind: "connection-remove",
+      connection,
+    });
+    subject.next({ token: "updated-token", baseUrl: "https://provider.example/" });
+
+    await Promise.all([first.save(firstDocument), second.save(secondDocument)]);
+
+    expect(subject.value).toMatchObject({
+      token: "updated-token",
+      baseUrl: "https://provider.example/",
+    });
+    expect((await first.load()).events.map((event) => event.id).sort()).toEqual(
+      [...firstDocument.events, ...secondDocument.events].map((event) => event.id).sort(),
+    );
+  });
+
   function reader(settings: ForwarderOptions) {
     const generatorService = mock<CredentialGeneratorService>();
     const subject = new BehaviorSubject(settings);

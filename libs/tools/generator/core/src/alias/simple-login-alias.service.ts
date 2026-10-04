@@ -95,18 +95,17 @@ export class SimpleLoginAliasService {
 
   async create(request: CreateSimpleLoginAliasRequest = {}): Promise<SimpleLoginAlias> {
     await this.recoverProviderOperations();
+    const hostname = normalizedHostname(request.hostname);
     const operation: AliasProviderOperation = {
       operation: "create",
       connection: { version: 1, connectionId: this.adapter.connection.connectionId },
-      request: { hostname: normalizedHostname(request.hostname) },
+      request: { hostname },
     };
     return this.journalMutation(operation, async () => {
       const alias = await this.adapter.withCreateIntent(request, () =>
         this.withClient((client) =>
           client.create({
-            hostname: normalizedHostname(request.hostname)
-              ? sensitive(normalizedHostname(request.hostname)!)
-              : undefined,
+            hostname: hostname ? sensitive(hostname) : undefined,
           }),
         ),
       );
@@ -443,7 +442,9 @@ export class SimpleLoginAliasService {
     }
     if (
       projectAliasSync(document).conflicts.some(
-        (conflict) => conflict.kind === "provider-state" || conflict.kind === "alias-identity",
+        (conflict) =>
+          (conflict.kind === "provider-state" || conflict.kind === "alias-identity") &&
+          conflict.key.startsWith(`${this.adapter.connection.connectionId}\n`),
       )
     ) {
       throw new SimpleLoginAliasError("An alias change requires conflict resolution", "conflict");
@@ -515,7 +516,17 @@ export class SimpleLoginAliasService {
       return;
     }
     const unsettled = Object.values(projectAliasSync(document).operations).filter(
-      ({ status }) => status === "prepared" || status === "dispatched" || status === "unknown",
+      ({ event, status }) => {
+        const operation = event.value;
+        const connectionId =
+          operation.operation === "create"
+            ? operation.connection.connectionId
+            : operation.alias.connectionId;
+        return (
+          connectionId === this.adapter.connection.connectionId &&
+          (status === "prepared" || status === "dispatched" || status === "unknown")
+        );
+      },
     );
     for (const pending of unsettled) {
       document = await this.recoverProviderOperation(document, pending);
@@ -593,17 +604,9 @@ export class SimpleLoginAliasService {
     const tail = previous.then(() => current);
     this.operationTail = tail;
     await previous;
-    let client: AliasClient;
+    let client: AliasClient | undefined;
     try {
       client = new AliasClient(this.adapter.connection, this.adapter);
-    } catch (error) {
-      release();
-      if (this.operationTail === tail) {
-        this.operationTail = Promise.resolve();
-      }
-      throw normalizeSimpleLoginAliasError(error);
-    }
-    try {
       return await operation(client);
     } catch (error) {
       const normalized = normalizeSimpleLoginAliasError(error);
@@ -617,7 +620,7 @@ export class SimpleLoginAliasService {
           )
         : normalized;
     } finally {
-      client.free();
+      client?.free();
       release();
       if (this.operationTail === tail) {
         this.operationTail = Promise.resolve();
