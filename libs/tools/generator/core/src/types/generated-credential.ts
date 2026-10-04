@@ -1,5 +1,7 @@
 import { Jsonify } from "type-fest";
 
+import { GeneratedCredentialMetadata } from "@bitwarden/common/tools/alias";
+
 import { CredentialType } from "../metadata";
 
 /** A credential generation result */
@@ -13,6 +15,7 @@ export class GeneratedCredential {
    *   semantics.
    * @param source traces the origin of the request that generated this credential.
    * @param website traces the website associated with the generated credential.
+   * @param metadata non-secret provider identity retained only for the immediate save flow.
    */
   constructor(
     readonly credential: string,
@@ -22,6 +25,7 @@ export class GeneratedCredential {
     generationDate: Date | number,
     readonly source?: string,
     readonly website?: string,
+    readonly metadata?: GeneratedCredentialMetadata,
   ) {
     if (typeof generationDate === "number") {
       this.generationDate = new Date(generationDate);
@@ -44,7 +48,9 @@ export class GeneratedCredential {
 
   /** Serializes a credential to a JSON-compatible object */
   toJSON() {
-    // omits the source and website because they were introduced to solve
+    // omits source, website, and provider metadata because they are transient save-flow context.
+    // In particular, an alias binding must never enter generator history serialization.
+    // source and website were introduced to solve
     // UI bugs and it's not yet known whether there's a desire to support
     // them in the generator history view.
     return {

@@ -78,7 +78,7 @@ export class ForwarderGeneratorStrategy<
 
     const create = this.createForwardingAddress(this.configuration, options);
     const result = await this.client.fetchJson(create, requestOptions);
-    return result;
+    return typeof result === "string" ? result : result.credential;
   };
 
   // per-user encrypted state

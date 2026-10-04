@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Alias browser integration registration</title>
+  </head>
+  <body>
+    <main>
+      <h1>Create integration account</h1>
+      <form id="registration" action="/registered" method="post">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required />
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" required />
+
+        <button type="submit">Create account</button>
+      </form>
+    </main>
+  </body>
+</html>

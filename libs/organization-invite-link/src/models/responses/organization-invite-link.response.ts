@@ -35,6 +35,17 @@ export class OrganizationInviteLinkResponseModel extends BaseResponse {
   }
 }
 
+type OrganizationInviteLinkData = Pick<
+  OrganizationInviteLinkResponseModel,
+  | "id"
+  | "code"
+  | "organizationId"
+  | "allowedDomains"
+  | "invite"
+  | "supportsConfirmation"
+  | "creationDate"
+>;
+
 export class OrganizationInviteLink {
   /** The unique identifier of the invite link. */
   id: string;
@@ -51,7 +62,7 @@ export class OrganizationInviteLink {
   /** The ISO-8601 date the invite link was created. */
   creationDate: string;
 
-  constructor(response: Jsonify<OrganizationInviteLinkResponseModel>) {
+  constructor(response: OrganizationInviteLinkData) {
     this.id = response.id;
     this.code = response.code;
     this.organizationId = response.organizationId;
@@ -62,7 +73,10 @@ export class OrganizationInviteLink {
   }
 
   static fromJSON(obj: Jsonify<OrganizationInviteLink>): OrganizationInviteLink {
-    return Object.assign(new OrganizationInviteLink(obj as any), obj);
+    return Object.assign(
+      new OrganizationInviteLink(obj as unknown as OrganizationInviteLinkData),
+      obj,
+    );
   }
 
   static fromSdk(obj: SdkOrganizationInviteLink): OrganizationInviteLink {

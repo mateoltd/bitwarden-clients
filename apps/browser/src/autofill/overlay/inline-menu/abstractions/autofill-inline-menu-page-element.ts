@@ -10,3 +10,7 @@ export type AutofillInlineMenuPageElementWindowMessage = {
   inlineMenuCipherId?: string;
   height?: number;
 };
+
+export type AutofillInlineMenuUserActionMessage = {
+  command: "fillEmailAlias";
+};

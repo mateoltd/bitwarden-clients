@@ -2,6 +2,7 @@ import {
   Component,
   EventEmitter,
   Input,
+  inject,
   OnChanges,
   OnDestroy,
   OnInit,
@@ -9,22 +10,50 @@ import {
   SimpleChanges,
 } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
-import { map, ReplaySubject, skip, Subject, switchAll, takeUntil, withLatestFrom } from "rxjs";
+import {
+  concatMap,
+  filter,
+  firstValueFrom,
+  map,
+  merge,
+  ReplaySubject,
+  skip,
+  Subject,
+  switchAll,
+  takeUntil,
+  withLatestFrom,
+} from "rxjs";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { Account } from "@bitwarden/common/auth/abstractions/account.service";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { SyncService } from "@bitwarden/common/platform/sync";
+import {
+  aliasConnectionKey,
+  createAliasSyncDocument,
+  projectAliasSync,
+} from "@bitwarden/common/tools/alias";
 import { VendorId } from "@bitwarden/common/tools/extension";
+import { Vendor } from "@bitwarden/common/tools/extension/vendor/data";
+import { UserStateSubject } from "@bitwarden/common/tools/state/user-state-subject";
+import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import {
   FormFieldModule,
   AriaDisableDirective,
   TooltipDirective,
   BitIconButtonComponent,
   CheckboxModule,
+  ToastService,
 } from "@bitwarden/components";
 import {
   CredentialGeneratorService,
+  attachSimpleLoginAliasSyncStore,
+  createSimpleLoginAliasService,
+  createSimpleLoginConnectionId,
   ForwarderOptions,
   GeneratorMetadata,
+  isSimpleLoginConnectionId,
+  simpleLoginAliasSyncStore,
 } from "@bitwarden/generator-core";
 import { I18nPipe } from "@bitwarden/ui-common";
 
@@ -53,6 +82,10 @@ const Controls = Object.freeze({
   ],
 })
 export class ForwarderSettingsComponent implements OnInit, OnChanges, OnDestroy {
+  private readonly toastService = inject(ToastService);
+  private readonly i18nService = inject(I18nService);
+  private readonly cipherService = inject(CipherService, { optional: true }) ?? undefined;
+  private readonly syncService = inject(SyncService, { optional: true }) ?? undefined;
   /** Instantiates the component
    *  @param generatorService settings and policy logic
    *  @param formBuilder reactive form controls
@@ -149,12 +182,121 @@ export class ForwarderSettingsComponent implements OnInit, OnChanges, OnDestroy 
 
     // now that outputs are set up, connect inputs
     this.saveSettings
-      .pipe(withLatestFrom(this.settings.valueChanges, settings$), takeUntil(this.destroyed$))
-      .subscribe(([, value, settings]) => {
-        // convert prefix boolean back to sentinel string for the settings store
-        const saveValues = { ...value, prefix: (value as any).prefix ? "website" : "" };
-        settings.next(saveValues as ForwarderOptions);
-      });
+      .pipe(
+        withLatestFrom(this.settings.valueChanges, this.account$, this.vendor),
+        concatMap(async ([, value, account, vendor]) => {
+          if (
+            this.componentDestroyed ||
+            this.account?.id !== account.id ||
+            this.forwarder !== vendor
+          ) {
+            return;
+          }
+          // Bind each save to the account that requested it, even if the component switches
+          // accounts while a connection removal is syncing its encrypted carrier.
+          const cancelled$ = merge(
+            this.destroyed$,
+            this.account$.pipe(filter((active) => active.id !== account.id)),
+            this.vendor.pipe(filter((active) => active !== vendor)),
+          );
+          const account$ = new ReplaySubject<Account>(1);
+          account$.next(account);
+          let settings: UserStateSubject<ForwarderOptions> | undefined;
+          try {
+            settings = this.generatorService.settings<ForwarderOptions>(
+              this.generatorService.forwarder(vendor),
+              { account$ },
+            );
+            const current = await firstValueFrom(settings.pipe(takeUntil(cancelled$)));
+            const saveValues: ForwarderOptions = {
+              ...current,
+              domain: value.domain ?? undefined,
+              token: value.token ?? undefined,
+              baseUrl: value.baseUrl ?? undefined,
+              prefix: value.prefix ? "website" : "",
+            };
+            const removedConnection =
+              vendor === Vendor.simplelogin &&
+              current.aliasSync &&
+              isSimpleLoginConnectionId(current.connectionId) &&
+              projectAliasSync(current.aliasSync).connections[
+                aliasConnectionKey({ version: 1, connectionId: current.connectionId })
+              ]?.status === "removed";
+            if (
+              vendor === Vendor.simplelogin &&
+              saveValues.token?.trim() &&
+              (!current.token?.trim() ||
+                !isSimpleLoginConnectionId(current.connectionId) ||
+                removedConnection)
+            ) {
+              // Reconnecting is a new identity. The old carrier retains its terminal tombstone.
+              saveValues.connectionId = createSimpleLoginConnectionId();
+              saveValues.aliasSync = createAliasSyncDocument();
+            }
+            if (
+              vendor === Vendor.simplelogin &&
+              current.token?.trim() &&
+              !saveValues.token?.trim() &&
+              isSimpleLoginConnectionId(current.connectionId)
+            ) {
+              const settingsWithSync = attachSimpleLoginAliasSyncStore(
+                current,
+                settings,
+                account,
+                this.cipherService,
+                this.syncService,
+              );
+              const lifecycle = createSimpleLoginAliasService({
+                token: current.token,
+                baseUrl: current.baseUrl,
+                connectionId: current.connectionId,
+                syncStore: simpleLoginAliasSyncStore(settingsWithSync),
+              });
+              saveValues.aliasSync = (await lifecycle.removeConnection()) ?? current.aliasSync;
+            }
+            if (
+              !this.componentDestroyed &&
+              this.account?.id === account.id &&
+              this.forwarder === vendor
+            ) {
+              // The settings subject persists asynchronously. Keep it alive until storage emits.
+              const saved = firstValueFrom(
+                settings.pipe(
+                  skip(1),
+                  filter((stored) =>
+                    Object.entries(saveValues).every(
+                      ([key, value]) =>
+                        JSON.stringify(stored[key as keyof ForwarderOptions]) ===
+                        JSON.stringify(value),
+                    ),
+                  ),
+                  takeUntil(cancelled$),
+                ),
+              );
+              settings.next(saveValues);
+              await saved;
+            }
+          } catch {
+            // Do not terminate the save stream or expose provider responses and credentials.
+            if (
+              !this.componentDestroyed &&
+              this.account?.id === account.id &&
+              this.forwarder === vendor
+            ) {
+              this.toastService.showToast({
+                variant: "error",
+                title: "",
+                message: this.i18nService.t("unexpectedError"),
+              });
+            }
+          } finally {
+            settings?.complete();
+            account$.complete();
+          }
+        }),
+        takeUntil(this.destroyed$),
+      )
+      .subscribe();
   }
 
   private saveSettings = new Subject<string>();
@@ -181,7 +323,9 @@ export class ForwarderSettingsComponent implements OnInit, OnChanges, OnDestroy 
   private readonly refresh$ = new Subject<void>();
 
   private readonly destroyed$ = new Subject<void>();
+  private componentDestroyed = false;
   ngOnDestroy(): void {
+    this.componentDestroyed = true;
     this.destroyed$.next();
     this.destroyed$.complete();
   }

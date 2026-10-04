@@ -115,7 +115,7 @@ jobs:
         id: get-current-sdk
         run: |
           CURRENT_SDK_VERSION=$(git show origin/$_BASE_BRANCH:package.json | jq -r '.dependencies."@bitwarden/sdk-internal" // empty')
-          CURRENT_COMMERCIAL_VERSION=$(git show origin/$_BASE_BRANCH:package.json | jq -r '.dependencies."@bitwarden/commercial-sdk-internal" // empty')
+          CURRENT_COMMERCIAL_VERSION=$(git show origin/$_BASE_BRANCH:release/commercial-sdk-overlay.json | jq -r '.package.version // empty')
 
           if [ -z "$CURRENT_SDK_VERSION" ]; then
             echo "::warning::Could not find current @bitwarden/sdk-internal version"
@@ -243,9 +243,14 @@ jobs:
       - name: Update SDK versions
         run: |
           echo "📦 Installing SDK version: $_SDK_VERSION"
-          npm install --save-exact @bitwarden/sdk-internal@$_SDK_VERSION
-          npm install --save-exact @bitwarden/commercial-sdk-internal@$_SDK_VERSION
-          echo "✅ SDK packages updated in package.json"
+          npm install --save-exact "@bitwarden/sdk-internal@$_SDK_VERSION"
+          COMMERCIAL_TARBALL=$(npm view "@bitwarden/commercial-sdk-internal@$_SDK_VERSION" dist.tarball)
+          COMMERCIAL_INTEGRITY=$(npm view "@bitwarden/commercial-sdk-internal@$_SDK_VERSION" dist.integrity)
+          jq --arg version "$_SDK_VERSION" --arg tarball "$COMMERCIAL_TARBALL" --arg integrity "$COMMERCIAL_INTEGRITY" \
+            '.package.version = $version | .package.registryTarball = $tarball | .package.integrity = $integrity' \
+            release/commercial-sdk-overlay.json > release/commercial-sdk-overlay.json.tmp
+          mv release/commercial-sdk-overlay.json.tmp release/commercial-sdk-overlay.json
+          echo "✅ Public SDK package and commercial overlay updated"
 
       - name: Generate changelog
         id: changelog
@@ -428,9 +433,14 @@ jobs:
           SDK_VERSION: ${{ inputs.sdk-version }}
         run: |
           echo "📦 Installing SDK version: $SDK_VERSION"
-          npm install --save-exact @bitwarden/sdk-internal@$SDK_VERSION
-          npm install --save-exact @bitwarden/commercial-sdk-internal@$SDK_VERSION
-          echo "✅ SDK packages updated in package.json"
+          npm install --save-exact "@bitwarden/sdk-internal@$SDK_VERSION"
+          COMMERCIAL_TARBALL=$(npm view "@bitwarden/commercial-sdk-internal@$SDK_VERSION" dist.tarball)
+          COMMERCIAL_INTEGRITY=$(npm view "@bitwarden/commercial-sdk-internal@$SDK_VERSION" dist.integrity)
+          jq --arg version "$SDK_VERSION" --arg tarball "$COMMERCIAL_TARBALL" --arg integrity "$COMMERCIAL_INTEGRITY" \
+            '.package.version = $version | .package.registryTarball = $tarball | .package.integrity = $integrity' \
+            release/commercial-sdk-overlay.json > release/commercial-sdk-overlay.json.tmp
+          mv release/commercial-sdk-overlay.json.tmp release/commercial-sdk-overlay.json
+          echo "✅ Public SDK package and commercial overlay updated"
 
       - name: Test summary
         env:

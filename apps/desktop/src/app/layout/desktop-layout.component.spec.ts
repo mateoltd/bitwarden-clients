@@ -192,7 +192,7 @@ describe("DesktopLayoutComponent", () => {
     it("renders the current navigation unchanged", () => {
       expect(fixture.nativeElement.querySelector("app-vault-filter")).toBeTruthy();
       expect(fixture.nativeElement.querySelector("app-send-filters-nav")).toBeTruthy();
-      expect(navText()).toEqual(["generator", "importNoun", "exportNoun"]);
+      expect(navText()).toEqual(["generator", "emailAliases", "importNoun", "exportNoun"]);
     });
   });
 
@@ -211,6 +211,7 @@ describe("DesktopLayoutComponent", () => {
         "Acme",
         "tools",
         "generator",
+        "emailAliases",
         "exportNoun",
         "manage",
         "myFolders",

@@ -62,6 +62,7 @@ import { MessagingService } from "@bitwarden/common/platform/abstractions/messag
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { SyncService } from "@bitwarden/common/platform/sync";
+import { EmailAliasIdentity } from "@bitwarden/common/tools/alias";
 import { CipherId, OrganizationId, UserId, CollectionId } from "@bitwarden/common/types/guid";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -1212,10 +1213,14 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
       }
       await this.activeDrawerRef.close();
     }
+    let requestedAlias: EmailAliasIdentity | undefined;
     const drawerRef = await VaultItemDialogComponent.openDrawer(this.dialogService, {
       mode,
       formConfig,
       restore: this.restore,
+      onManageAlias: (alias) => {
+        requestedAlias = alias;
+      },
     });
     this.activeDrawerRef = drawerRef;
     drawerRef?.closed.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((result) => {
@@ -1226,11 +1231,20 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
         this.activeDrawerRef = undefined;
         this.cipher.set(null);
       }
-      void this.router.navigate([], {
-        queryParams: { action: null, itemId: null },
-        queryParamsHandling: "merge",
-        replaceUrl: true,
-      });
+      if (requestedAlias) {
+        void this.router.navigate(["/aliases"], {
+          queryParams: {
+            aliasId: requestedAlias.aliasId,
+            connectionId: requestedAlias.connectionId,
+          },
+        });
+      } else {
+        void this.router.navigate([], {
+          queryParams: { action: null, itemId: null },
+          queryParamsHandling: "merge",
+          replaceUrl: true,
+        });
+      }
       if (result === VaultItemDialogResult.Saved || result === VaultItemDialogResult.Deleted) {
         this.refresh();
       }

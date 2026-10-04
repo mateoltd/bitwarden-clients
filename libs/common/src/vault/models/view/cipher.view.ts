@@ -13,6 +13,11 @@ import { asUuid, uuidAsString } from "../../../platform/abstractions/sdk/sdk.ser
 import { InitializerMetadata } from "../../../platform/interfaces/initializer-metadata.interface";
 import { InitializerKey } from "../../../platform/services/cryptography/initializer-key";
 import { DeepJsonify } from "../../../types/deep-jsonify";
+import {
+  AliasBinding,
+  bindAliasReferenceToSdkCipher,
+  hydrateAliasBinding,
+} from "../../alias-binding";
 import { CipherType, LinkedIdType } from "../../enums";
 import { CipherRepromptType } from "../../enums/cipher-reprompt-type";
 import { CipherPermissionsApi } from "../api/cipher-permissions.api";
@@ -57,6 +62,8 @@ export class CipherView implements View, InitializerMetadata {
   passport = new PassportView();
   attachments: AttachmentView[] = [];
   fields: FieldView[] = [];
+  /** Provider-neutral alias identity extracted from the encrypted first-class login member. */
+  aliasBinding?: AliasBinding;
   passwordHistory: PasswordHistoryView[] = [];
   collectionIds: string[] = [];
   revisionDate: Date;
@@ -279,6 +286,8 @@ export class CipherView implements View, InitializerMetadata {
         break;
     }
 
+    hydrateAliasBinding(view, obj.aliasBinding);
+
     return view;
   }
 
@@ -369,6 +378,8 @@ export class CipherView implements View, InitializerMetadata {
         break;
     }
 
+    hydrateAliasBinding(cipherView, obj.login?.aliasReference);
+
     return cipherView;
   }
 
@@ -378,6 +389,7 @@ export class CipherView implements View, InitializerMetadata {
    * @returns {CipherCreateRequest} The SDK cipher create request object
    */
   toSdkCreateCipherRequest(): CipherCreateRequest {
+    const sdkCipherView = this.toSdkCipherView();
     const sdkCipherCreateRequest: CipherCreateRequest = {
       organizationId: this.organizationId ? asUuid(this.organizationId) : undefined,
       collectionIds: this.collectionIds ? this.collectionIds.map((i) => asUuid(i)) : [],
@@ -386,8 +398,8 @@ export class CipherView implements View, InitializerMetadata {
       notes: this.notes,
       favorite: this.favorite ?? false,
       reprompt: this.reprompt ?? CipherRepromptType.None,
-      fields: this.fields?.map((f) => f.toSdkFieldView()),
-      type: this.getSdkCipherViewType(),
+      fields: sdkCipherView.fields ?? [],
+      type: this.getSdkCipherViewType(sdkCipherView),
       archivedDate: this.archivedDate?.toISOString(),
     };
 
@@ -400,6 +412,7 @@ export class CipherView implements View, InitializerMetadata {
    * @returns {CipherEditRequest} The SDK cipher edit request object
    */
   toSdkUpdateCipherRequest(): CipherEditRequest {
+    const sdkCipherView = this.toSdkCipherView();
     const sdkCipherEditRequest: CipherEditRequest = {
       id: asUuid(this.id),
       organizationId: this.organizationId ? asUuid(this.organizationId) : undefined,
@@ -408,8 +421,8 @@ export class CipherView implements View, InitializerMetadata {
       notes: this.notes,
       favorite: this.favorite ?? false,
       reprompt: this.reprompt ?? CipherRepromptType.None,
-      fields: this.fields?.map((f) => f.toSdkFieldView()),
-      type: this.getSdkCipherViewType(),
+      fields: sdkCipherView.fields ?? [],
+      type: this.getSdkCipherViewType(sdkCipherView),
       revisionDate: this.revisionDate?.toISOString(),
       archivedDate: this.archivedDate?.toISOString(),
       attachments: this.attachments?.map((a) => a.toSdkAttachmentView()),
@@ -437,34 +450,42 @@ export class CipherView implements View, InitializerMetadata {
   /**
    * Returns the SDK CipherViewType object for the cipher.
    *
-   * @returns {CipherViewType} The SDK CipherViewType for the cipher.t
+   * @param sdkCipherView A prepared SDK view whose login may contain SDK-bound resources.
+   * @returns {CipherViewType} The SDK CipherViewType for the cipher.
    */
-  getSdkCipherViewType(): CipherViewType {
+  getSdkCipherViewType(sdkCipherView?: SdkCipherView): CipherViewType {
     let viewType: CipherViewType;
     switch (this.type) {
       case CipherType.Card:
-        viewType = { card: this.card?.toSdkCardView() };
+        viewType = { card: sdkCipherView?.card ?? this.card?.toSdkCardView() };
         break;
       case CipherType.Identity:
-        viewType = { identity: this.identity?.toSdkIdentityView() };
+        viewType = { identity: sdkCipherView?.identity ?? this.identity?.toSdkIdentityView() };
         break;
       case CipherType.Login:
-        viewType = { login: this.login?.toSdkLoginView() };
+        viewType = { login: sdkCipherView?.login ?? this.login?.toSdkLoginView() };
         break;
       case CipherType.SecureNote:
-        viewType = { secureNote: this.secureNote?.toSdkSecureNoteView() };
+        viewType = {
+          secureNote: sdkCipherView?.secureNote ?? this.secureNote?.toSdkSecureNoteView(),
+        };
         break;
       case CipherType.SshKey:
-        viewType = { sshKey: this.sshKey?.toSdkSshKeyView() };
+        viewType = { sshKey: sdkCipherView?.sshKey ?? this.sshKey?.toSdkSshKeyView() };
         break;
       case CipherType.BankAccount:
-        viewType = { bankAccount: this.bankAccount?.toSdkBankAccountView() };
+        viewType = {
+          bankAccount: sdkCipherView?.bankAccount ?? this.bankAccount?.toSdkBankAccountView(),
+        };
         break;
       case CipherType.DriversLicense:
-        viewType = { driversLicense: this.driversLicense?.toSdkDriversLicenseView() };
+        viewType = {
+          driversLicense:
+            sdkCipherView?.driversLicense ?? this.driversLicense?.toSdkDriversLicenseView(),
+        };
         break;
       case CipherType.Passport:
-        viewType = { passport: this.passport?.toSdkPassportView() };
+        viewType = { passport: sdkCipherView?.passport ?? this.passport?.toSdkPassportView() };
         break;
       default:
         viewType = {
@@ -548,6 +569,6 @@ export class CipherView implements View, InitializerMetadata {
         break;
     }
 
-    return sdkCipherView;
+    return bindAliasReferenceToSdkCipher(this, sdkCipherView);
   }
 }

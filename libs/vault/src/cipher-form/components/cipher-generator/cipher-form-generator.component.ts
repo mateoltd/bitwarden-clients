@@ -46,7 +46,7 @@ export class CipherFormGeneratorComponent {
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-output-emitter-ref
   @Output()
-  valueGenerated = new EventEmitter<string>();
+  valueGenerated = new EventEmitter<GeneratedCredential>();
 
   /** Event handler for when an algorithm is selected */
   onAlgorithmSelected = (selected: AlgorithmInfo) => {
@@ -55,6 +55,6 @@ export class CipherFormGeneratorComponent {
 
   /** Event handler for both generation components */
   onCredentialGenerated = (generatedCred: GeneratedCredential) => {
-    this.valueGenerated.emit(generatedCred.credential);
+    this.valueGenerated.emit(generatedCred);
   };
 }

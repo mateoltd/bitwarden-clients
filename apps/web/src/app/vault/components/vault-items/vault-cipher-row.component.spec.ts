@@ -1,3 +1,4 @@
+import { OverlayContainer } from "@angular/cdk/overlay";
 import { CommonModule } from "@angular/common";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { RouterModule } from "@angular/router";
@@ -24,6 +25,7 @@ import {
   CopyCipherFieldService,
   OrganizationNameBadgeComponent,
   VaultCopyButtonsService,
+  VaultItemCopyActionsComponent,
 } from "@bitwarden/vault";
 
 import { VaultCipherRowComponent } from "./vault-cipher-row.component";
@@ -60,6 +62,7 @@ describe("VaultCipherRowComponent", () => {
         OrganizationNameBadgeComponent,
         PremiumBadgeComponent,
         ShareLinkMenuItemDirective,
+        VaultItemCopyActionsComponent,
       ],
       providers: [
         { provide: I18nService, useValue: { t: (key: string) => key } },
@@ -105,6 +108,32 @@ describe("VaultCipherRowComponent", () => {
   afterAll(() => {
     // eslint-disable-next-line no-console
     console.error = originalError;
+  });
+
+  it("renders a stable-ID management route for a bound email alias", () => {
+    const cipher = new CipherView();
+    cipher.id = "cipher-1";
+    cipher.name = "Test Login";
+    cipher.type = CipherType.Login;
+    cipher.aliasBinding = {
+      version: 1,
+      connectionId: "11111111-1111-4111-8111-111111111111",
+      aliasId: "42",
+      address: "bound@sl.example",
+    };
+    component.cipher = cipher;
+    component.disabled = false;
+    fixture.detectChanges();
+    const menuTrigger = fixture.nativeElement.querySelector(
+      'button[biticonbutton="bwi-ellipsis-v"]',
+    ) as HTMLButtonElement;
+    expect(menuTrigger).toBeTruthy();
+    menuTrigger.click();
+    fixture.detectChanges();
+    const overlayContent = TestBed.inject(OverlayContainer).getContainerElement().innerHTML;
+    expect(overlayContent).toContain("manageEmailAlias");
+    expect(overlayContent).toContain("/tools/aliases?aliasId=42");
+    expect(overlayContent).toContain(`connectionId=${cipher.aliasBinding.connectionId}`);
   });
 
   describe("showAssignToCollections", () => {

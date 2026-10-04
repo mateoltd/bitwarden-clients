@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 3,
+  "aliasReferenceSchemaVersion": 1,
+  "sourceCommit": "5562c7eafe6826594e4096d6d0d77ac9668b8bfe",
+  "releaseVersion": "0.3.0-alias-provider-neutral.2",
+  "releaseChannel": "unreleased-prerelease",
+  "candidatePolicy": {
+    "registriesPublished": false,
+    "gitTagCreated": false,
+    "githubReleaseCreated": false
+  },
+  "integrationBase": "b904fe4629d8cecd9edf63440149297e185d4fa1",
+  "previousPublicAliasHead": "4a08b5fe81c363169d36f582cc13c03b59d212d8",
+  "upstreamBase": "167d44eca79020334618607f53f1db366f70ffe4",
+  "providerPin": {
+    "adapterId": "simplelogin",
+    "repository": "https://github.com/simple-login/app.git",
+    "commit": "dbc45fcce4e8e6b4fa615cc729ca95a67bf75266"
+  },
+  "clientsContract": {
+    "repository": "https://github.com/mateoltd/bitwarden-clients.git",
+    "branch": "integration/alias-clients-launch-20260926",
+    "commit": "018085075bfb18421bb22e7793360a6fd762da1d",
+    "node": ">=24.17.0",
+    "typescript": "5.9.3",
+    "compilerOptions": {
+      "strict": false,
+      "moduleResolution": "bundler",
+      "noImplicitAny": true,
+      "target": "ES2016",
+      "module": "ES2020",
+      "lib": [
+        "es5",
+        "es6",
+        "es7",
+        "dom",
+        "ES2021",
+        "ESNext.Disposable"
+      ],
+      "allowSyntheticDefaultImports": true,
+      "resolveJsonModule": true,
+      "skipLibCheck": true,
+      "useDefineForClassFields": false
+    },
+    "stockSdkVersion": "0.2.0-main.1051"
+  },
+  "iosIntegrationContract": {
+    "repository": "https://github.com/mateoltd/ios.git",
+    "branch": "feat/first-class-aliases",
+    "commit": "736a85b5d3f2afbdb46b61b7698ebd0828e7481d",
+    "currentSdkSwift": {
+      "repository": "https://github.com/mateoltd/sdk-swift",
+      "commit": "858d31ac18214e47c5264fc73da8c9885565bda0"
+    },
+    "requiredArtifact": "swift",
+    "aliasReferenceSchemaVersion": 1,
+    "integrationStatus": "requires-provider-neutral-repin"
+  },
+  "packages": {
+    "typescriptWasm": {
+      "name": "@bitwarden/sdk-internal",
+      "version": "0.3.0-alias-provider-neutral.2",
+      "aliasReferenceSchemaVersion": 1,
+      "format": "npm-tarball",
+      "artifact": {
+        "path": "artifacts/alias-sdk-typescript/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.2.tgz",
+        "bytes": 11252698,
+        "sha256": "d294d0e22b8627f61f2c7faa2c90baf44c2def92fbf0d7230aac574656df8470"
+      }
+    }
+  },
+  "evidence": {
+    "sbom": {
+      "path": "SBOM.cdx.json",
+      "bytes": 557108,
+      "sha256": "b9e56c3e4c65143b1ba565ae5d274795086299909ca0d8c6155a153fdc273176"
+    },
+    "dependencyAudit": {
+      "path": "artifacts/alias-sdk-assurance/AUDIT-REPORT.json",
+      "bytes": 1539,
+      "sha256": "7fb982d5d9f048cd1e015956abf619377954b3c6c8ad59862127a81038e671ad"
+    },
+    "acceptedAuditRisks": [
+      {
+        "advisoryId": "RUSTSEC-2023-0071",
+        "package": "rsa",
+        "version": "0.10.0-rc.18",
+        "dependencyPath": "bitwarden-crypto -> rsa",
+        "reviewedOn": "2026-08-14",
+        "expiresOn": "2026-10-01",
+        "riskOwner": "SDK Security Engineering",
+        "rationale": "RustSec lists no patched rsa release. Alias operations do not invoke RSA private-key operations, and SDK private-key operations execute on the local client without an alias-provider timing oracle.",
+        "limitation": "This exception does not cover a consumer that exposes SDK RSA private-key timing to a remote observer. Replace or re-assess the dependency before this date or when a constant-time release becomes available."
+      }
+    ],
+    "apiReports": {
+      "alias-sdk-typescript": {
+        "path": "artifacts/alias-sdk-typescript/API-REPORT.txt",
+        "bytes": 579735,
+        "sha256": "3e2b2ba032987f3e85f52ee964dc099b7bc30c1daddf6d6256bb9bb1be1d3f8d"
+      }
+    },
+    "reproducibility": {
+      "alias-sdk-typescript": {
+        "path": "artifacts/alias-sdk-typescript/REPRODUCIBILITY.txt",
+        "bytes": 90,
+        "sha256": "832d99afa65d2cea1c9b214a603ad5af517202603e60a55246f4ed9808d56c8b"
+      }
+    }
+  },
+  "provenance": {
+    "sourceRepository": "https://github.com/mateoltd/bitwarden-sdk-internal",
+    "builderId": "https://github.com/mateoltd/bitwarden-sdk-internal/actions/runs/36289197668/attempts/1",
+    "workflowRef": "mateoltd/bitwarden-sdk-internal/.github/workflows/alias-sdk-release.yml@refs/heads/integration/alias-sdk-launch-20260926",
+    "eventName": "push",
+    "keylessAttestation": {
+      "issuer": "https://token.actions.githubusercontent.com",
+      "strategy": "GitHub artifact attestation over every candidate file",
+      "verification": "gh attestation verify --repo mateoltd/bitwarden-sdk-internal <candidate-file>"
+    }
+  },
+  "requiredClientIntegrationSteps": [
+    {
+      "id": "verify-source-and-artifact",
+      "platforms": [
+        "typescriptWasm",
+        "swift",
+        "kotlinJvm",
+        "android"
+      ],
+      "instruction": "Verify the selected artifact SHA-256 and source commit against this handoff manifest before integrating it."
+    },
+    {
+      "id": "typescript-wasm-package",
+      "platforms": [
+        "typescriptWasm"
+      ],
+      "instruction": "Install the exact .tgz as @bitwarden/sdk-internal, keep the existing WASM initialization path, and remove any client-local alias lifecycle or alias-reference implementation."
+    },
+    {
+      "id": "swift-package",
+      "platforms": [
+        "swift"
+      ],
+      "instruction": "Extract the Swift archive, consume its BitwardenSdk package and BitwardenFFI.xcframework together, and remove any separately generated alias bindings."
+    },
+    {
+      "id": "kotlin-jvm-package",
+      "platforms": [
+        "kotlinJvm"
+      ],
+      "instruction": "Place the versioned JAR and matching host native library on the same runtime path, then remove any separately generated alias bindings."
+    },
+    {
+      "id": "android-package",
+      "platforms": [
+        "android"
+      ],
+      "instruction": "Add the versioned AAR as the sole Android SDK binary and remove any separately generated alias bindings or native libraries."
+    },
+    {
+      "id": "current-reference-schema",
+      "platforms": [
+        "typescriptWasm",
+        "swift",
+        "kotlinJvm",
+        "android"
+      ],
+      "instruction": "Persist only the SDK's canonical alias reference schema version 1: version, connectionId, opaque bounded aliasId, and canonical address. Reject missing, zero, malformed, provider-specific, and unknown future shapes; do not migrate old unreleased values or infer bindings from usernames or addresses."
+    },
+    {
+      "id": "encrypted-connection-metadata",
+      "platforms": [
+        "typescriptWasm",
+        "swift",
+        "kotlinJvm",
+        "android"
+      ],
+      "instruction": "Store adapter identifiers, endpoints, labels, capabilities, and credentials only in the encrypted connection record. Never copy them into alias references, vault bindings, journals, telemetry, or logs."
+    },
+    {
+      "id": "provider-pin",
+      "platforms": [
+        "typescriptWasm",
+        "swift",
+        "kotlinJvm",
+        "android"
+      ],
+      "instruction": "Use the provider commit recorded in providerPin when reproducing the real SimpleLogin lifecycle gate."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "artifacts/alias-sdk-assurance/AUDIT-REPORT.json",
+      "bytes": 1539,
+      "sha256": "7fb982d5d9f048cd1e015956abf619377954b3c6c8ad59862127a81038e671ad"
+    },
+    {
+      "path": "artifacts/alias-sdk-assurance/AUDIT-TOOL-STATUS.txt",
+      "bytes": 36,
+      "sha256": "effb6c09c8826e5c5d3da4f3371db974fc44913897953354516c1384844474d2"
+    },
+    {
+      "path": "artifacts/alias-sdk-typescript/ALIAS_REFERENCE_SCHEMA_VERSION",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "artifacts/alias-sdk-typescript/API-REPORT.txt",
+      "bytes": 579735,
+      "sha256": "3e2b2ba032987f3e85f52ee964dc099b7bc30c1daddf6d6256bb9bb1be1d3f8d"
+    },
+    {
+      "path": "artifacts/alias-sdk-typescript/BUILD-ENVIRONMENT.txt",
+      "bytes": 180,
+      "sha256": "e9264476d59ca495b38984afd09d0dad9bd0d30d4beb7b6ced32c3aae0a28849"
+    },
+    {
+      "path": "artifacts/alias-sdk-typescript/PACKAGE_VERSION",
+      "bytes": 31,
+      "sha256": "4d6e4d41f026aa95c9854c39bd2c3b83b5642da81db83c183786cb1419dbb723"
+    },
+    {
+      "path": "artifacts/alias-sdk-typescript/REPRODUCIBILITY.txt",
+      "bytes": 90,
+      "sha256": "832d99afa65d2cea1c9b214a603ad5af517202603e60a55246f4ed9808d56c8b"
+    },
+    {
+      "path": "artifacts/alias-sdk-typescript/VERSION",
+      "bytes": 41,
+      "sha256": "94a512b4a295b3fdc0852c1dfcf2bb72445e3d4b6dd81ae0065af91aa5de89ab"
+    },
+    {
+      "path": "artifacts/alias-sdk-typescript/bitwarden-sdk-internal-0.3.0-alias-provider-neutral.2.tgz",
+      "bytes": 11252698,
+      "sha256": "d294d0e22b8627f61f2c7faa2c90baf44c2def92fbf0d7230aac574656df8470"
+    }
+  ]
+}
