@@ -5,6 +5,7 @@ import { ActivatedRoute, convertToParamMap, Router } from "@angular/router";
 import { mock, MockProxy } from "jest-mock-extended";
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { parseEmailAliasIdentity } from "@bitwarden/common/tools/alias";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { DialogService, ToastService } from "@bitwarden/components";
 import {
@@ -44,6 +45,12 @@ function makeAlias(overrides: Partial<SimpleLoginAlias> = {}): SimpleLoginAlias 
     pgpDisabled: false,
     mailboxes: [],
     latestActivity: null,
+    identity: parseEmailAliasIdentity({
+      version: 1,
+      connectionId: "11111111-1111-4111-8111-111111111111",
+      aliasId: String(overrides.id ?? 42),
+      address: overrides.address ?? "desktop-alias@sl.test",
+    })!,
     ...overrides,
   };
 }
