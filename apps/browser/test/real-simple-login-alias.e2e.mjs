@@ -1027,9 +1027,10 @@ function closeServer(server) {
 async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectionId) {
   // A fresh browser context receives the saved login only through the real vault sync API.
   const browser = await chromium.launch({ executablePath: browserExecutable, headless: false });
+  let page;
   try {
     const webContext = await browser.newContext({ ignoreHTTPSErrors: true });
-    const page = await webContext.newPage();
+    page = await webContext.newPage();
     page.setDefaultTimeout(30_000);
     const webUrl = new URL(process.env.WEB_URL);
     await page.goto(new URL("#/login", webUrl).toString());
@@ -1043,8 +1044,6 @@ async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectio
       await page.getByRole("dialog").getByText("Skip to web app", { exact: true }).click();
     }
     await page.waitForURL(/#\/vault$/, { timeout: 60_000 });
-    const row = page.getByRole("row").filter({ hasText: marker });
-    await row.waitFor();
     // The optional install prompt checks for an extension asynchronously after vault navigation.
     const extensionPrompt = page.locator("web-vault-extension-prompt-dialog");
     try {
@@ -1056,6 +1055,8 @@ async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectio
       await extensionPrompt.getByRole("button", { name: "Skip", exact: true }).click();
       await extensionPrompt.waitFor({ state: "hidden" });
     }
+    const row = page.getByRole("row").filter({ hasText: marker });
+    await row.waitFor();
     assert.equal((await row.innerText()).includes(aliasAddress), true);
     await row.getByRole("button", { name: "More options", exact: true }).click();
     const link = page.getByRole("menuitem").filter({ hasText: /Manage.*alias/i });
@@ -1081,6 +1082,9 @@ async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectio
     await detail.getByRole("button", { name: "Disable", exact: true }).waitFor();
     await captureEvidence(page, "alias-web-recovered-management.png", detail);
     console.log("REAL_WEB_BOUND_CONNECTION_RECOVERY");
+  } catch (error) {
+    if (page) await captureEvidence(page, "alias-web-failure-masked.png");
+    throw error;
   } finally {
     await browser.close();
   }
