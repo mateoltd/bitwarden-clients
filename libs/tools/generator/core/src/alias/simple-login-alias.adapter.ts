@@ -179,9 +179,7 @@ function adapterFailure(error: unknown, mutation: boolean): AliasAdapterFailure 
       code = "sync-conflict";
       break;
     case "invalid-response":
-      // A rejected response does not prove a mutation was rejected by the provider. Keep its
-      // journal unresolved so a retry cannot create another identity after a successful POST.
-      code = mutation ? "outcome-unknown" : "invalid-response";
+      code = "invalid-response";
       break;
     default:
       code = mutation ? "outcome-unknown" : "offline";
@@ -377,11 +375,13 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
     if (Object.keys(body).length === 0) {
       throw new SimpleLoginAliasError("SimpleLogin update is empty", "invalid-response");
     }
-    const response = record(await this.request("PATCH", `api/aliases/${id}`, body, true), "update");
-    if (response.ok !== true) {
-      throw invalidResponse("alias update response");
-    }
-    return this.getNative(String(id));
+    const value = await this.request("PATCH", `api/aliases/${id}`, body, true);
+    return this.mutationResult(async () => {
+      if (record(value, "update").ok !== true) {
+        throw invalidResponse("alias update response");
+      }
+      return this.getNative(String(id));
+    });
   }
 
   async domains(): Promise<SimpleLoginAliasDomain[]> {
@@ -419,21 +419,24 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
     recipient: string,
   ): Promise<NativeSimpleLoginContact> {
     const aliasId = this.numericIdentity(identity);
-    return this.parseContact(
-      await this.request("POST", `api/aliases/${aliasId}/contacts`, { contact: recipient }, true),
+    const value = await this.request(
+      "POST",
+      `api/aliases/${aliasId}/contacts`,
+      { contact: recipient },
+      true,
     );
+    return this.mutationResult(() => this.parseContact(value));
   }
 
   async deleteContact(contactId: string): Promise<void> {
     const id = this.numericId(contactId, "contact id");
-    const response = record(
-      await this.request("DELETE", `api/contacts/${id}`, undefined, true),
-      "delete",
-    );
-    if (response.deleted !== true) {
-      throw invalidResponse("contact deletion response");
-    }
-    this.contacts.delete(String(id));
+    const value = await this.request("DELETE", `api/contacts/${id}`, undefined, true);
+    await this.mutationResult(() => {
+      if (record(value, "delete").deleted !== true) {
+        throw invalidResponse("contact deletion response");
+      }
+      this.contacts.delete(String(id));
+    });
   }
 
   async create(request: CreateAliasRequest): Promise<AliasAdapterResult<Alias>> {
@@ -474,7 +477,7 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
             undefined,
             true,
           );
-          current = await this.getNative(identity.aliasId);
+          current = await this.mutationResult(() => this.getNative(identity.aliasId));
         }
         if (current.enabled !== enabled) {
           throw new SimpleLoginAliasError("SimpleLogin state did not converge", "conflict");
@@ -488,13 +491,12 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
     return this.result(true, async (): Promise<DeleteAliasResult> => {
       const id = this.numericIdentity(identity);
       try {
-        const response = record(
-          await this.request("DELETE", `api/aliases/${id}`, undefined, true),
-          "alias deletion",
-        );
-        if (response.deleted !== true) {
-          throw invalidResponse("alias deletion response");
-        }
+        const value = await this.request("DELETE", `api/aliases/${id}`, undefined, true);
+        await this.mutationResult(() => {
+          if (record(value, "alias deletion").deleted !== true) {
+            throw invalidResponse("alias deletion response");
+          }
+        });
       } catch (error) {
         if (!(error instanceof SimpleLoginAliasError) || error.code !== "not-found") {
           throw error;
@@ -570,9 +572,13 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
             name: intent.name,
           }
         : { note: intent.note };
-    return this.parseAlias(
-      await this.request("POST", `${path}${params.size ? `?${params}` : ""}`, body, true),
+    const value = await this.request(
+      "POST",
+      `${path}${params.size ? `?${params}` : ""}`,
+      body,
+      true,
     );
+    return this.mutationResult(() => this.parseAlias(value));
   }
 
   private parseAlias(value: unknown): SimpleLoginAlias {
@@ -736,7 +742,7 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
           undefined,
           true,
         );
-        current = await this.findContact(alias, contactId);
+        current = await this.mutationResult(() => this.findContact(alias, contactId));
       }
       if (current.blocked !== blocked) {
         throw new SimpleLoginAliasError("SimpleLogin contact state did not converge", "conflict");
@@ -796,6 +802,23 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
     }
   }
 
+  /** Validate/read back a dispatched mutation without treating an unreadable result as rejection. */
+  private async mutationResult<Value>(operation: () => Value | Promise<Value>): Promise<Value> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error instanceof SimpleLoginAliasError && error.code === "invalid-response") {
+        throw new SimpleLoginAliasError(
+          "SimpleLogin mutation outcome is unknown",
+          "remote-error",
+          error.status,
+          error.retryAfterSeconds,
+        );
+      }
+      throw error;
+    }
+  }
+
   private async request(
     method: string,
     relative: string,
@@ -825,6 +848,12 @@ export class SimpleLoginAliasAdapter implements AliasProviderAdapter {
         "remote-error",
       );
     }
+    return mutation
+      ? this.mutationResult(() => this.readResponse(response, mutation))
+      : this.readResponse(response, mutation);
+  }
+
+  private async readResponse(response: Response, mutation: boolean): Promise<unknown> {
     if (
       !response ||
       typeof response.status !== "number" ||

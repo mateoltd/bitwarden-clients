@@ -138,9 +138,16 @@ describe("SimpleLogin provider operation journal", () => {
     },
   );
 
-  it.each(["create", "toggle", "delete"] as const)(
-    "rejects contact %s from a stale client after connection removal",
-    async (operation) => {
+  it.each([
+    ["create", false],
+    ["toggle", false],
+    ["delete", false],
+    ["create", true],
+    ["toggle", true],
+    ["delete", true],
+  ] as const)(
+    "rejects contact %s after shared-store removal (reconstructed: %s)",
+    async (operation, reconstructed) => {
       let requests = 0;
       const server = createServer((_request, response) => {
         requests++;
@@ -178,7 +185,7 @@ describe("SimpleLogin provider operation journal", () => {
         },
       };
       try {
-        const service = createSimpleLoginAliasService({
+        const settings = {
           token: "encrypted-provider-token",
           baseUrl: `http://127.0.0.1:${address.port}`,
           connectionId,
@@ -188,14 +195,17 @@ describe("SimpleLogin provider operation journal", () => {
               persisted = document;
             },
           },
-        });
+        };
+        const service = createSimpleLoginAliasService(settings);
         await service.removeConnection();
+        // Reconstruction reads the same durable tombstone as the retained client.
+        const stale = reconstructed ? createSimpleLoginAliasService(settings) : service;
         const result =
           operation === "create"
-            ? service.createReverseAlias(41, contact.address)
+            ? stale.createReverseAlias(41, contact.address)
             : operation === "toggle"
-              ? service.toggleContactBlocked(contact)
-              : service.deleteContact(contact);
+              ? stale.toggleContactBlocked(contact)
+              : stale.deleteContact(contact);
         await expect(result).rejects.toMatchObject({ code: "conflict" });
         expect(requests).toBe(0);
       } finally {
@@ -205,6 +215,55 @@ describe("SimpleLogin provider operation journal", () => {
       }
     },
   );
+
+  it.each([
+    [401, "invalid-credentials"],
+    [403, "forbidden"],
+    [429, "rate-limited"],
+  ])("keeps explicit HTTP %s create rejection definitive", async (status, code) => {
+    let requests = 0;
+    const server = createServer((_request, response) => {
+      requests++;
+      response.writeHead(requests === 1 ? Number(status) : 200, {
+        "Content-Type": "application/json",
+        "Retry-After": "7",
+      });
+      response.end(JSON.stringify(requests === 1 ? { error: "rejected" } : aliasResponse));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("test server did not bind a port");
+    }
+    let persisted = createAliasSyncDocument();
+    const settings = {
+      token: "encrypted-provider-token",
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      connectionId,
+      syncStore: {
+        load: async () => persisted,
+        save: async (document: AliasSyncDocument) => {
+          persisted = document;
+        },
+      },
+    };
+    try {
+      await expect(createSimpleLoginAliasService(settings).create()).rejects.toMatchObject({
+        code,
+        status,
+        ...(status === 429 ? { retryAfterSeconds: 7 } : {}),
+      });
+      expect(Object.values(projectAliasSync(persisted).operations)[0].status).toBe("failed");
+      await expect(createSimpleLoginAliasService(settings).create()).resolves.toMatchObject({
+        id: 41,
+      });
+      expect(requests).toBe(2);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  });
 
   it("rejects non-v1 journals before any provider mutation", async () => {
     let requests = 0;
@@ -244,66 +303,71 @@ describe("SimpleLogin provider operation journal", () => {
     }
   });
 
-  it.each(["connection lost", "invalid JSON", "invalid snapshot", "oversized response"])(
-    "does not retry a create after %s leaves its outcome unknown",
-    async (failure) => {
-      let requests = 0;
-      const server = createServer((request, response) => {
-        requests += 1;
-        if (failure === "connection lost") {
-          request.socket.destroy();
-        } else {
-          response.writeHead(200, { "Content-Type": "application/json" });
-          response.end(
-            failure === "invalid JSON"
-              ? "{"
-              : JSON.stringify(
-                  failure === "oversized response" ? { padding: "x".repeat(600_000) } : {},
-                ),
-          );
-        }
-      });
-      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        throw new Error("test server did not bind to a TCP port");
-      }
-      const baseUrl = `http://127.0.0.1:${address.port}`;
-      let persisted: AliasSyncDocument = createAliasSyncDocument(
-        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      );
-      const syncStore = {
-        load: async () => persisted,
-        save: async (document: AliasSyncDocument) => {
-          persisted = document;
-        },
-      };
-
-      try {
-        const firstProcess = createSimpleLoginAliasService({
-          token: "encrypted-provider-token",
-          baseUrl,
-          connectionId,
-          syncStore,
+  it.each([
+    "connection lost",
+    "invalid JSON",
+    "invalid snapshot",
+    "invalid content type",
+    "oversized response",
+  ])("does not retry a create after %s leaves its outcome unknown", async (failure) => {
+    let requests = 0;
+    const server = createServer((request, response) => {
+      requests += 1;
+      if (failure === "connection lost") {
+        request.socket.destroy();
+      } else {
+        response.writeHead(200, {
+          "Content-Type": failure === "invalid content type" ? "text/html" : "application/json",
         });
-        await expect(firstProcess.create()).rejects.toMatchObject({ code: "remote-error" });
-        expect(requests).toBe(1);
-        expect(Object.values(projectAliasSync(persisted).operations)[0].status).toBe("unknown");
-        expect(JSON.stringify(persisted)).not.toContain("encrypted-provider-token");
-
-        const restartedProcess = createSimpleLoginAliasService({
-          token: "encrypted-provider-token",
-          baseUrl,
-          connectionId,
-          syncStore,
-        });
-        await expect(restartedProcess.create()).rejects.toMatchObject({ code: "conflict" });
-        expect(requests).toBe(1);
-      } finally {
-        await new Promise<void>((resolve, reject) =>
-          server.close((error) => (error ? reject(error) : resolve())),
+        response.end(
+          failure === "invalid JSON"
+            ? "{"
+            : JSON.stringify(
+                failure === "oversized response" ? { padding: "x".repeat(600_000) } : {},
+              ),
         );
       }
-    },
-  );
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("test server did not bind to a TCP port");
+    }
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    let persisted: AliasSyncDocument = createAliasSyncDocument(
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+    const syncStore = {
+      load: async () => persisted,
+      save: async (document: AliasSyncDocument) => {
+        persisted = document;
+      },
+    };
+
+    try {
+      const firstProcess = createSimpleLoginAliasService({
+        token: "encrypted-provider-token",
+        baseUrl,
+        connectionId,
+        syncStore,
+      });
+      await expect(firstProcess.create()).rejects.toMatchObject({ code: "remote-error" });
+      expect(requests).toBe(1);
+      expect(Object.values(projectAliasSync(persisted).operations)[0].status).toBe("unknown");
+      expect(JSON.stringify(persisted)).not.toContain("encrypted-provider-token");
+
+      const restartedProcess = createSimpleLoginAliasService({
+        token: "encrypted-provider-token",
+        baseUrl,
+        connectionId,
+        syncStore,
+      });
+      await expect(restartedProcess.create()).rejects.toMatchObject({ code: "conflict" });
+      expect(requests).toBe(1);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  });
 });
