@@ -183,10 +183,7 @@ async function listAllAliases(
 ): Promise<Alias[]> {
   const aliases = new Map<string, Alias>();
   let page = 0;
-  const seenPages = new Set<number>();
-
-  while (!seenPages.has(page)) {
-    seenPages.add(page);
+  while (true) {
     const result = await listAliasPageWithRetry(aliasService, page, waitForRetry);
     for (const alias of result.aliases) {
       const id = alias.identity.aliasId;
@@ -452,6 +449,15 @@ export class AliasReconciliationService {
         beforePlan.actions.map((action) => [cipherIdString(action.cipher_id), action]),
       );
       const changedIds = new Set(output.result.changedCipherIds.map(cipherIdString));
+      const restoreOriginal = (cipherId: string): void => {
+        const original = originalById.get(cipherId);
+        const outputIndex = finalSdkCiphers.findIndex(
+          (cipher) => cipher.id !== undefined && cipherIdString(cipher.id) === cipherId,
+        );
+        if (original && outputIndex >= 0) {
+          finalSdkCiphers[outputIndex] = original;
+        }
+      };
 
       for (const cipherId of changedIds) {
         const sdkCipher = updatedById.get(cipherId);
@@ -473,11 +479,7 @@ export class AliasReconciliationService {
           (transaction) => transaction.cipherId === cipherId,
         );
         if (recoveryPending) {
-          const original = originalById.get(cipherId);
-          const outputIndex = finalSdkCiphers.findIndex((cipher) => cipher.id === sdkCipher?.id);
-          if (original && outputIndex >= 0) {
-            finalSdkCiphers[outputIndex] = original;
-          }
+          restoreOriginal(cipherId);
           if (change) {
             changes.push({ ...change, status: "pending", reason: "reference-recovery-pending" });
           }
@@ -498,11 +500,7 @@ export class AliasReconciliationService {
             );
           }
         } catch {
-          const original = originalById.get(cipherId);
-          const outputIndex = finalSdkCiphers.findIndex((cipher) => cipher.id === sdkCipher?.id);
-          if (original && outputIndex >= 0) {
-            finalSdkCiphers[outputIndex] = original;
-          }
+          restoreOriginal(cipherId);
           const matching = (
             (await this.referenceJournal.pendingReferenceTransactions()) ?? []
           ).filter(
@@ -544,11 +542,7 @@ export class AliasReconciliationService {
           const vaultOutcomePending =
             transactionId !== undefined &&
             pendingTransactions.some((transaction) => transaction.transactionId === transactionId);
-          const original = originalById.get(cipherId);
-          const outputIndex = finalSdkCiphers.findIndex((cipher) => cipher.id === sdkCipher?.id);
-          if (original && outputIndex >= 0) {
-            finalSdkCiphers[outputIndex] = original;
-          }
+          restoreOriginal(cipherId);
           if (change) {
             changes.push({
               ...change,
