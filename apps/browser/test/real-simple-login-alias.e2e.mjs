@@ -1022,6 +1022,21 @@ async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectio
       path: path.join(evidenceDirectory, "alias-web-synced-menu.png"),
       mask: [page.locator("input"), page.getByText(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)],
     });
+    // This context has no provider settings. The saved login must select and recover its exact
+    // encrypted connection before management can read or change the real provider alias.
+    await link.click();
+    await page.waitForURL(/#\/tools\/aliases\?/);
+    const detail = page.getByTestId("alias-detail");
+    await detail.getByRole("heading", { name: aliasAddress, exact: true }).waitFor();
+    await detail.getByRole("button", { name: "Disable", exact: true }).click();
+    await detail.getByRole("button", { name: "Enable", exact: true }).waitFor();
+    await detail.getByRole("button", { name: "Enable", exact: true }).click();
+    await detail.getByRole("button", { name: "Disable", exact: true }).waitFor();
+    await detail.screenshot({
+      path: path.join(evidenceDirectory, "alias-web-recovered-management.png"),
+      mask: [page.locator("input, textarea"), page.getByText(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)],
+    });
+    console.log("REAL_WEB_BOUND_CONNECTION_RECOVERY");
   } finally {
     await browser.close();
   }

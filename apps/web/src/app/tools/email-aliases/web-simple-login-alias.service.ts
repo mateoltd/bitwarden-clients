@@ -29,45 +29,60 @@ export class WebSimpleLoginAliasService {
     private readonly syncService?: SyncService,
   ) {}
 
-  async isConfigured(): Promise<boolean> {
+  async isConfigured(expectedConnectionId?: string): Promise<boolean> {
     try {
-      await this.service();
+      await this.service(expectedConnectionId);
       return true;
     } catch {
       return false;
     }
   }
 
-  async recommend(website: string): Promise<SimpleLoginAliasRecommendation> {
-    return (await this.service()).recommend(website);
+  async recommend(
+    website: string,
+    expectedConnectionId?: string,
+  ): Promise<SimpleLoginAliasRecommendation> {
+    return (await this.service(expectedConnectionId)).recommend(website);
   }
 
-  async create(request: CreateSimpleLoginAliasRequest): Promise<SimpleLoginAlias> {
-    return (await this.service()).create(request);
+  async create(
+    request: CreateSimpleLoginAliasRequest,
+    expectedConnectionId?: string,
+  ): Promise<SimpleLoginAlias> {
+    return (await this.service(expectedConnectionId)).create(request);
   }
 
   async list(
     page: number,
     query: string,
     filter: SimpleLoginAliasFilter,
+    expectedConnectionId?: string,
   ): Promise<SimpleLoginAliasPage> {
-    return (await this.service()).list(page, query || undefined, filter);
+    return (await this.service(expectedConnectionId)).list(page, query || undefined, filter);
   }
 
-  async get(id: number): Promise<SimpleLoginAlias> {
-    return (await this.service()).get(id);
+  async get(id: number, expectedConnectionId?: string): Promise<SimpleLoginAlias> {
+    return (await this.service(expectedConnectionId)).get(id);
   }
 
-  async update(id: number, update: UpdateSimpleLoginAliasRequest): Promise<SimpleLoginAlias> {
-    return (await this.service()).update(id, update);
+  async update(
+    id: number,
+    update: UpdateSimpleLoginAliasRequest,
+    expectedConnectionId?: string,
+  ): Promise<SimpleLoginAlias> {
+    return (await this.service(expectedConnectionId)).update(id, update);
   }
 
-  async setEnabled(id: number, enabled: boolean): Promise<SimpleLoginAlias> {
-    return (await this.service()).setEnabled(id, enabled);
+  async setEnabled(
+    id: number,
+    enabled: boolean,
+    expectedConnectionId?: string,
+  ): Promise<SimpleLoginAlias> {
+    return (await this.service(expectedConnectionId)).setEnabled(id, enabled);
   }
 
-  async delete(id: number): Promise<void> {
-    return (await this.service()).delete(id);
+  async delete(id: number, expectedConnectionId?: string): Promise<void> {
+    return (await this.service(expectedConnectionId)).delete(id);
   }
 
   async removeConnection(): Promise<void> {
@@ -82,27 +97,35 @@ export class WebSimpleLoginAliasService {
     return (await this.service()).resolveSynchronizationConflict(conflictId, chosenEventId);
   }
 
-  async domains(): Promise<SimpleLoginAliasDomain[]> {
-    return (await this.service()).domains();
+  async domains(expectedConnectionId?: string): Promise<SimpleLoginAliasDomain[]> {
+    return (await this.service(expectedConnectionId)).domains();
   }
 
-  async contacts(aliasId: number, page: number): Promise<SimpleLoginContactPage> {
-    return (await this.service()).contacts(aliasId, page);
+  async contacts(
+    aliasId: number,
+    page: number,
+    expectedConnectionId?: string,
+  ): Promise<SimpleLoginContactPage> {
+    return (await this.service(expectedConnectionId)).contacts(aliasId, page);
   }
 
-  async createReverseAlias(aliasId: number, contact: string): Promise<SimpleLoginContact> {
-    return (await this.service()).createReverseAlias(aliasId, contact);
+  async createReverseAlias(
+    aliasId: number,
+    contact: string,
+    expectedConnectionId?: string,
+  ): Promise<SimpleLoginContact> {
+    return (await this.service(expectedConnectionId)).createReverseAlias(aliasId, contact);
   }
 
   async toggleContactBlocked(contact: SimpleLoginContact): Promise<boolean> {
-    return (await this.service()).toggleContactBlocked(contact);
+    return (await this.service(contact.identity.alias.connectionId)).toggleContactBlocked(contact);
   }
 
   async deleteContact(contact: SimpleLoginContact): Promise<void> {
-    return (await this.service()).deleteContact(contact);
+    return (await this.service(contact.identity.alias.connectionId)).deleteContact(contact);
   }
 
-  private async service() {
+  private async service(expectedConnectionId?: string) {
     const account = await firstValueFrom(this.accountService.activeAccount$);
     if (!account) {
       throw new SimpleLoginAliasError("SimpleLogin credentials are missing", "invalid-credentials");
@@ -113,6 +136,7 @@ export class WebSimpleLoginAliasService {
         account,
         this.cipherService,
         this.syncService,
+        expectedConnectionId,
       ),
     );
   }

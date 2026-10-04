@@ -132,10 +132,14 @@ export class EmailAliasesComponent implements OnInit {
       return;
     }
     await this.run(async () => {
-      const updated = await this.aliasesService.update(alias.id, {
-        name: this.editForm.controls.name.value,
-        note: this.editForm.controls.note.value,
-      });
+      const updated = await this.aliasesService.update(
+        alias.id,
+        {
+          name: this.editForm.controls.name.value,
+          note: this.editForm.controls.note.value,
+        },
+        alias.identity.connectionId,
+      );
       this.selectedAlias.set(updated);
       this.patchEditForm(updated);
     });
@@ -147,7 +151,9 @@ export class EmailAliasesComponent implements OnInit {
       return;
     }
     await this.run(async () => {
-      this.selectedAlias.set(await this.aliasesService.setEnabled(alias.id, !alias.enabled));
+      this.selectedAlias.set(
+        await this.aliasesService.setEnabled(alias.id, !alias.enabled, alias.identity.connectionId),
+      );
     });
   }
 
@@ -166,7 +172,7 @@ export class EmailAliasesComponent implements OnInit {
       if (!confirmed) {
         return;
       }
-      await this.aliasesService.delete(alias.id);
+      await this.aliasesService.delete(alias.id, alias.identity.connectionId);
       await this.router.navigate(["/email-aliases"]);
     });
   }
@@ -178,7 +184,7 @@ export class EmailAliasesComponent implements OnInit {
       return;
     }
     await this.run(async () => {
-      await this.aliasesService.createReverseAlias(alias.id, contact);
+      await this.aliasesService.createReverseAlias(alias.id, contact, alias.identity.connectionId);
       this.reverseAliasForm.reset();
       await this.fetchContacts(alias, 0);
     });
@@ -243,13 +249,13 @@ export class EmailAliasesComponent implements OnInit {
 
   private async loadDetail(id: number, expectedConnectionId?: string | null) {
     await this.run(async () => {
-      const alias = await this.aliasesService.get(id);
+      const alias = await this.aliasesService.get(id, expectedConnectionId ?? undefined);
       if (expectedConnectionId != null && alias.identity.connectionId !== expectedConnectionId) {
         this.selectedAlias.set(undefined);
         this.contacts.set([]);
         throw new SimpleLoginAliasError("Alias connection does not match", "conflict");
       }
-      const contacts = await this.aliasesService.contacts(alias.id, 0);
+      const contacts = await this.aliasesService.contacts(alias.id, 0, alias.identity.connectionId);
       this.selectedAlias.set(alias);
       this.patchEditForm(alias);
       this.setContacts(contacts);
@@ -265,7 +271,9 @@ export class EmailAliasesComponent implements OnInit {
   }
 
   private async fetchContacts(alias: SimpleLoginAlias, page: number) {
-    this.setContacts(await this.aliasesService.contacts(alias.id, page));
+    this.setContacts(
+      await this.aliasesService.contacts(alias.id, page, alias.identity.connectionId),
+    );
   }
 
   private setContacts(result: { items: SimpleLoginContact[]; page: number; nextPage?: number }) {

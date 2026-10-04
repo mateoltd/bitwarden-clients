@@ -123,7 +123,7 @@ describe("EmailAliasesComponent", () => {
         expect(component.error).toBe("aliasUnknownError");
       } else {
         expect(component.selected).toEqual(alias());
-        expect(aliasesService.contacts).toHaveBeenCalledWith(7, 0);
+        expect(aliasesService.contacts).toHaveBeenCalledWith(7, 0, alias().identity.connectionId);
       }
     },
   );
@@ -135,7 +135,7 @@ describe("EmailAliasesComponent", () => {
     expect(component.aliases).toEqual([alias()]);
     expect(component.nextPage).toBe(1);
     expect(component.domains).toHaveLength(2);
-    expect(aliasesService.list).toHaveBeenCalledWith(0, "", "all");
+    expect(aliasesService.list).toHaveBeenCalledWith(0, "", "all", undefined);
   });
 
   it("recommends reuse and creates then opens a real lifecycle alias", async () => {
@@ -156,10 +156,13 @@ describe("EmailAliasesComponent", () => {
 
     await component.createAlias();
 
-    expect(aliasesService.create).toHaveBeenCalledWith({
-      kind: "random",
-      hostname: "https://example.com/register",
-    });
+    expect(aliasesService.create).toHaveBeenCalledWith(
+      {
+        kind: "random",
+        hostname: "https://example.com/register",
+      },
+      undefined,
+    );
     expect(component.selected?.id).toBe(8);
     expect(router.navigate).toHaveBeenCalledWith([], {
       relativeTo: expect.anything(),
@@ -183,19 +186,23 @@ describe("EmailAliasesComponent", () => {
     dialogService.openSimpleDialog.mockResolvedValue(true);
 
     await component.saveAlias();
-    expect(aliasesService.update).toHaveBeenCalledWith(7, {
-      name: "Alias",
-      note: "Created in web",
-      pinned: false,
-      pgpDisabled: false,
-      mailboxIds: [3],
-    });
+    expect(aliasesService.update).toHaveBeenCalledWith(
+      7,
+      {
+        name: "Alias",
+        note: "Created in web",
+        pinned: false,
+        pgpDisabled: false,
+        mailboxIds: [3],
+      },
+      alias().identity.connectionId,
+    );
 
     await component.setEnabled(false);
     expect(component.selected?.enabled).toBe(false);
 
     await component.deleteAlias();
-    expect(aliasesService.delete).toHaveBeenCalledWith(7);
+    expect(aliasesService.delete).toHaveBeenCalledWith(7, alias().identity.connectionId);
     expect(component.selected).toBeUndefined();
     expect(component.recommendation).toBeUndefined();
   });
@@ -208,7 +215,11 @@ describe("EmailAliasesComponent", () => {
     dialogService.openSimpleDialog.mockResolvedValue(true);
 
     await component.createReverseAlias();
-    expect(aliasesService.createReverseAlias).toHaveBeenCalledWith(7, "contact@example.com");
+    expect(aliasesService.createReverseAlias).toHaveBeenCalledWith(
+      7,
+      "contact@example.com",
+      alias().identity.connectionId,
+    );
     expect(component.contacts).toEqual([contact]);
 
     await component.toggleContact(contact);

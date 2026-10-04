@@ -96,4 +96,30 @@ describe("BrowserSimpleLoginAliasService", () => {
     await expect(service["lifecycle"]()).rejects.toMatchObject({ code: "invalid-response" });
     expect(settings$.value.connectionId).toBe("invalid");
   });
+
+  it.each(["delete", "setEnabled", "update"] as const)(
+    "rejects a delayed %s after the configured connection changes",
+    async (operation) => {
+      const selectedConnectionId = connectionId;
+      settings$.next({
+        token: "other-provider-token",
+        baseUrl: "https://other-provider.example/",
+        connectionId: "44444444-4444-4444-8444-444444444444",
+      });
+      const fetch = jest.spyOn(globalThis, "fetch");
+      try {
+        const result =
+          operation === "delete"
+            ? service.delete(42, selectedConnectionId)
+            : operation === "setEnabled"
+              ? service.setEnabled(42, false, selectedConnectionId)
+              : service.update(42, { note: "updated" }, selectedConnectionId);
+
+        await expect(result).rejects.toMatchObject({ code: "invalid-credentials" });
+        expect(fetch).not.toHaveBeenCalled();
+      } finally {
+        fetch.mockRestore();
+      }
+    },
+  );
 });

@@ -72,20 +72,28 @@ export class BrowserSimpleLoginAliasService {
     return (await this.lifecycle()).list(page, query, aliasFilter);
   }
 
-  async get(id: number): Promise<SimpleLoginAlias> {
-    return (await this.lifecycle()).get(id);
+  async get(id: number, expectedConnectionId?: string): Promise<SimpleLoginAlias> {
+    return (await this.lifecycle(expectedConnectionId)).get(id);
   }
 
-  async update(id: number, update: UpdateSimpleLoginAliasRequest): Promise<SimpleLoginAlias> {
-    return (await this.lifecycle()).update(id, update);
+  async update(
+    id: number,
+    update: UpdateSimpleLoginAliasRequest,
+    expectedConnectionId?: string,
+  ): Promise<SimpleLoginAlias> {
+    return (await this.lifecycle(expectedConnectionId)).update(id, update);
   }
 
-  async setEnabled(id: number, enabled: boolean): Promise<SimpleLoginAlias> {
-    return (await this.lifecycle()).setEnabled(id, enabled);
+  async setEnabled(
+    id: number,
+    enabled: boolean,
+    expectedConnectionId?: string,
+  ): Promise<SimpleLoginAlias> {
+    return (await this.lifecycle(expectedConnectionId)).setEnabled(id, enabled);
   }
 
-  async delete(id: number): Promise<void> {
-    await (await this.lifecycle()).delete(id);
+  async delete(id: number, expectedConnectionId?: string): Promise<void> {
+    await (await this.lifecycle(expectedConnectionId)).delete(id);
   }
 
   async removeConnection(): Promise<void> {
@@ -104,23 +112,29 @@ export class BrowserSimpleLoginAliasService {
     return (await this.lifecycle()).domains();
   }
 
-  async contacts(aliasId: number, page = 0): Promise<SimpleLoginContactPage> {
-    return (await this.lifecycle()).contacts(aliasId, page);
+  async contacts(
+    aliasId: number,
+    page = 0,
+    expectedConnectionId?: string,
+  ): Promise<SimpleLoginContactPage> {
+    return (await this.lifecycle(expectedConnectionId)).contacts(aliasId, page);
   }
 
-  async createReverseAlias(aliasId: number, contact: string) {
-    return (await this.lifecycle()).createReverseAlias(aliasId, contact);
+  async createReverseAlias(aliasId: number, contact: string, expectedConnectionId?: string) {
+    return (await this.lifecycle(expectedConnectionId)).createReverseAlias(aliasId, contact);
   }
 
   async toggleContactBlocked(contact: SimpleLoginContact): Promise<boolean> {
-    return (await this.lifecycle()).toggleContactBlocked(contact);
+    return (await this.lifecycle(contact.identity.alias.connectionId)).toggleContactBlocked(
+      contact,
+    );
   }
 
   async deleteContact(contact: SimpleLoginContact): Promise<void> {
-    await (await this.lifecycle()).deleteContact(contact);
+    await (await this.lifecycle(contact.identity.alias.connectionId)).deleteContact(contact);
   }
 
-  private async lifecycle(): Promise<SimpleLoginAliasService> {
+  private async lifecycle(expectedConnectionId?: string): Promise<SimpleLoginAliasService> {
     const account = await firstValueFrom(this.accountService.activeAccount$);
     if (!account) {
       throw new SimpleLoginAliasError("SimpleLogin credentials are missing", "invalid-credentials");
@@ -131,6 +145,7 @@ export class BrowserSimpleLoginAliasService {
         account,
         this.cipherService,
         this.syncService,
+        expectedConnectionId,
       ),
     );
   }

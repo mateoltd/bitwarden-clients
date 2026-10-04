@@ -95,12 +95,20 @@ describe("EmailAliasesComponent", () => {
     component["reverseAliasForm"].setValue({ contact: "contact@example.com" });
     await component["createReverseAlias"]();
 
-    expect(aliasesService.update).toHaveBeenCalledWith(42, {
-      name: "Registration",
-      note: "updated",
-    });
-    expect(aliasesService.setEnabled).toHaveBeenCalledWith(42, false);
-    expect(aliasesService.createReverseAlias).toHaveBeenCalledWith(42, "contact@example.com");
+    expect(aliasesService.update).toHaveBeenCalledWith(
+      42,
+      {
+        name: "Registration",
+        note: "updated",
+      },
+      alias.identity.connectionId,
+    );
+    expect(aliasesService.setEnabled).toHaveBeenCalledWith(42, false, alias.identity.connectionId);
+    expect(aliasesService.createReverseAlias).toHaveBeenCalledWith(
+      42,
+      "contact@example.com",
+      alias.identity.connectionId,
+    );
   });
 
   it("requires confirmation before deleting a reverse alias", async () => {

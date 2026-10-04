@@ -52,9 +52,17 @@ export class EmailAliasesComponent implements OnInit {
     private readonly router: Router,
   ) {}
 
+  private get connectionId(): string | undefined {
+    return (
+      this.selected?.identity.connectionId ??
+      this.route.snapshot.queryParamMap.get("connectionId") ??
+      undefined
+    );
+  }
+
   async ngOnInit(): Promise<void> {
     await this.run(async () => {
-      this.configured = await this.aliasesService.isConfigured();
+      this.configured = await this.aliasesService.isConfigured(this.connectionId);
       if (!this.configured) {
         return;
       }
@@ -93,7 +101,7 @@ export class EmailAliasesComponent implements OnInit {
   async recommend(): Promise<void> {
     this.recommendation = undefined;
     await this.run(async () => {
-      this.recommendation = await this.aliasesService.recommend(this.website);
+      this.recommendation = await this.aliasesService.recommend(this.website, this.connectionId);
     });
   }
 
@@ -101,13 +109,16 @@ export class EmailAliasesComponent implements OnInit {
     this.saving = true;
     try {
       await this.run(async () => {
-        const alias = await this.aliasesService.create({
-          kind: "random",
-          hostname: this.website || undefined,
-        });
+        const alias = await this.aliasesService.create(
+          {
+            kind: "random",
+            hostname: this.website || undefined,
+          },
+          this.connectionId,
+        );
         this.recommendation = undefined;
         await this.loadAliases(0);
-        await this.selectAlias(alias.id);
+        await this.selectAlias(alias.id, alias.identity.connectionId);
       });
     } finally {
       this.saving = false;
@@ -116,11 +127,16 @@ export class EmailAliasesComponent implements OnInit {
 
   async openAlias(aliasOrId: SimpleLoginAlias | number): Promise<void> {
     const id = typeof aliasOrId === "number" ? aliasOrId : aliasOrId.id;
-    await this.run(() => this.selectAlias(id));
+    await this.run(() =>
+      this.selectAlias(
+        id,
+        typeof aliasOrId === "number" ? this.connectionId : aliasOrId.identity.connectionId,
+      ),
+    );
   }
 
   private async selectAlias(id: number, expectedConnectionId?: string | null): Promise<void> {
-    const alias = await this.aliasesService.get(id);
+    const alias = await this.aliasesService.get(id, expectedConnectionId ?? undefined);
     if (expectedConnectionId != null && alias.identity.connectionId !== expectedConnectionId) {
       this.selected = undefined;
       this.contacts = [];
@@ -149,20 +165,25 @@ export class EmailAliasesComponent implements OnInit {
   }
 
   async saveAlias(): Promise<void> {
-    if (!this.selected) {
+    const alias = this.selected;
+    if (!alias) {
       return;
     }
 
     this.saving = true;
     try {
       await this.run(async () => {
-        this.selected = await this.aliasesService.update(this.selected!.id, {
-          name: this.selected!.name,
-          note: this.selected!.note,
-          pinned: this.selected!.pinned,
-          pgpDisabled: this.selected!.pgpDisabled,
-          mailboxIds: this.selected!.mailboxes.map((mailbox) => mailbox.id),
-        });
+        this.selected = await this.aliasesService.update(
+          alias.id,
+          {
+            name: alias.name,
+            note: alias.note,
+            pinned: alias.pinned,
+            pgpDisabled: alias.pgpDisabled,
+            mailboxIds: alias.mailboxes.map((mailbox) => mailbox.id),
+          },
+          alias.identity.connectionId,
+        );
         await this.loadAliases(this.page);
       });
     } finally {
@@ -171,18 +192,24 @@ export class EmailAliasesComponent implements OnInit {
   }
 
   async setEnabled(enabled: boolean): Promise<void> {
-    if (!this.selected) {
+    const alias = this.selected;
+    if (!alias) {
       return;
     }
 
     await this.run(async () => {
-      this.selected = await this.aliasesService.setEnabled(this.selected!.id, enabled);
+      this.selected = await this.aliasesService.setEnabled(
+        alias.id,
+        enabled,
+        alias.identity.connectionId,
+      );
       this.replaceListedAlias(this.selected);
     });
   }
 
   async deleteAlias(): Promise<void> {
-    if (!this.selected) {
+    const alias = this.selected;
+    if (!alias) {
       return;
     }
 
@@ -196,8 +223,8 @@ export class EmailAliasesComponent implements OnInit {
       if (!confirmed) {
         return;
       }
-      const deletedAliasId = this.selected!.id;
-      await this.aliasesService.delete(deletedAliasId);
+      const deletedAliasId = alias.id;
+      await this.aliasesService.delete(deletedAliasId, alias.identity.connectionId);
       if (this.recommendation?.alias?.id === deletedAliasId) {
         this.recommendation = undefined;
       }
@@ -208,12 +235,13 @@ export class EmailAliasesComponent implements OnInit {
 
   async createReverseAlias(): Promise<void> {
     const contact = this.reverseAliasContact.trim();
-    if (!this.selected || !contact) {
+    const alias = this.selected;
+    if (!alias || !contact) {
       return;
     }
 
     await this.run(async () => {
-      await this.aliasesService.createReverseAlias(this.selected!.id, contact);
+      await this.aliasesService.createReverseAlias(alias.id, contact, alias.identity.connectionId);
       this.reverseAliasContact = "";
       await this.loadContacts(0);
     });
@@ -254,21 +282,27 @@ export class EmailAliasesComponent implements OnInit {
   }
 
   private async loadAliases(page: number): Promise<void> {
-    const result = await this.aliasesService.list(page, this.query.trim(), this.filter);
+    const result = await this.aliasesService.list(
+      page,
+      this.query.trim(),
+      this.filter,
+      this.connectionId,
+    );
     this.aliases = result.items;
     this.page = result.page;
     this.nextPage = result.nextPage;
   }
 
   private async loadDomains(): Promise<void> {
-    this.domains = await this.aliasesService.domains();
+    this.domains = await this.aliasesService.domains(this.connectionId);
   }
 
   private async loadContacts(page: number): Promise<void> {
-    if (!this.selected) {
+    const alias = this.selected;
+    if (!alias) {
       return;
     }
-    const result = await this.aliasesService.contacts(this.selected.id, page);
+    const result = await this.aliasesService.contacts(alias.id, page, alias.identity.connectionId);
     this.contacts = result.items;
     this.contactPage = result.page;
     this.nextContactPage = result.nextPage;
