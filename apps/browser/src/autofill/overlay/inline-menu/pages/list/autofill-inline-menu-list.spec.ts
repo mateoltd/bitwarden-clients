@@ -1809,6 +1809,31 @@ describe("AutofillInlineMenuList", () => {
       );
     });
 
+    it("keeps the active button and its private channel when a recommendation refreshes", async () => {
+      const privatePostMessage = jest.spyOn(userActionChannel.port1, "postMessage");
+      const container = autofillInlineMenuList["inlineMenuListContainer"];
+      const action = container.querySelector("[data-email-alias-action]");
+      action.dispatchEvent(new MouseEvent("mousedown"));
+
+      postWindowMessage({
+        command: "updateAutofillInlineMenuEmailAliasRecommendation",
+        token: "test-token",
+        emailAliasRecommendation: {
+          hostname: "registration.example",
+          canCreate: true,
+          address: "reusable@aliases.example",
+        },
+      });
+      await flushPromises();
+
+      expect(container.querySelector("[data-email-alias-action]")).toBe(action);
+      expect(action.textContent).toContain("reusable@aliases.example");
+      action.dispatchEvent(new MouseEvent("mouseup"));
+      action.dispatchEvent(new MouseEvent("click"));
+      expect(privatePostMessage).toHaveBeenCalledTimes(1);
+      expect(privatePostMessage).toHaveBeenCalledWith({ command: "fillEmailAlias" });
+    });
+
     it("rejects synthetic alias activation", () => {
       jest.spyOn(EventSecurity, "isEventTrusted").mockReturnValue(false);
       const privatePostMessage = jest.spyOn(userActionChannel.port1, "postMessage");

@@ -38,17 +38,29 @@ const evidenceDirectory = process.env.ALIAS_E2E_EVIDENCE_DIRECTORY
   ? path.resolve(process.env.ALIAS_E2E_EVIDENCE_DIRECTORY)
   : fs.mkdtempSync(path.join(os.tmpdir(), "bitwarden-alias-evidence-"));
 fs.mkdirSync(evidenceDirectory, { recursive: true, mode: 0o700 });
-async function captureEvidence(page, name) {
+async function captureEvidence(page, name, region) {
   // Credentials must not enter screenshots, including when a password is revealed.
   const options = {
     path: path.join(evidenceDirectory, name),
-    mask: [page.locator("input"), page.getByText(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)],
+    mask: [page.locator("input, textarea"), page.getByText(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)],
   };
-  if (name === "alias-bound-menu.png") {
-    await page.getByRole("menu").screenshot(options);
-  } else {
-    await page.screenshot(options);
+  const target = region ?? (name === "alias-bound-menu.png" ? page.getByRole("menu") : undefined);
+  if (target) {
+    const box = await target.boundingBox();
+    const viewport = page.viewportSize();
+    assert.ok(box && viewport, "the evidence region must be visible in the current viewport");
+    const x = Math.max(0, box.x);
+    const y = Math.max(0, box.y);
+    options.clip = {
+      x,
+      y,
+      width: Math.min(box.x + box.width, viewport.width) - x,
+      height: Math.min(box.y + box.height, viewport.height) - y,
+    };
+    assert.ok(options.clip.width > 0 && options.clip.height > 0);
   }
+  // A locator screenshot can scroll/resize the popup and dismiss its open menu.
+  await page.screenshot(options);
 }
 const servers = [];
 let context;
@@ -276,8 +288,28 @@ try {
     );
     try {
       assert.ok(reuseAction.asElement(), "The real reuse action must be an element");
-      // ElementHandle keeps Playwright's visibility/stability checks inside the closed shadow root.
-      await reuseAction.asElement().click();
+      // Hold a real pointer activation across a provider-backed recommendation refresh.
+      await reuseAction.asElement().hover();
+      await reuseAction.asElement().evaluate((button) => {
+        self.aliasRefreshObserved = false;
+        const observer = new MutationObserver(() => {
+          self.aliasRefreshObserved = true;
+          observer.disconnect();
+        });
+        observer.observe(button.parentElement, {
+          subtree: true,
+          childList: true,
+          attributes: true,
+        });
+      });
+      await reuse.mouse.down();
+      await worker.evaluate(async () => {
+        const overlay = self.bitwardenMain.overlayBackground;
+        await overlay.refreshEmailAliasRecommendation(overlay.inlineMenuListPort);
+      });
+      await reuseFrame.waitForFunction(() => self.aliasRefreshObserved);
+      assert.equal(await reuseAction.asElement().evaluate((button) => button.isConnected), true);
+      await reuse.mouse.up();
     } finally {
       await reuseAction.dispose();
     }
@@ -301,6 +333,7 @@ try {
   }
   assert.equal(await reuse.locator("#email").inputValue(), aliasAddress);
   assert.equal(simpleLoginCreateRequests, 1, "hostname reuse must not create a second alias");
+  console.log("REAL_ALIAS_REUSED_DURING_REFRESH");
 
   const marker = `Alias browser e2e ${Date.now()}`;
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html#/tabs/generator`);
@@ -416,6 +449,7 @@ try {
   await popup.getByText(marker, { exact: true }).waitFor({ timeout: 20_000 });
   const vaultItem = popup.getByText(marker, { exact: true }).locator("xpath=ancestor::bit-item");
   await vaultItem.getByRole("button", { name: "More options" }).click();
+  await popup.getByRole("menuitem", { name: "Manage bound alias", exact: true }).waitFor();
   await captureEvidence(popup, "alias-bound-menu.png");
   await popup.getByRole("menuitem", { name: "Manage bound alias", exact: true }).click();
   const boundConnectionId = await waitForBoundAliasRoute(popup, alias.id);
@@ -1018,10 +1052,7 @@ async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectio
     assert.equal(route.pathname, "/tools/aliases");
     assert.equal(route.searchParams.get("aliasId"), String(aliasId));
     assert.equal(route.searchParams.get("connectionId"), connectionId);
-    await page.getByRole("menu").screenshot({
-      path: path.join(evidenceDirectory, "alias-web-synced-menu.png"),
-      mask: [page.locator("input"), page.getByText(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)],
-    });
+    await captureEvidence(page, "alias-web-synced-menu.png", page.getByRole("menu"));
     // This context has no provider settings. The saved login must select and recover its exact
     // encrypted connection before management can read or change the real provider alias.
     await link.click();
@@ -1032,10 +1063,7 @@ async function assertIndependentWebSync(marker, aliasAddress, aliasId, connectio
     await detail.getByRole("button", { name: "Enable", exact: true }).waitFor();
     await detail.getByRole("button", { name: "Enable", exact: true }).click();
     await detail.getByRole("button", { name: "Disable", exact: true }).waitFor();
-    await detail.screenshot({
-      path: path.join(evidenceDirectory, "alias-web-recovered-management.png"),
-      mask: [page.locator("input, textarea"), page.getByText(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)],
-    });
+    await captureEvidence(page, "alias-web-recovered-management.png", detail);
     console.log("REAL_WEB_BOUND_CONNECTION_RECOVERY");
   } finally {
     await browser.close();

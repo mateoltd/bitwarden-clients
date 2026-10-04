@@ -196,15 +196,17 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
       return;
     }
 
-    this.inlineMenuListContainer
-      .querySelector("[data-email-alias-action]")
-      ?.parentElement?.remove();
+    const existingButton = this.inlineMenuListContainer.querySelector<HTMLButtonElement>(
+      "[data-email-alias-action]",
+    );
     const recommendation = this.emailAliasRecommendation;
     if (!recommendation || (!recommendation.canCreate && !recommendation.address)) {
+      existingButton?.parentElement?.remove();
       return;
     }
 
-    const button = globalThis.document.createElement("button");
+    // A refresh can arrive between pointer-down and pointer-up. Preserve the activation target.
+    const button = existingButton ?? globalThis.document.createElement("button");
     button.type = "button";
     button.tabIndex = -1;
     button.dataset.emailAliasAction = "true";
@@ -223,6 +225,9 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
         : this.getTranslation("createEmailAlias"),
     );
     button.prepend(buildSvgDomElement(plusIcon));
+    if (existingButton) {
+      return;
+    }
     button.addEventListener(EVENTS.CLICK, this.handleEmailAliasAction);
     const container = this.buildButtonContainer(button);
     const newItemContainer =
