@@ -223,6 +223,8 @@ export class SimpleLoginAliasService {
   }
 
   async createReverseAlias(aliasId: number, contact: string): Promise<SimpleLoginContact> {
+    await this.recoverProviderOperations();
+    await this.assertMutationAllowed();
     const alias = await this.identityForId(aliasId);
     const identity = await this.withClient((client) =>
       client.create_send_reply_identity({ alias, recipient: sensitive(contact) }),
@@ -231,6 +233,8 @@ export class SimpleLoginAliasService {
   }
 
   async toggleContactBlocked(contact: SimpleLoginContact): Promise<boolean> {
+    await this.recoverProviderOperations();
+    await this.assertMutationAllowed();
     const current = this.contactIdentity(contact);
     const updated = await this.withClient((client) =>
       client.set_send_reply_blocked(current, !current.blocked),
@@ -242,6 +246,8 @@ export class SimpleLoginAliasService {
   }
 
   async deleteContact(contact: SimpleLoginContact): Promise<void> {
+    await this.recoverProviderOperations();
+    await this.assertMutationAllowed();
     const identity = this.contactIdentity(contact);
     await this.withClient((client) => client.remove_send_reply_identity(identity));
   }

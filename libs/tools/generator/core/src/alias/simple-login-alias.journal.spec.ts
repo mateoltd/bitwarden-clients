@@ -2,6 +2,7 @@
 
 import { createServer } from "http";
 
+import { SensitiveString } from "@bitwarden/alias-sdk-internal";
 import {
   AliasSyncDocument,
   appendAliasSyncEvent,
@@ -12,6 +13,7 @@ import {
 } from "@bitwarden/common/tools/alias";
 
 import { createSimpleLoginAliasService } from "./simple-login-alias.service";
+import { SimpleLoginContact } from "./simple-login-alias.types";
 
 const connectionId = "11111111-1111-4111-8111-111111111111";
 
@@ -128,6 +130,74 @@ describe("SimpleLogin provider operation journal", () => {
         await expect(service.create()).resolves.toMatchObject({ id: 41 });
         expect(requests).toBe(1);
         expect(projectAliasSync(persisted).operations[foreignOperationId].status).toBe("prepared");
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          server.close((error) => (error ? reject(error) : resolve())),
+        );
+      }
+    },
+  );
+
+  it.each(["create", "toggle", "delete"] as const)(
+    "rejects contact %s from a stale client after connection removal",
+    async (operation) => {
+      let requests = 0;
+      const server = createServer((_request, response) => {
+        requests++;
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(aliasResponse));
+      });
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        throw new Error("test server did not bind to a TCP port");
+      }
+      let persisted = createAliasSyncDocument();
+      const alias = parseEmailAliasIdentity({
+        version: 1,
+        connectionId,
+        aliasId: "41",
+        address: "settled@aliases.example.com",
+      })!;
+      const contact: SimpleLoginContact = {
+        id: 99,
+        address: "contact@example.com",
+        reverseAlias: "reverse-token",
+        reverseAliasAddress: "reply@aliases.example.com",
+        createdAt: 1_700_000_000,
+        lastEmailSentAt: null,
+        blocked: false,
+        existed: false,
+        identity: {
+          alias,
+          identityId: "99",
+          recipient: "contact@example.com" as SensitiveString,
+          address: "reply@aliases.example.com" as SensitiveString,
+          valid: true,
+          blocked: false,
+        },
+      };
+      try {
+        const service = createSimpleLoginAliasService({
+          token: "encrypted-provider-token",
+          baseUrl: `http://127.0.0.1:${address.port}`,
+          connectionId,
+          syncStore: {
+            load: async () => persisted,
+            save: async (document: AliasSyncDocument) => {
+              persisted = document;
+            },
+          },
+        });
+        await service.removeConnection();
+        const result =
+          operation === "create"
+            ? service.createReverseAlias(41, contact.address)
+            : operation === "toggle"
+              ? service.toggleContactBlocked(contact)
+              : service.deleteContact(contact);
+        await expect(result).rejects.toMatchObject({ code: "conflict" });
+        expect(requests).toBe(0);
       } finally {
         await new Promise<void>((resolve, reject) =>
           server.close((error) => (error ? reject(error) : resolve())),
